@@ -87,7 +87,7 @@ Yalnızca `DECISIONS.md`'ye girecek kararlar: case'te doğrudan geçenler, mimar
 - **Faz sonu:** `/finish-phase` → `make test` + `make lint`, `review-pr`, `/code-review` (genelde `medium`; Faz 5 ve 8 için `high`), en fazla 2 tur, reddedilen bulgu listesi → dosya bazlı faz özeti → onayla push (`ask`) ve PR. Merge sende.
 - **Kararlar:** Bölüm 2'deki her karar, "Görevler" sütunundaki ilk görevin commit'inde `DECISIONS.md`'ye girer. Uygulama sırasında çıkan yeni bir önemli karar önce Bölüm 2'ye eklenir, sonra aynı şekilde yazılır.
 - **Session export:** Her oturum sonunda `/export` → `ai-sessions/phase-<N>_<konu>.md` (ör. `phase-1_setup.md`; aynı fazda ikinci oturum `phase-1_setup-2.md`); commit'ten önce `node scripts/scrub-sessions.mjs --check`.
-- **PR dili:** PR başlığı ve açıklaması İngilizce. Planın, README'nin ve dosya bazlı özetlerin dili Türkçe kalır.
+- **Dil:** Projenin tüm dosyaları ve içerikleri İngilizce yazılır: kod, yorumlar, config dosyaları (`.gitignore` yorumları dahil), `README.md`, `DECISIONS.md`, `CLAUDE.md`, rules/skills/agents, hook ve script mesajları, commit mesajları, PR başlığı ve açıklaması. Türkçe kalanlar: bu plan (`docs/plan.md`, çalışma belgesi), Claude'un sohbetteki raporları ve dosya bazlı özetler. Ürün içeriği (LLM'in ürettiği kampanya metni) ürün gereği Türkçe kalır (5.9, 11.1).
 - **Takvim (çekirdek akış 5 günde):**
 
   | Gün | Fazlar                                   | Gün sonu ölçütü                                                                 |

@@ -1,0 +1,2 @@
+# Keep LF everywhere so CRLF checkouts on Windows don't break shell scripts in containers
+* text=auto eol=lf
