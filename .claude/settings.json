@@ -112,6 +112,7 @@
       }
     ]
   },
+  "enabledMcpjsonServers": ["context7"],
   "enabledPlugins": {
     "security-guidance@claude-plugins-official": true
   }
