@@ -6,19 +6,16 @@
 // operations. It fails closed: a command it cannot parse safely is blocked.
 // Exit code 2 makes Claude Code reject the call and show stderr to the model.
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { API_KEY_PATTERN, writeHookLog } from './hook-log.mjs';
 
 const EXIT_BLOCK = 2;
 const MAX_SHELL_DEPTH = 3; // bash -c "bash -c '...'" nesting we are willing to unwrap
-const LOG_COMMAND_LIMIT = 200;
 const GIT_TIMEOUT_MS = 5_000;
 const MAX_DIFF_BYTES = 64 * 1024 * 1024;
 
 const PROTECTED_BRANCHES = new Set(['main', 'master']);
-const API_KEY_PATTERN = /sk-ant-[A-Za-z0-9_-]{20,}/;
-const API_KEY_PATTERN_GLOBAL = /sk-ant-[A-Za-z0-9_-]{20,}/g;
 const API_KEY_VARIABLE = /(?:\$\{?|\$env:|%)ANTHROPIC_API_KEY/i;
 
 // Shell features whose result we cannot predict statically.
@@ -421,22 +418,6 @@ function makeContext(cwd) {
   };
 }
 
-function logBlock(projectDir, tool, verdict, command) {
-  try {
-    const logDir = join(projectDir, '.claude', 'logs');
-    mkdirSync(logDir, { recursive: true });
-    const shown = String(command ?? '')
-      .replace(API_KEY_PATTERN_GLOBAL, 'sk-ant-***')
-      .replace(/\s+/g, ' ')
-      .slice(0, LOG_COMMAND_LIMIT);
-    const line = `${new Date().toISOString()}\tguard\tBLOCK\t${verdict.rule}\t${tool}\t${shown}\n`;
-    appendFileSync(join(logDir, 'hooks.log'), line);
-  } catch (error) {
-    // A failed log write must not unblock the command; say so on stderr instead.
-    process.stderr.write(`guard: could not write hooks.log: ${error.message}\n`);
-  }
-}
-
 const readStdin = () =>
   new Promise((resolveInput, reject) => {
     let data = '';
@@ -471,7 +452,7 @@ async function main() {
   }
   if (!verdict.blocked) return;
 
-  logBlock(projectDir, tool, verdict, command);
+  writeHookLog(projectDir, 'guard', 'BLOCK', verdict.rule, tool, command);
   process.stderr.write(`Blocked by guard hook [${verdict.rule}]: ${verdict.reason}\n`);
   process.exitCode = EXIT_BLOCK;
 }
