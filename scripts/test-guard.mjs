@@ -2,13 +2,19 @@
 // Tests for .claude/hooks/guard.mjs: table-driven cases against evaluate(), then a few
 // end-to-end runs of the real hook process (exit code, stderr, log line).
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { evaluate } from '../.claude/hooks/guard.mjs';
 
-const GUARD_PATH = resolve(dirname(fileURLToPath(import.meta.url)), '../.claude/hooks/guard.mjs');
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const GUARD_PATH = join(ROOT, '.claude/hooks/guard.mjs');
+const SETTINGS_PATH = join(ROOT, '.claude/settings.json');
+// guard.mjs: branch lookup + staged diff + unstaged diff, each capped at 5 s (GIT_TIMEOUT_MS).
+const GUARD_WORST_CASE_SECONDS = 15;
+// format.mjs: one formatter run capped at 30 s (FORMATTER_TIMEOUT_MS).
+const FORMAT_WORST_CASE_SECONDS = 30;
 // Built at runtime so this file itself never contains a key-shaped string.
 const FAKE_KEY = `sk-${'ant'}-${'a1B2c3D4'.repeat(4)}`;
 
@@ -131,7 +137,9 @@ function contextFor(testCase) {
 }
 
 let failures = 0;
+let total = 0;
 const report = (ok, label, detail = '') => {
+  total++;
   if (!ok) failures++;
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  (${detail})` : ''}`);
 };
@@ -186,10 +194,42 @@ try {
   });
   const loggedAfter = readFileSync(logPath, 'utf8');
   report(keyed.status === 2 && !loggedAfter.includes(FAKE_KEY), 'e2e: keys are masked in hooks.log');
+
+  // An unexpected crash must block (exit 2); Node's default exit 1 would let the command run.
+  const preload = join(projectDir, 'explode-preload.mjs');
+  writeFileSync(
+    preload,
+    "JSON.parse = () => new Proxy({}, { get() { throw new Error('boom'); } });\n",
+  );
+  const crashed = spawnSync(process.execPath, ['--import', pathToFileURL(preload).href, GUARD_PATH], {
+    input: JSON.stringify({ tool_name: 'Bash', cwd: projectDir, tool_input: { command: 'git status' } }),
+    encoding: 'utf8',
+    env: { ...process.env, CLAUDE_PROJECT_DIR: projectDir },
+  });
+  report(crashed.status === 2, 'e2e: unexpected crash fails closed', `status=${crashed.status}`);
+  report(
+    /\tBLOCK\tinternal-error\t/.test(readFileSync(logPath, 'utf8')),
+    'e2e: unexpected crash is logged as internal-error',
+  );
 } finally {
   rmSync(projectDir, { recursive: true, force: true });
 }
 
-const total = cases.length + 8;
+// settings.json: narrow matchers and timeouts above the hooks' own worst case.
+const settings = JSON.parse(readFileSync(SETTINGS_PATH, 'utf8'));
+const hookEntry = (event, matcher) => settings.hooks?.[event]?.find((entry) => entry.matcher === matcher);
+const guardTimeout = hookEntry('PreToolUse', 'Bash|PowerShell')?.hooks?.[0]?.timeout;
+report(
+  guardTimeout >= GUARD_WORST_CASE_SECONDS,
+  'settings: guard hook timeout covers its git calls',
+  `timeout=${guardTimeout}s, needs >= ${GUARD_WORST_CASE_SECONDS}s`,
+);
+const formatTimeout = hookEntry('PostToolUse', 'Write|Edit')?.hooks?.[0]?.timeout;
+report(
+  formatTimeout >= FORMAT_WORST_CASE_SECONDS,
+  'settings: format hook timeout covers the formatter',
+  `timeout=${formatTimeout}s, needs >= ${FORMAT_WORST_CASE_SECONDS}s`,
+);
+
 console.log(`\n${total - failures}/${total} passed`);
 process.exit(failures === 0 ? 0 : 1);

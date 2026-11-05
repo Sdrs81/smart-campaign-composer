@@ -458,5 +458,13 @@ async function main() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
-  await main();
+  try {
+    await main();
+  } catch (error) {
+    // An uncaught error exits 1, which Claude Code treats as non-blocking and lets the
+    // command run. A guard that crashed must block instead.
+    writeHookLog(process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), 'guard', 'BLOCK', 'internal-error', '-', error.message);
+    process.stderr.write(`guard: unexpected error (${error.message}); blocking (fail closed)\n`);
+    process.exitCode = EXIT_BLOCK;
+  }
 }

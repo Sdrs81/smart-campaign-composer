@@ -1,6 +1,6 @@
 # Smart Campaign Composer
 
-## Stack
+## Tech Stack
 
 Laravel 12 (PHP 8.4, FrankenPHP, JSON API only) · PostgreSQL 17 · Redis 7 · Vue 3 + TypeScript + Vite + Pinia + Tailwind · mock provider (plain PHP + Redis) · Pest, Vitest, Playwright.
 
