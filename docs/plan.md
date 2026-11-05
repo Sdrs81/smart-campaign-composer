@@ -86,7 +86,8 @@ Yalnızca `DECISIONS.md`'ye girecek kararlar: case'te doğrudan geçenler, mimar
 - **Git öncesi özet (zorunlu):** Her görevin raporu ve her fazın kapanışı, herhangi bir git komutundan (`add`, `commit`, `push`, PR) hemen önce, değişen/eklenen her dosya için bir özet tablosu içerir: `dosya | yeni/değişti | ne yapıldı | neden`. Ardından kabul kriteri kanıtı (komut + çıktı) ve doküman sorguları gelir. Faz kapanışındaki özet fazın tüm dosyalarını kapsar.
 - **Faz sonu:** `/finish-phase` → `make test` + `make lint`, `review-pr`, `/code-review` (genelde `medium`; Faz 5 ve 8 için `high`), en fazla 2 tur, reddedilen bulgu listesi → dosya bazlı faz özeti → onayla push (`ask`) ve PR. Merge sende.
 - **Kararlar:** Bölüm 2'deki her karar, "Görevler" sütunundaki ilk görevin commit'inde `DECISIONS.md`'ye girer. Uygulama sırasında çıkan yeni bir önemli karar önce Bölüm 2'ye eklenir, sonra aynı şekilde yazılır.
-- **Session export:** Her oturum sonunda `/export` → `ai-sessions/YYYY-MM-DD-<konu>.md`; commit'ten önce `node scripts/scrub-sessions.mjs --check`.
+- **Session export:** Her oturum sonunda `/export` → `ai-sessions/phase-<N>_<konu>.md` (ör. `phase-1_setup.md`; aynı fazda ikinci oturum `phase-1_setup-2.md`); commit'ten önce `node scripts/scrub-sessions.mjs --check`.
+- **PR dili:** PR başlığı ve açıklaması İngilizce. Planın, README'nin ve dosya bazlı özetlerin dili Türkçe kalır.
 - **Takvim (çekirdek akış 5 günde):**
 
   | Gün | Fazlar                                   | Gün sonu ölçütü                                                                 |
@@ -107,7 +108,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 
 ## Faz 0: Plan · tamamlandı (2026-11-05)
 
-`docs/plan.md` ve `ai-sessions/` (planlama oturumunun export'u), `phase-0/plan` dalı ve PR'ı. Kurulum araçları henüz olmadığı için görev formatı ve `finish-phase` dışında, elle yapıldı.
+`docs/plan.md` ve `ai-sessions/` (planlama oturumunun export'u: `phase-0_plan.md`), `phase-0/plan` dalı ve PR #1. Kurulum araçları henüz olmadığı için görev formatı ve `finish-phase` dışında, elle yapıldı.
 
 ---
 
@@ -183,7 +184,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 - **Kabul:** `/task 1.13` deneme koşusunda tüm adımlar raporda görünür.
 
 ### 1.8 `review-pr` ve `finish-phase` skill'leri
-- **İş:** `review-pr`: salt-okur (`Write`/`Edit` yasak); `git diff main...HEAD` + `git diff HEAD` + izlenmeyen dosyalar; kontrol listesi: proje değişmezleri, sır yok, nötr fixture, test var mı. `finish-phase`: test + lint → `review-pr` → `/code-review` (seviye fazdan) → yalnızca bug/güvenlik/kural ihlali düzeltilir, en fazla 2 tur, reddedilenler listesi → fazın tüm dosyaları için dosya bazlı özet tablosu, kontroller, düzeltmeler, PR başlığı → onayla push + `gh pr create`.
+- **İş:** `review-pr`: salt-okur (`Write`/`Edit` yasak); `git diff main...HEAD` + `git diff HEAD` + izlenmeyen dosyalar; kontrol listesi: proje değişmezleri, sır yok, nötr fixture, test var mı. `finish-phase`: test + lint → `review-pr` → `/code-review` (seviye fazdan) → yalnızca bug/güvenlik/kural ihlali düzeltilir, en fazla 2 tur, reddedilenler listesi → fazın tüm dosyaları için dosya bazlı özet tablosu, kontroller, düzeltmeler, PR başlığı → onayla push + `gh pr create` (başlık ve açıklama İngilizce).
 - **Dosyalar:** `.claude/skills/review-pr/SKILL.md`, `.claude/skills/finish-phase/SKILL.md`
 - **Bağımlı:** 1.7
 - **Kabul:** `review-pr` commit'lenmemiş değişiklikte boş diff vermez (1.13'te denenir).
@@ -651,7 +652,7 @@ Performans ilkeleri (gerektiği yerde): lazy route, stream delta'larını `reque
 - **İş:** Tüm export'lar `ai-sessions/`'a; `scrub-sessions.mjs`; `--check` 0.
 - **Dosyalar:** `ai-sessions/*`
 - **Bağımlı:** 11.4
-- **Kabul:** `--check` 0; dosya listesi tarih sırasıyla.
+- **Kabul:** `--check` 0; her fazın en az bir `phase-<N>_<konu>.md` dosyası var.
 
 ---
 
