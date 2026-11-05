@@ -13,6 +13,7 @@ Laravel 12 (PHP 8.4, FrankenPHP, JSON API only) · PostgreSQL 17 · Redis 7 · V
 - `make e2e`
 - `node scripts/test-guard.mjs`
 - `node scripts/test-format.mjs`
+- `node scripts/test-scrub.mjs`
 
 On Windows use the `docker compose` equivalents from the README. Host needs PHP 8.4, Composer, Node, Docker.
 

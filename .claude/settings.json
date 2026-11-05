@@ -35,6 +35,8 @@
       "Bash(npx playwright test*)",
 
       "Bash(node scripts/test-guard.mjs)",
+      "Bash(node scripts/test-format.mjs)",
+      "Bash(node scripts/test-scrub.mjs)",
       "Bash(node scripts/scrub-sessions.mjs*)",
 
       "Bash(git status*)",
