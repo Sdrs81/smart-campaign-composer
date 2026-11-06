@@ -7,7 +7,10 @@ namespace App\Providers;
 use App\Llm\ClaudeLlmClient;
 use App\Llm\FakeLlmClient;
 use App\Llm\LlmClient;
+use App\Llm\Prompts\SegmentPrompt;
 use App\Llm\RecordingLlmClient;
+use App\Llm\SegmentExtractor;
+use App\Segment\SegmentRuleParser;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
@@ -27,6 +30,17 @@ class LlmServiceProvider extends ServiceProvider
         $this->app->singleton(RecordingLlmClient::class, fn (Application $app): RecordingLlmClient => new RecordingLlmClient(
             $app->make(LlmClient::class),
             config('llm.driver') === 'fake' ? self::FAKE_MODEL_NAME : (string) config('llm.anthropic.model'),
+        ));
+
+        // Built here instead of autowired: it needs the logging client and config values (K11).
+        $this->app->bind(SegmentExtractor::class, fn (Application $app): SegmentExtractor => new SegmentExtractor(
+            $app->make(RecordingLlmClient::class),
+            $app->make(SegmentPrompt::class),
+            $app->make(SegmentRuleParser::class),
+            (int) config('llm.max_repair_attempts'),
+            (int) config('llm.segment.max_tokens'),
+            (int) config('llm.brief.min_length'),
+            (int) config('llm.brief.max_length'),
         ));
     }
 

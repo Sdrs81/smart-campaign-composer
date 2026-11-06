@@ -29,6 +29,13 @@ final class RecordingLlmClient implements LlmClient
         return $this->lastCall;
     }
 
+    /** @param  list<string>  $errors  path-based validation messages for the most recent call */
+    public function markLastCallInvalid(array $errors): void
+    {
+        $this->lastCall?->markInvalid($errors);
+        $this->lastCall?->save();
+    }
+
     public function complete(LlmRequest $request): LlmResponse
     {
         $startedAt = hrtime(true);

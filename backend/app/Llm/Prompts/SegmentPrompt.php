@@ -19,7 +19,8 @@ final class SegmentPrompt
 {
     public const VERSION = 'segment-v1';
 
-    private const TEMPLATE = 'prompts/segment.v1.md';
+    // Built from __DIR__ rather than resource_path() so unit tests need no framework boot.
+    private const TEMPLATE_PATH = __DIR__.'/../../../resources/prompts/segment.v1.md';
 
     private const DATE_FORMAT = 'Y-m-d';
 
@@ -31,7 +32,7 @@ final class SegmentPrompt
      */
     public function system(): string
     {
-        return strtr((string) file_get_contents(resource_path(self::TEMPLATE)), [
+        return strtr((string) file_get_contents(self::TEMPLATE_PATH), [
             '{{FIELD_TABLE}}' => $this->fieldTable(),
             '{{MAX_IN_VALUES}}' => (string) FieldDefinition::MAX_IN_VALUES,
             '{{DAYS_RANGE}}' => FieldDefinition::MIN_RELATIVE_DAYS.' to '.FieldDefinition::MAX_RELATIVE_DAYS,

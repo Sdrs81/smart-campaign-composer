@@ -34,4 +34,15 @@ return [
     // Validation failures are fed back to the model at most this many times (K11).
     'max_repair_attempts' => 2,
 
+    // Marketer brief accepted by the segment extractor, in characters.
+    'brief' => [
+        'min_length' => 10,
+        'max_length' => 1000,
+    ],
+
+    // The answer is short JSON, but thinking tokens count against max_tokens, so leave room for them.
+    'segment' => [
+        'max_tokens' => 4096,
+    ],
+
 ];

@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 use App\Exceptions\ApiException;
 use App\Exceptions\ErrorResponse;
+use App\Llm\Exceptions\LlmException;
+use App\Llm\Exceptions\LlmRefused;
+use App\Llm\Exceptions\LlmTruncated;
+use App\Llm\Exceptions\LlmUnavailable;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -27,6 +31,18 @@ return Application::configure(basePath: dirname(__DIR__))
         );
 
         $exceptions->render(fn (ApiException $e) => ErrorResponse::make($e->errorCode(), $e->getMessage(), $e->status(), $e->details()));
+
+        // 503 when Claude is unreachable (retrying later may work); 502 when it answered but unusably.
+        $exceptions->render(function (LlmException $e) {
+            [$code, $status] = match (true) {
+                $e instanceof LlmUnavailable => ['llm_unavailable', 503],
+                $e instanceof LlmTruncated => ['llm_truncated', 502],
+                $e instanceof LlmRefused => ['llm_refused', 502],
+                default => ['llm_bad_response', 502],
+            };
+
+            return ErrorResponse::make($code, $e->getMessage(), $status);
+        });
 
         $exceptions->render(fn (ValidationException $e) => ErrorResponse::make(
             'validation_failed',
