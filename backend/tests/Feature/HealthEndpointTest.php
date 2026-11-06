@@ -5,21 +5,17 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
 
-// The local test run has no Redis server, so the connection is a stub; the same
-// endpoint is exercised against the real Redis container by `make test`.
-function stubRedis(?Throwable $failure = null): void
+// Runs against the real Postgres and Redis containers (`make test`); only an outage
+// has to be simulated.
+function redisDown(): void
 {
     $connection = Mockery::mock();
-    $failure === null
-        ? $connection->shouldReceive('ping')->andReturn(true)
-        : $connection->shouldReceive('ping')->andThrow($failure);
+    $connection->shouldReceive('ping')->andThrow(new RuntimeException('Connection refused'));
 
     Redis::shouldReceive('connection')->andReturn($connection);
 }
 
 it('returns 200 with dependency states when everything is up', function () {
-    stubRedis();
-
     $this->getJson('/api/health')
         ->assertOk()
         ->assertExactJson([
@@ -30,7 +26,7 @@ it('returns 200 with dependency states when everything is up', function () {
 });
 
 it('returns 503 with the error body when redis is down', function () {
-    stubRedis(new RuntimeException('Connection refused'));
+    redisDown();
 
     $this->getJson('/api/health')
         ->assertStatus(503)
@@ -41,7 +37,6 @@ it('returns 503 with the error body when redis is down', function () {
 });
 
 it('returns 503 when the database is down', function () {
-    stubRedis();
     config([
         'database.connections.broken' => ['driver' => 'sqlite', 'database' => '/nonexistent-dir/missing.sqlite'],
         'database.default' => 'broken',

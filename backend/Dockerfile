@@ -26,6 +26,10 @@ RUN composer dump-autoload --optimize --no-interaction \
     && mkdir -p storage/logs storage/framework/cache/data storage/framework/sessions storage/framework/views bootstrap/cache \
     && chmod -R a+rwX storage bootstrap/cache
 
+# Empty on purpose: settings come from the container environment, and a missing file
+# makes dotenv emit a warning that Pest prints on every test.
+RUN touch .env
+
 COPY docker/backend/entrypoint.sh /usr/local/bin/campaign-entrypoint
 RUN chmod +x /usr/local/bin/campaign-entrypoint
 
