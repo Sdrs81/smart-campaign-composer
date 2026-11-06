@@ -1,0 +1,40 @@
+# Dependencies
+vendor/
+node_modules/
+
+# Real env files (only .env.example is tracked)
+.env
+.env.local
+.env.testing
+.env.production
+.env.*.local
+!.env.example
+
+# Build output
+frontend/dist/
+backend/public/build/
+backend/public/hot
+backend/bootstrap/cache/*.php
+coverage/
+
+# Laravel runtime files
+backend/storage/*.key
+backend/storage/logs/
+backend/storage/framework/cache/data/
+backend/storage/framework/sessions/
+backend/storage/framework/views/
+.phpunit.result.cache
+.phpunit.cache/
+
+# Playwright
+frontend/playwright-report/
+frontend/test-results/
+
+# Claude hook logs
+.claude/logs/
+
+# Editor and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
