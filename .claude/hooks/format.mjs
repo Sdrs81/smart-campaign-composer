@@ -18,10 +18,16 @@ const PRETTIER_BINS = ['node_modules/prettier/bin/prettier.cjs', 'node_modules/p
 const PINT_BIN = 'vendor/bin/pint';
 const GENERATED_DIRS = new Set(['node_modules', 'vendor']);
 
+/** True when `path` is `directory` or below it. `relative` ignores drive-letter case on Windows. */
+function isInside(path, directory) {
+  const fromDirectory = relative(directory, path);
+  return !/^\.\.(?:[\\/]|$)/.test(fromDirectory) && !isAbsolute(fromDirectory);
+}
+
 /** Looks for `<dir>/<bin>` from `startDir` up to `projectDir`. */
 function findTool(startDir, projectDir, bins) {
   let dir = startDir;
-  while (dir === projectDir || dir.startsWith(projectDir + sep)) {
+  while (isInside(dir, projectDir)) {
     for (const bin of bins) {
       if (existsSync(join(dir, bin))) return { root: dir, bin: join(dir, bin) };
     }
@@ -39,6 +45,8 @@ export function formatFile(file, projectDir) {
   const extension = extname(file).toLowerCase();
   const usesPint = PINT_EXTENSIONS.has(extension);
   if (!usesPint && !PRETTIER_EXTENSIONS.has(extension)) return null;
+  // Files outside the project (memory notes, other repos) are never ours to rewrite.
+  if (!isInside(file, projectDir)) return null;
   if (relative(projectDir, file).split(sep).some((part) => GENERATED_DIRS.has(part))) return null;
   if (!existsSync(file)) return { status: 'SKIP', detail: 'file not found' };
 

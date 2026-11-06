@@ -6,7 +6,8 @@
 // operations. It fails closed: a command it cannot parse safely is blocked.
 // Exit code 2 makes Claude Code reject the call and show stderr to the model.
 import { execFileSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { readFileSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API_KEY_PATTERN, writeHookLog } from './hook-log.mjs';
 
@@ -46,12 +47,29 @@ const READERS = new Set([
 ]);
 const REMOVE_VERBS = new Set(['rm', 'rmdir', 'rd', 'del', 'erase', 'remove-item', 'ri']);
 const EVAL_VERBS = new Set(['eval', 'iex', 'invoke-expression']);
-const SHELL_COMMAND_FLAG = /^(?:-c|-lc|-ec|-command|\/c|\/k)$/i;
-const SHELL_ENCODED_FLAG = /^-e(?:nc(?:odedcommand)?)?$/i;
+// bash/sh flag clusters that end in c (-c, -lc, -xc, -ic), PowerShell -Command and its
+// abbreviations (-co ... -command), and cmd /c, /k.
+const SHELL_COMMAND_FLAG = /^(?:-[a-z]*c|-co(?:m(?:m(?:a(?:n(?:d)?)?)?)?)?|\/[ck])$/i;
+// PowerShell -EncodedCommand and its abbreviations (-e, -ec, -enc ...) carry base64 we cannot
+// read. PowerShell only: for bash and sh, -e is errexit.
+const POWERSHELL_ENCODED_FLAG = /^-e(?:c|n[a-z]*)?$/i;
+const POWERSHELL = new Set(['powershell', 'pwsh']);
 
 // Names a glob such as `.e*` could expand to; used to catch `cat .e*`.
 const ENV_FILE_SAMPLES = ['.env', '.env.local', '.env.testing', '.env.production', '.env.staging'];
 const ENV_EXAMPLE = '.env.example';
+// `.env` and `.env.<suffix>`, but not look-alikes such as `.envrc`.
+const ENV_FILE_NAME = /^\.env(?:\..*)?$/;
+// The value after these flags is free text (commit message, PR title or body), not a file.
+// Scoped per command: in `git diff` or `git log`, -b and -m are other flags, not messages.
+const GIT_MESSAGE_FLAG = /^(?:-[a-zA-Z]*m|--message)$/;
+const GIT_MESSAGE_SUBCOMMANDS = new Set(['commit', 'tag', 'merge']);
+const GH_TEXT_FLAG = /^(?:--title|--body|-t|-b)$/;
+const MESSAGE_FLAG_WITH_VALUE = /^--(?:message|title|body)=/;
+// `git commit` flags that consume the next argument, so it is not mistaken for a pathspec.
+const COMMIT_VALUE_FLAG =
+  /^(?:-[a-zA-Z]*[mFcCt]|--(?:message|file|author|date|reuse-message|reedit-message|cleanup|template|fixup|squash|trailer))$/;
+const MAX_UNTRACKED_FILE_BYTES = 1024 * 1024;
 
 const ALLOW = Object.freeze({ blocked: false });
 const block = (rule, reason) => ({ blocked: true, rule, reason });
@@ -152,7 +170,7 @@ function globToRegExp(glob) {
 function isRealEnvFileName(name, readerInvolved) {
   const lower = name.toLowerCase();
   if (lower === ENV_EXAMPLE) return false;
-  if (!/[*?[]/.test(lower)) return lower.startsWith('.env');
+  if (!/[*?[]/.test(lower)) return ENV_FILE_NAME.test(lower);
   // A leading `*` or `?` also matches dotfiles on Windows, but only matters when the
   // command reads file contents.
   if (!lower.startsWith('.') && !readerInvolved) return false;
@@ -160,10 +178,27 @@ function isRealEnvFileName(name, readerInvolved) {
   return ENV_FILE_SAMPLES.some((sample) => pattern.test(sample));
 }
 
+/** Drops commit messages and PR titles/bodies, so prose that mentions `.env` is not a file access. */
+function withoutMessageText(argv) {
+  const verb = verbOf(argv[0]);
+  let isTextFlag;
+  if (verb === 'gh') {
+    isTextFlag = (token) => GH_TEXT_FLAG.test(token);
+  } else if (verb === 'git' && GIT_MESSAGE_SUBCOMMANDS.has(parseGit(argv.slice(1)).sub)) {
+    isTextFlag = (token) => GIT_MESSAGE_FLAG.test(token);
+  } else {
+    return argv;
+  }
+  return argv.filter(
+    (token, index) =>
+      index === 0 || !(isTextFlag(argv[index - 1]) || MESSAGE_FLAG_WITH_VALUE.test(token)),
+  );
+}
+
 function checkEnvFileAccess(argv) {
   if (verbOf(argv[0]) === 'git' && argv.includes('check-ignore')) return null;
   const readerInvolved = candidatesOf(argv).some((c) => READERS.has(verbOf(c[0])));
-  for (const token of argv) {
+  for (const token of withoutMessageText(argv)) {
     for (const word of subwords(token)) {
       if (/^\/proc\/[^/]+\/environ$/.test(word)) {
         return block('env-dump', 'reading /proc/*/environ exposes secrets');
@@ -207,11 +242,45 @@ function parseGit(args) {
   return { dir, sub: args[i], rest: args.slice(i + 1) };
 }
 
+/** True when `git commit` takes content from the working tree: -a/--all or a pathspec. */
+function commitReadsWorkingTree(args) {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    const readsTree =
+      arg === '--' ||
+      arg === '--all' ||
+      arg === '--include' ||
+      arg === '--only' ||
+      arg.startsWith('--pathspec-from-file') ||
+      /^-[a-zA-Z]*[aio][a-zA-Z]*$/.test(arg); // -a, -i, -o, alone or in a cluster
+    if (readsTree) return true;
+    if (COMMIT_VALUE_FLAG.test(arg)) {
+      i++; // skip the flag's value
+    } else if (!arg.startsWith('-')) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function checkGit(args, state, ctx) {
   const { dir, sub, rest } = parseGit(args);
   const currentBranch = () => (state.branch !== undefined ? state.branch : ctx.branch(dir));
 
+  if (sub === 'add') {
+    state.stagesFiles = true; // a later commit in the same command takes files the index lacks now
+    return null;
+  }
+
   if (sub === 'switch' || sub === 'checkout') {
+    // `git checkout main -- file` restores a file and stays on the current branch; a bare
+    // trailing `--` still switches.
+    const separatorAt = rest.indexOf('--');
+    if (separatorAt >= 0 && separatorAt < rest.length - 1) return null;
+    if (rest.includes('-')) {
+      state.branch = null; // `git switch -` goes to a branch we cannot know statically
+      return null;
+    }
     const target = rest.find((a) => !a.startsWith('-'));
     const creating = rest.some((a) => ['-b', '-B', '-c', '-C'].includes(a));
     if (target && (PROTECTED_BRANCHES.has(target) || sub === 'switch' || creating)) {
@@ -239,6 +308,9 @@ function checkGit(args, state, ctx) {
     if (targetsMain) return block('push-target-main', 'pushing to main is not allowed');
     const branch = currentBranch();
     if (branch === null) return block('unknown-branch', 'could not determine the current branch');
+    if (branch === '') {
+      return block('detached-head', 'HEAD is detached; switch to a phase branch before pushing');
+    }
     if (PROTECTED_BRANCHES.has(branch)) {
       return block('push-from-main', 'pushing while on main is not allowed; use a phase branch');
     }
@@ -251,12 +323,14 @@ function checkGit(args, state, ctx) {
     if (PROTECTED_BRANCHES.has(branch)) {
       return block('commit-on-main', 'committing on main is not allowed; use a phase branch');
     }
-    const includesUnstaged = rest.some((a) => a === '--all' || /^-[a-zA-Z]*a[a-zA-Z]*$/.test(a));
-    const leaked = ctx.stagedSecret(includesUnstaged, dir);
+    const readsWorkingTree = state.stagesFiles || commitReadsWorkingTree(rest);
+    const leaked = ctx.stagedSecret(readsWorkingTree, dir);
     if (leaked === null) {
-      return block('unknown-diff', 'could not read the diff to check it for API keys');
+      return block('unknown-diff', 'could not read the changes to check them for API keys');
     }
-    if (leaked) return block('secret-in-commit', 'an Anthropic API key (sk-ant-) is in the diff');
+    if (leaked) {
+      return block('secret-in-commit', 'an Anthropic API key (sk-ant-) is in the changes to commit');
+    }
   }
   return null;
 }
@@ -308,7 +382,7 @@ function checkEnvDump(verb, args) {
 function checkShellWrapper(verb, argv, ctx, depth) {
   if (!SHELLS.has(verb)) return null;
   for (let i = 1; i < argv.length; i++) {
-    if (SHELL_ENCODED_FLAG.test(argv[i])) {
+    if (POWERSHELL.has(verb) && POWERSHELL_ENCODED_FLAG.test(argv[i])) {
       return block('unparseable', 'encoded commands cannot be inspected');
     }
     if (SHELL_COMMAND_FLAG.test(argv[i]) && argv[i + 1] !== undefined) {
@@ -398,19 +472,32 @@ function makeContext(cwd) {
       maxBuffer: MAX_DIFF_BYTES,
       stdio: ['ignore', 'pipe', 'ignore'],
     });
+  const untrackedFileHoldsSecret = (dir) => {
+    const root = dir ? resolve(cwd, dir) : cwd;
+    const names = git(dir, ['ls-files', '--others', '--exclude-standard', '-z']).split('\0');
+    return names.filter(Boolean).some((name) => {
+      const file = join(root, name);
+      const stat = statSync(file);
+      if (!stat.isFile()) return false;
+      // A file too big to read whole cannot be shown clean; throwing makes the caller block.
+      if (stat.size > MAX_UNTRACKED_FILE_BYTES) throw new Error(`${name} is too large to scan`);
+      return API_KEY_PATTERN.test(readFileSync(file, 'utf8'));
+    });
+  };
   return {
     branch(dir) {
       try {
+        // Empty on a detached HEAD (rebase, bisect): a commit there cannot land on main.
         return git(dir, ['branch', '--show-current']).trim();
       } catch {
         return null; // unknown state is blocked by the caller (fail closed)
       }
     },
-    stagedSecret(includeUnstaged, dir) {
+    stagedSecret(includeWorkingTree, dir) {
       try {
         const staged = git(dir, ['diff', '--cached']);
-        const unstaged = includeUnstaged ? git(dir, ['diff']) : '';
-        return hasAddedSecret(staged + unstaged);
+        if (!includeWorkingTree) return hasAddedSecret(staged);
+        return hasAddedSecret(staged + git(dir, ['diff'])) || untrackedFileHoldsSecret(dir);
       } catch {
         return null;
       }

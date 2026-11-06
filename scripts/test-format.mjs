@@ -90,6 +90,18 @@ try {
   );
   check('missing file: SKIP', formatFile(join(withTool, 'docs/ghost.md'), withTool)?.status === 'SKIP');
 
+  const outside = put(withoutTool, 'docs/outside.md', MESSY);
+  check('file outside the project is ignored', formatFile(outside, withTool) === null);
+  check('file outside the project is untouched', readFileSync(outside, 'utf8') === MESSY);
+
+  if (process.platform === 'win32') {
+    // The same folder spelled with a different drive-letter case must still count as inside.
+    const recased = put(withTool, 'docs/recased.md', MESSY);
+    const flipped = (recased[0] === recased[0].toUpperCase() ? recased[0].toLowerCase() : recased[0].toUpperCase()) + recased.slice(1);
+    result = formatFile(flipped, withTool);
+    check('drive-letter case does not matter', result?.status === 'FORMATTED', result?.status);
+  }
+
   // End to end: the hook process as Claude Code runs it
   const logPath = join(withTool, '.claude', 'logs', 'hooks.log');
   const run = (payload, raw) =>

@@ -2,7 +2,8 @@
 name: review-pr
 description: Read-only review of everything on the current branch against main (committed, staged, unstaged and untracked changes). Reports findings only and never changes files.
 when_to_use: Use when the user runs /review-pr, or asks to review the branch, the diff or the changes before a PR or a commit.
-disallowed-tools: Write Edit NotebookEdit
+context: fork
+agent: Explore
 ---
 
 # Review the branch

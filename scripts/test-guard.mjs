@@ -2,7 +2,7 @@
 // Tests for .claude/hooks/guard.mjs: table-driven cases against evaluate(), then a few
 // end-to-end runs of the real hook process (exit code, stderr, log line).
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -57,6 +57,20 @@ const cases = [
   { name: 'commit -am without a key', shell: 'powershell', command: 'git commit -am "x"', expect: ALLOW },
   { name: 'diff against main', shell: 'bash', command: 'git diff main...HEAD', expect: ALLOW },
   { name: 'switch to main then only read', shell: 'bash', command: 'git switch main && git log --oneline -3', expect: ALLOW },
+  { name: 'add then commit scans the working tree', shell: 'bash', command: 'git add leaked.txt && git commit -m x', secret: 'unstaged', expect: BLOCK, rule: 'secret-in-commit' },
+  { name: 'pathspec commit scans the working tree', shell: 'bash', command: 'git commit leaked.txt -m x', secret: 'unstaged', expect: BLOCK, rule: 'secret-in-commit' },
+  { name: 'pathspec after -- scans the working tree', shell: 'bash', command: 'git commit -m x -- leaked.txt', secret: 'unstaged', expect: BLOCK, rule: 'secret-in-commit' },
+  { name: 'plain commit ignores keys outside the index', shell: 'bash', command: 'git commit -m "x"', secret: 'unstaged', expect: ALLOW },
+  { name: 'amend without pathspec ignores the working tree', shell: 'bash', command: 'git commit --amend --no-edit', secret: 'unstaged', expect: ALLOW },
+  { name: 'checkout of a file from main keeps the branch', shell: 'bash', command: 'git checkout main -- README.md && git commit -m x', expect: ALLOW },
+  { name: 'switch - leaves the branch unknown', shell: 'bash', command: 'git switch - && git commit -m x', expect: BLOCK, rule: 'unknown-branch' },
+  { name: 'unreadable branch blocks a push', shell: 'bash', command: 'git push origin HEAD', branch: null, expect: BLOCK, rule: 'unknown-branch' },
+  { name: 'push from a detached HEAD', shell: 'bash', command: 'git push origin HEAD', branch: '', expect: BLOCK, rule: 'detached-head' },
+  { name: 'commit during a rebase on a detached HEAD', shell: 'bash', command: 'git commit --amend --no-edit', branch: '', expect: ALLOW },
+  { name: 'bare trailing -- still switches to main', shell: 'bash', command: 'git checkout main -- && git commit -m x', expect: BLOCK, rule: 'commit-on-main' },
+  { name: '--include reads the working tree', shell: 'bash', command: 'git commit -m x --include', secret: 'unstaged', expect: BLOCK, rule: 'secret-in-commit' },
+  { name: '-o reads the working tree', shell: 'bash', command: 'git commit -o -m x', secret: 'unstaged', expect: BLOCK, rule: 'secret-in-commit' },
+  { name: '--pathspec-from-file reads the working tree', shell: 'bash', command: 'git commit --pathspec-from-file=list.txt -m x', secret: 'unstaged', expect: BLOCK, rule: 'secret-in-commit' },
 
   // Real env files
   { name: 'cat .env', shell: 'bash', command: 'cat .env', expect: BLOCK, rule: 'env-file' },
@@ -84,6 +98,17 @@ const cases = [
   { name: 'git add .env.example', shell: 'bash', command: 'git add .env.example', expect: ALLOW },
   { name: 'git check-ignore .env', shell: 'bash', command: 'git check-ignore -v .env', expect: ALLOW },
   { name: 'grep inside .env.example', shell: 'bash', command: 'grep ANTHROPIC .env.example', expect: ALLOW },
+  { name: 'commit message mentioning .env', shell: 'bash', command: 'git commit -m "fix: ignore .env in gitignore"', expect: ALLOW },
+  { name: 'commit -am message mentioning .env', shell: 'powershell', command: 'git commit -am "docs: explain the .env setup"', expect: ALLOW },
+  { name: 'commit --message= mentioning .env', shell: 'bash', command: 'git commit --message="docs: copy .env.example to .env"', expect: ALLOW },
+  { name: 'PR title and body mentioning .env', shell: 'bash', command: 'gh pr create --title "Add .env docs" --body "Copy the example to .env first"', expect: ALLOW },
+  { name: 'commit -F reading .env', shell: 'bash', command: 'git commit -m x -F .env', expect: BLOCK, rule: 'env-file' },
+  { name: 'cat .envrc is not a real env file', shell: 'bash', command: 'cat .envrc', expect: ALLOW },
+  { name: 'cat .env.staging', shell: 'bash', command: 'cat .env.staging', expect: BLOCK, rule: 'env-file' },
+  { name: 'git diff --no-index -b does not hide .env', shell: 'bash', command: 'git diff --no-index -b .env /dev/null', expect: BLOCK, rule: 'env-file' },
+  { name: 'git log -m does not hide .env', shell: 'bash', command: 'git log -p -m .env', expect: BLOCK, rule: 'env-file' },
+  { name: 'git commit -t does not hide a .env template', shell: 'bash', command: 'git commit -m x -t .env', expect: BLOCK, rule: 'env-file' },
+  { name: 'git checkout -b does not hide .env', shell: 'bash', command: 'git checkout -b .env', expect: BLOCK, rule: 'env-file' },
 
   // Environment dumps and keys
   { name: 'printenv', shell: 'bash', command: 'printenv', expect: BLOCK, rule: 'env-dump' },
@@ -114,6 +139,12 @@ const cases = [
   { name: 'encoded PowerShell', shell: 'powershell', command: 'powershell -EncodedCommand ZQBjAGgAbwA=', expect: BLOCK, rule: 'unparseable' },
   { name: 'backtick around git', shell: 'powershell', command: 'git commit -m "`x`"', expect: BLOCK, rule: 'unparseable' },
   { name: 'non-string command', shell: 'bash', command: undefined, expect: BLOCK, rule: 'invalid-input' },
+  { name: 'bash -xc runs an inner rm -rf', shell: 'bash', command: 'bash -xc "rm -rf build"', expect: BLOCK, rule: 'recursive-delete' },
+  { name: 'bash -ic runs an inner push to main', shell: 'bash', command: 'bash -ic "git push origin main"', expect: BLOCK, rule: 'push-target-main' },
+  { name: 'powershell -Comm abbreviation', shell: 'powershell', command: 'powershell -Comm "Remove-Item -Recurse build"', expect: BLOCK, rule: 'recursive-delete' },
+  { name: 'bash -c with a harmless inner command', shell: 'bash', command: 'bash -c "echo hello"', expect: ALLOW },
+  { name: 'PowerShell -ec is an encoded command', shell: 'powershell', command: 'powershell -ec ZQBjAGgAbwA=', expect: BLOCK, rule: 'unparseable' },
+  { name: 'bash -e is errexit, not an encoded command', shell: 'bash', command: 'bash -e ./run.sh', expect: ALLOW },
 
   // Everyday commands stay allowed
   { name: 'git status', shell: 'bash', command: 'git status --short', expect: ALLOW },
@@ -211,6 +242,28 @@ try {
     /\tBLOCK\tinternal-error\t/.test(readFileSync(logPath, 'utf8')),
     'e2e: unexpected crash is logged as internal-error',
   );
+
+  // A real repository: `git add x && git commit` is evaluated before the add has run.
+  const repo = join(projectDir, 'repo');
+  mkdirSync(repo);
+  const init = spawnSync('git', ['init', '-q', '-b', 'phase-1/test'], { cwd: repo });
+  report(init.status === 0, 'e2e: test repository created (git >= 2.28)', `status=${init.status}`);
+  writeFileSync(join(repo, 'leaked.txt'), `key=${FAKE_KEY}\n`);
+  const inRepo = (command) =>
+    runHook(projectDir, { tool_name: 'Bash', cwd: repo, tool_input: { command } });
+  // A block only counts when it carries the expected rule, not just exit code 2.
+  const blockedBy = (command, rule) => {
+    const run = inRepo(command);
+    return run.status === 2 && run.stderr.includes(`[${rule}]`);
+  };
+  report(blockedBy('git add leaked.txt && git commit -m x', 'secret-in-commit'), 'e2e: add && commit scans untracked files for keys');
+  report(blockedBy('git commit leaked.txt -m x', 'secret-in-commit'), 'e2e: pathspec commit scans the working tree');
+  report(inRepo('git commit -m x').status === 0, 'e2e: plain commit ignores keys outside the index');
+
+  // A file over the scan cap cannot be shown clean, so the commit is blocked.
+  rmSync(join(repo, 'leaked.txt'));
+  writeFileSync(join(repo, 'big.bin'), Buffer.alloc(1024 * 1024 + 1));
+  report(blockedBy('git add big.bin && git commit -m x', 'unknown-diff'), 'e2e: oversized untracked file fails closed');
 } finally {
   rmSync(projectDir, { recursive: true, force: true });
 }
