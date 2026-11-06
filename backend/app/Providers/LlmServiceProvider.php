@@ -7,15 +7,27 @@ namespace App\Providers;
 use App\Llm\ClaudeLlmClient;
 use App\Llm\FakeLlmClient;
 use App\Llm\LlmClient;
+use App\Llm\RecordingLlmClient;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
 
 class LlmServiceProvider extends ServiceProvider
 {
+    // Recorded as the model of every call made by the offline client.
+    private const FAKE_MODEL_NAME = 'fake';
+
     public function register(): void
     {
         // Singleton: the fake keeps its scenario queue between resolutions.
         $this->app->singleton(LlmClient::class, fn (): LlmClient => $this->resolveClient());
+
+        // LlmClient stays the raw client so tests can queue scenarios on the fake. Classes that must
+        // write the call log (K11) ask for RecordingLlmClient, which wraps that same shared instance.
+        $this->app->singleton(RecordingLlmClient::class, fn (Application $app): RecordingLlmClient => new RecordingLlmClient(
+            $app->make(LlmClient::class),
+            config('llm.driver') === 'fake' ? self::FAKE_MODEL_NAME : (string) config('llm.anthropic.model'),
+        ));
     }
 
     // config/llm.php only resolves; an invalid combination fails here, loudly (K9).

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\LlmCallOutcome;
 use App\Llm\Exceptions\LlmUnavailable;
 use App\Llm\FakeLlmClient;
+use App\Llm\LlmClient;
 use App\Llm\LlmRequest;
 use App\Llm\LlmResponse;
 use App\Llm\LlmUsage;
@@ -76,9 +77,10 @@ it('records a failing stream as failed', function (): void {
 it('records a stream the caller abandons as aborted', function (): void {
     $client = new RecordingLlmClient((new FakeLlmClient)->enqueue('Uzun bir mesaj metni burada'), 'fake');
 
-    $stream = $client->stream(recordedRequest());
-    $stream->current();
-    unset($stream);
+    // Leaving the loop after the first chunk drops the generator, which is what a closed browser tab does.
+    foreach ($client->stream(recordedRequest()) as $chunk) {
+        break;
+    }
 
     $call = LlmCall::query()->sole();
     expect($call->outcome)->toBe(LlmCallOutcome::Aborted)
@@ -90,6 +92,7 @@ it('keeps the repair attempt number and lets the caller mark a call invalid', fu
     $client->complete(recordedRequest(attempt: 2));
 
     $call = $client->lastCall();
+    assert($call !== null);
     $call->markInvalid(['conditions[0].field: unknown field "foo"']);
     $call->save();
 
@@ -97,4 +100,16 @@ it('keeps the repair attempt number and lets the caller mark a call invalid', fu
     expect($stored->attempt)->toBe(2)
         ->and($stored->outcome)->toBe(LlmCallOutcome::Invalid)
         ->and($stored->validation_errors)->toBe(['conditions[0].field: unknown field "foo"']);
+});
+
+it('is resolved from the container around the shared client, so queued fake scenarios are recorded', function (): void {
+    $fake = app(LlmClient::class);
+    assert($fake instanceof FakeLlmClient);
+    $fake->enqueue('{"ok":true}');
+
+    $response = app(RecordingLlmClient::class)->complete(recordedRequest());
+
+    expect($response->text)->toBe('{"ok":true}')
+        ->and(app(RecordingLlmClient::class))->toBe(app(RecordingLlmClient::class))
+        ->and(LlmCall::query()->sole()->model)->toBe('fake');
 });
