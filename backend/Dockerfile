@@ -6,8 +6,8 @@
 FROM dunglas/frankenphp:1-php8.4
 
 # intl: grapheme_strlen counts visible characters; pcntl: queue:work signals;
-# redis + pdo_pgsql: queue/rate limiter and database.
-RUN install-php-extensions pdo_pgsql redis pcntl intl opcache
+# redis + pdo_pgsql: queue/rate limiter and database; zip: Composer unpacks dist archives.
+RUN install-php-extensions pdo_pgsql redis pcntl intl opcache zip
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 

@@ -1,0 +1,102 @@
+name: smart-campaign-composer
+
+x-backend: &backend
+  image: smart-campaign-backend:dev
+  env_file: .env
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-campaign}
+      POSTGRES_USER: ${DB_USERNAME:-campaign}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-campaign}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Web role: migrates and seeds on start, then serves the API.
+  app:
+    <<: *backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # Fails on any non-2xx, so a down database or Redis (503) marks the app unhealthy.
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1/api/health') === false ? 1 : 0);"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 40s
+
+  # Same image as app, one queue per channel. Started after app so migrations are done.
+  worker-sms:
+    <<: *backend
+    command: ["php", "artisan", "queue:work", "redis", "--queue=sms", "--sleep=0", "--max-time=3600"]
+    stop_grace_period: 60s
+    deploy:
+      replicas: ${WORKERS_PER_CHANNEL:-8}
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      # The entrypoint execs the worker, so it is PID 1 while it is alive.
+      test: ["CMD-SHELL", "grep -q queue:work /proc/1/cmdline"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  worker-email:
+    <<: *backend
+    command: ["php", "artisan", "queue:work", "redis", "--queue=email", "--sleep=0", "--max-time=3600"]
+    stop_grace_period: 60s
+    deploy:
+      replicas: ${WORKERS_PER_CHANNEL:-8}
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q queue:work /proc/1/cmdline"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+volumes:
+  pgdata:
