@@ -22,7 +22,7 @@ class CustomerFactory extends Factory
         return [
             'first_name' => fake()->firstName(),
             'last_name' => fake()->lastName(),
-            'email' => fake()->unique()->safeEmail(), // example.com only
+            'email' => fake()->unique()->userName().'@example.com', // safeEmail() also picks example.net/.org
             'phone' => '+90500'.fake()->unique()->numerify('#######'), // not a routable number range
             'city' => fake()->randomElement(['İstanbul', 'Ankara', 'İzmir']),
             'gender' => fake()->randomElement(['female', 'male']),
