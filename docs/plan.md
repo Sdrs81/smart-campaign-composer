@@ -324,6 +324,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 
 - **Dosyalar:** migration, `app/Models/Customer.php`, `app/Enums/Channel.php`, factory, unit test
 - **Bağımlı:** 2.9
+- **Not:** Testler Postgres'e zorlandı, `make test-backend` ile çalışır; `campaign_test` yalnızca yeni `pgdata` hacminde oluşur.
 - **Kabul:** `canReceive` unit testleri (izin yok / iletişim bilgisi yok / izinli) yeşil.
 
 ### 3.2 Seeder
@@ -331,6 +332,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 - **İş:** 5.000 kullanıcı, Faker `tr_TR`, sabit seed (deterministik). Dağılımlar her alan için anlamlı ve birbiriyle tutarlı (ör. `first_purchase_at ≤ last_purchase_at`, `orders_count = 0` ise satın alma tarihleri boş, `avg_order_value = total_spent / orders_count`): ağırlıklı ~15 şehir (İstanbul ~%30); hiç alışveriş yapmamış ~%15; son 30 günde sepete ekleyip son 30 günde satın almamış ~%12; sadakat seviyeleri piramit; SMS izni ~%70, email izni ~%80; ~%3 boş `first_name`; ~%10 `en`. Toplu insert (1.000'lik chunk).
 - **Dosyalar:** `database/seeders/CustomerSeeder.php`, `DatabaseSeeder.php`
 - **Bağımlı:** 3.1
+- **Not:** Entrypoint "tablo boşsa seed" kontrolü `customers` tablosuna bakar (`SEED_CHECK_TABLE`); ad değişirse env güncellenir.
 - **Kabul:** `make fresh` iki kez → `SELECT count(*), md5(string_agg(email, ',' ORDER BY id))` aynı; dağılım sorgusu hedeflere ±%3 yakın.
 
 ### 3.3 `Campaign` ve durum makinesi
@@ -395,6 +397,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 - **İş:** `LlmClient::complete(LlmRequest): LlmResponse`, `stream(LlmRequest): iterable<LlmChunk>`. DTO'lar: system, messages, JSON şeması, `maxTokens`; yanıt: metin, usage, `stopReason`. `FakeLlmClient`: sıralı senaryo kuyruğu (geçersiz → geçerli gibi), stream'i parçalara böler, hata da üretebilir. Container binding: `auto` / `claude` / `fake`.
 - **Dosyalar:** `app/Llm/LlmClient.php`, `LlmRequest.php`, `LlmResponse.php`, `LlmChunk.php`, `FakeLlmClient.php`, `app/Providers/LlmServiceProvider.php`, unit test
 - **Bağımlı:** 2.3
+- **Not:** `config/llm.php` yalnızca çözümler; bilinmeyen `LLM_DRIVER` değerinde (örn. `claud`) binding hata fırlatır.
 - **Kabul:** Unit: senaryo sırası, stream parçaları birleşince tam metin, binding doğru sürücüyü seçer.
 
 ### 5.2 `ClaudeLlmClient`: tek seferlik çağrı
@@ -483,6 +486,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 - **İş:** `POST /api/campaigns {brief}`, `GET /api/campaigns` (sayfalı), `GET /api/campaigns/{id}` (kural, sayılar, mesajlar, durum). FormRequest + Resource.
 - **Dosyalar:** controller, request, resource, route, feature test
 - **Bağımlı:** 3.3
+- **Not:** `ModelNotFoundException` → 404 eşlemesi `bootstrap/app.php`'ye eklenir.
 - **Kabul:** Feature: kısa brief → 422 ve alan hatası; oluşturma → 201; liste sayfalı.
 
 ### 6.2 Kitle çıkarma
@@ -497,6 +501,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 - **İş:** `POST /api/campaigns/{id}/content/stream` → SSE: `delta`, `final`, `error`; `final` sonrası `campaign_messages` (`source=llm`) ve `content_ready`. İstemci koparsa iptal.
 - **Dosyalar:** controller, feature test
 - **Bağımlı:** 5.10, 6.2
+- **Not:** Yanıta `X-Accel-Buffering: no` eklenir (nginx `/api/` tamponu zaten kapalı).
 - **Kabul:** Feature: yanıt `text/event-stream`, olay sırası delta… → final; DB'de iki mesaj.
 
 ### 6.4 Düzenleme, önizleme ve kurallar
@@ -515,6 +520,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 - **İş:** `mock-provider/`: tek giriş noktalı sade PHP, `php -S` (`PHP_CLI_SERVER_WORKERS=16`). `POST /sms {to, body}`, `POST /email {to, subject, body}`; `Idempotency-Key` zorunlu; geçersiz alıcı → 400 (kalıcı hata). `GET /health`, `GET /stats` (kanal başına toplam, tekrar sayısı, saniyelik en yüksek hız), `DELETE /stats` (test sıfırlama). Compose'a eklenir.
 - **Dosyalar:** `mock-provider/public/index.php`, `mock-provider/src/*`, `mock-provider/Dockerfile`, `docker-compose.yml`
 - **Bağımlı:** 2.8
+- **Not:** Compose servis adı `mock-provider` olmalı (`PROVIDER_URL` bunu bekler); `MOCK_*` env'leri `.env.example`'da hazır.
 - **Kabul:** `curl` ile SMS gönder → 200 ve `id`; `/stats` 1 gösterir.
 
 ### 7.2 Idempotency
@@ -548,6 +554,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 - **İş:** Saf sınıf: deneme n → `min(cap, base·2ⁿ)` aralığında full jitter; `RateLimited` → `max(retryAfter, backoff)`; maks. 5 deneme; `Permanent` → tekrar yok. Rastgele kaynağı enjekte edilir.
 - **Dosyalar:** `app/Delivery/RetryPolicy.php`, `RetryDecision.php`, unit test
 - **Bağımlı:** 8.1
+- **Not:** `config/delivery.php`'deki taban (200 ms) ve tavan (10 sn) tahmindir, burada ayarlanır.
 - **Kabul:** Unit: gecikme sınırları, `Retry-After` önceliği, 5. denemeden sonra `GiveUp`.
 
 ### 8.3 `SendDeliveryJob`
@@ -583,6 +590,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 - **İş:** `worker-sms`/`worker-email`: `queue:work redis --queue=<kanal> --sleep=0 --max-time=3600`, replica `WORKERS_PER_CHANNEL` (varsayılan 8). Graceful shutdown (`stop_grace_period`).
 - **Dosyalar:** `docker-compose.yml`
 - **Bağımlı:** 8.4
+- **Not:** Servisler 2.8'de var; burada komut/replica ince ayarı yapılır. 16 worker ve `app` aynı Postgres'e bağlanır, `max_connections=100` izlenir. Healthcheck `queue:work`'ün PID 1 olmasına bakar, komut değişirse güncellenir.
 - **Kabul:** `docker compose ps` → 16 worker; `docker compose logs worker-sms` işlenen job'ları gösterir.
 
 ### 8.8 Uçtan uca smoke script'i
@@ -702,6 +710,7 @@ Performans ilkeleri (gerektiği yerde): lazy route, stream delta'larını `reque
 - **İş:** Kurulum (`.env.example` → `.env`, key isteğe bağlı), mermaid mimari diyagramı, akış, endpoint tablosu, test komutları (Windows için `docker compose` eşdeğerleriyle), `llm:eval` sonucu, yapılmayanlar. Varsayımlar ve kapsam dışı: kimlik doğrulama yok (K22), içerik Türkçe, yasal SMS metni (İYS, çıkış ifadesi) yok, kampanyalar arası frekans sınırı yok, seed 5.000 kişi.
 - **Dosyalar:** `README.md`
 - **Bağımlı:** 10.8
+- **Not:** README'deki _TBD_ bölümler doldurulur; Docker imaj etiketleri (`node:24-alpine`, `nginx:stable-alpine`) sabitlenir; Boost için `backend/.env` içinde `APP_ENV=local` gerektiği yazılır.
 - **Kabul:** Okuyarak onay.
 
 ### 11.2 DECISIONS kontrolü

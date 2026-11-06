@@ -1,12 +1,26 @@
 # Decisions
 
-Each decision: what was chosen, why, and what was rejected.
+Each decision is written when the first task that needs it lands. Use this template:
+
+```
+## K<n>: <short title>
+
+- **Decision:** what was chosen.
+- **Rationale:** why, in one or two sentences.
+- **Alternatives:** what was rejected.
+```
 
 ## K1: Laravel 12 on FrankenPHP, classic mode
 
 - **Decision:** Laravel 12 (PHP 8.4) served by FrankenPHP in classic mode, without Octane.
 - **Rationale:** Queue, Redis throttling, migrations, seeders, Pest and SSE are built in. One container, no stream buffering to tune, and no state leaking between requests.
 - **Alternatives:** Symfony, Slim; nginx + php-fpm.
+
+## K2: PostgreSQL
+
+- **Decision:** PostgreSQL 17 is the only relational store.
+- **Rationale:** `COUNT(*) FILTER` gives per-channel counts in one query, `ON CONFLICT DO NOTHING` makes the audience snapshot idempotent, and JSONB holds structured values.
+- **Alternatives:** MySQL, SQLite.
 
 ## K3: Redis for queue, rate limiter and locks
 
