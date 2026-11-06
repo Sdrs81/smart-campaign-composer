@@ -71,6 +71,12 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** The case rewards reliable structured output. Failures, retries and latency stay visible and measurable (`llm:eval`, metrics), and a decorator adds this without touching the clients (OCP).
 - **Alternatives:** A single attempt with no repair; unlimited retries; logging inside each client; storing the full prompt.
 
+## K14: Personalisation with a closed variable list
+
+- **Decision:** A message may use only `{{first_name}}`, `{{last_name}}` and `{{city}}` (`Variables`), each with a fallback used when the customer has no value ("Değerli müşterimiz" for the first name). `PersonalizationRenderer` fills them in one regex pass, so cost is O(n) and a value that looks like `{{city}}` is inserted as text, never expanded. An unknown placeholder is reported, not rendered. Length is counted in visible characters with `grapheme_strlen` (a Turkish letter, an emoji or a joined family emoji is 1). The worst case counts each variable as the longer of the audience's longest value and its fallback, since a customer with no value gets the fallback. Spaces inside the braces are accepted (`{{ first_name }}`).
+- **Rationale:** A closed list leaves no room for template injection, and one pass keeps rendering linear. Counting what the reader sees keeps the limit true on the recipient's phone.
+- **Alternatives:** Twig or Blade as the template engine; counting bytes or code points.
+
 ## K15: Human approval as a campaign state machine
 
 - **Decision:** `Campaign` is a rich model: `defineAudience()`, `setContent()`, `approve()`, `startSending()`, `complete()` and `fail()` are the only way to change `status`, which is not mass assignable. Flow: `draft → audience_ready → content_ready → approved → sending → completed | failed`. Audience and content can be redone until approval (`audience_ready` and `content_ready` accept themselves, and `content_ready` can return to `audience_ready`), because the rule is read-only and the brief is what changes. `approved → approved` is allowed, so approving twice is a no-op. Any other move throws `InvalidCampaignTransition` (HTTP 409 with `from`, `to` and `allowed`). The methods change the model in memory only; the caller saves it.
