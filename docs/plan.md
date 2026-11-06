@@ -397,7 +397,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 - **İş:** `LlmClient::complete(LlmRequest): LlmResponse`, `stream(LlmRequest): iterable<LlmChunk>`. DTO'lar: system, messages, JSON şeması, `maxTokens`; yanıt: metin, usage, `stopReason`. `FakeLlmClient`: sıralı senaryo kuyruğu (geçersiz → geçerli gibi), stream'i parçalara böler, hata da üretebilir. Container binding: `auto` / `claude` / `fake`.
 - **Dosyalar:** `app/Llm/LlmClient.php`, `LlmRequest.php`, `LlmResponse.php`, `LlmChunk.php`, `FakeLlmClient.php`, `app/Providers/LlmServiceProvider.php`, unit test
 - **Bağımlı:** 2.3
-- **Not:** `config/llm.php` yalnızca çözümler; bilinmeyen `LLM_DRIVER` değerinde (örn. `claud`) binding hata fırlatır.
+- **Not:** `config/llm.php` yalnızca çözümler; bilinmeyen `LLM_DRIVER` değerinde (örn. `claud`) ve `claude` + boş key birleşiminde binding hata fırlatır.
 - **Kabul:** Unit: senaryo sırası, stream parçaları birleşince tam metin, binding doğru sürücüyü seçer.
 
 ### 5.2 `ClaudeLlmClient`: tek seferlik çağrı
