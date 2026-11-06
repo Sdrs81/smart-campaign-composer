@@ -13,7 +13,6 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
-use LogicException;
 
 /**
  * Calls the Anthropic Messages API over Laravel's HTTP client (K9).
@@ -33,6 +32,8 @@ final class ClaudeLlmClient implements LlmClient
     // A hostile or buggy retry-after must not stall a request for minutes.
     public const MAX_RETRY_DELAY_SECONDS = 30;
 
+    private const STREAM_READ_BYTES = 1024;
+
     private const STATUS_RATE_LIMITED = 429;
 
     private const FIRST_SERVER_ERROR_STATUS = 500;
@@ -50,15 +51,36 @@ final class ClaudeLlmClient implements LlmClient
 
     public function stream(LlmRequest $request): iterable
     {
-        throw new LogicException('ClaudeLlmClient::stream() is implemented in task 5.3.');
+        $body = $this->send($request, stream: true)->toPsrResponse()->getBody();
+        $parser = new SseParser;
+
+        // Retries cover only the connection phase; once bytes flow, a failure surfaces as an exception.
+        while (! $body->eof()) {
+            foreach ($parser->feed($body->read(self::STREAM_READ_BYTES)) as $chunk) {
+                yield $this->guardedChunk($chunk);
+            }
+        }
+
+        foreach ($parser->finish() as $chunk) {
+            yield $this->guardedChunk($chunk);
+        }
     }
 
-    private function send(LlmRequest $request): Response
+    private function guardedChunk(LlmChunk $chunk): LlmChunk
     {
-        $payload = $this->payload($request);
+        if ($chunk->stopReason !== null) {
+            $this->assertUsableStopReason($chunk->stopReason, null);
+        }
+
+        return $chunk;
+    }
+
+    private function send(LlmRequest $request, bool $stream = false): Response
+    {
+        $payload = $this->payload($request, $stream);
 
         for ($attempt = 1; ; $attempt++) {
-            $outcome = $this->attempt($payload);
+            $outcome = $this->attempt($payload, $stream);
 
             if ($outcome instanceof Response && ! $this->isRetryable($outcome)) {
                 return $this->failOnClientError($outcome);
@@ -79,20 +101,23 @@ final class ClaudeLlmClient implements LlmClient
     }
 
     /** @param  array<string, mixed>  $payload */
-    private function attempt(array $payload): Response|ConnectionException
+    private function attempt(array $payload, bool $stream): Response|ConnectionException
     {
         try {
             return Http::withHeaders([
                 'x-api-key' => $this->apiKey,
                 'anthropic-version' => self::API_VERSION,
-            ])->timeout($this->timeoutSeconds)->acceptJson()->post(self::API_URL, $payload);
+            ])->withOptions(['stream' => $stream])
+                ->timeout($this->timeoutSeconds)
+                ->acceptJson()
+                ->post(self::API_URL, $payload);
         } catch (ConnectionException $exception) {
             return $exception;
         }
     }
 
     /** @return array<string, mixed> */
-    private function payload(LlmRequest $request): array
+    private function payload(LlmRequest $request, bool $stream): array
     {
         $payload = [
             'model' => $this->model,
@@ -100,6 +125,10 @@ final class ClaudeLlmClient implements LlmClient
             'system' => $request->system,
             'messages' => $request->messages,
         ];
+
+        if ($stream) {
+            $payload['stream'] = true;
+        }
 
         if ($request->jsonSchema !== null) {
             $payload['output_config'] = ['format' => ['type' => 'json_schema', 'schema' => $request->jsonSchema]];
@@ -165,19 +194,11 @@ final class ClaudeLlmClient implements LlmClient
     {
         $stopReason = $body['stop_reason'] ?? null;
 
-        if ($stopReason === LlmResponse::STOP_REFUSAL) {
-            $category = $body['stop_details']['category'] ?? null;
-
-            throw new LlmRefused('Claude declined to answer (category: '.(is_string($category) ? $category : 'unspecified').').');
-        }
-
-        if ($stopReason === LlmResponse::STOP_MAX_TOKENS) {
-            throw new LlmTruncated('Claude hit max_tokens before finishing; raise max_tokens or shorten the task.');
-        }
-
         if (! is_string($stopReason) || ! is_array($body['content'] ?? null)) {
             throw new LlmBadResponse('Claude API response lacks a string "stop_reason" or a "content" array.');
         }
+
+        $this->assertUsableStopReason($stopReason, $body['stop_details']['category'] ?? null);
 
         return new LlmResponse(
             $this->textOf($body['content']),
@@ -187,6 +208,18 @@ final class ClaudeLlmClient implements LlmClient
             ),
             $stopReason,
         );
+    }
+
+    // Shared by complete() and stream(): a refused or cut-off answer must never reach a parser.
+    private function assertUsableStopReason(string $stopReason, mixed $refusalCategory): void
+    {
+        if ($stopReason === LlmResponse::STOP_REFUSAL) {
+            throw new LlmRefused('Claude declined to answer (category: '.(is_string($refusalCategory) ? $refusalCategory : 'unspecified').').');
+        }
+
+        if ($stopReason === LlmResponse::STOP_MAX_TOKENS) {
+            throw new LlmTruncated('Claude hit max_tokens before finishing; raise max_tokens or shorten the task.');
+        }
     }
 
     /** @param  array<mixed>  $blocks */

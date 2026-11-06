@@ -161,3 +161,43 @@ it('reports a connection failure in the final exception', function (): void {
     expect(fn () => claudeClient()->complete(claudeRequest()))
         ->toThrow(LlmUnavailable::class, 'connection error');
 });
+
+function claudeStreamFake(): void
+{
+    Http::fake([ClaudeLlmClient::API_URL => Http::response(
+        file_get_contents(__DIR__.'/../Fixtures/claude-stream.txt'),
+        200,
+        ['Content-Type' => 'text/event-stream'],
+    )]);
+}
+
+it('streams text deltas that join to the full text, ending with stop reason and usage', function (): void {
+    claudeStreamFake();
+
+    $chunks = [...claudeClient()->stream(claudeRequest())];
+    $last = end($chunks);
+
+    expect(implode('', array_map(fn ($chunk) => $chunk->text, $chunks)))
+        ->toBe('Merhaba, sepetinde ürün kaldı! İndirim seni bekliyor.')
+        ->and($last->stopReason)->toBe('end_turn')
+        ->and($last->usage->outputTokens)->toBe(15);
+    Http::assertSent(fn (Request $request): bool => $request['stream'] === true);
+});
+
+it('retries the connection phase of a stream like a normal call', function (): void {
+    Http::fake([ClaudeLlmClient::API_URL => Http::sequence()
+        ->push(['error' => ['type' => 'overloaded_error']], 529)
+        ->push((string) file_get_contents(__DIR__.'/../Fixtures/claude-stream.txt')),
+    ]);
+
+    expect(iterator_count(claudeClient()->stream(claudeRequest())))->toBe(4);
+});
+
+it('raises LlmTruncated when a stream stops at max_tokens', function (): void {
+    $stream = "event: message_delta\ndata: {\"delta\":{\"stop_reason\":\"max_tokens\"},\"usage\":{\"output_tokens\":9}}\n\n"
+        ."event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n";
+    Http::fake([ClaudeLlmClient::API_URL => Http::response($stream)]);
+
+    expect(fn () => iterator_to_array(claudeClient()->stream(claudeRequest())))
+        ->toThrow(LlmTruncated::class);
+});
