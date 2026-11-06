@@ -28,7 +28,7 @@ it('seeds the same customers every time', function () {
     $this->seed(CustomerSeeder::class);
     $first = emailFingerprint();
 
-    DB::statement('TRUNCATE customers RESTART IDENTITY');
+    DB::statement('TRUNCATE customers RESTART IDENTITY CASCADE');
     $this->seed(CustomerSeeder::class);
 
     expect($first)->toStartWith(SEEDED_CUSTOMERS.':')

@@ -52,6 +52,12 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** An invalid transition fails early, next to the data it protects. Idempotent approval makes a double click harmless.
 - **Alternatives:** A rule editor (YAGNI); status set from services or controllers.
 
+## K19: Three layers against double sends
+
+- **Decision:** (1) A DB unique key on `deliveries` (`campaign_id`, `customer_id`, `channel`) means a row exists once; the snapshot uses `ON CONFLICT DO NOTHING`. (2) An atomic claim, a conditional `UPDATE` from `pending` (or a stale `sending`) to `sending`, means two workers cannot take the same row. (3) The provider `Idempotency-Key` (sha256 of campaign, customer and channel, unique on the row) deduplicates a retry after a timeout. Different campaigns may reach the same customer (no frequency cap). `Delivery` is a rich model: `markSent()`, `markFailed()`, `scheduleRetry()` (back to `pending`) and `skip()` are the only way to change its status, and `sent`, `failed` and `skipped` are final. `attempts` counts finished provider attempts (sent, retry, failed), not skips. The database fills `created_at` and `updated_at`, because the snapshot is a raw `INSERT … SELECT`.
+- **Rationale:** Each layer covers a failure the others cannot: duplicate rows, concurrent workers, and an ambiguous network failure.
+- **Alternatives:** A Redis set; only `ShouldBeUnique` jobs.
+
 ## Setup notes (Phase 2)
 
 - **API only:** no web routes, views or Vite in the backend; errors share one `{error:{code,message,details}}` body.
