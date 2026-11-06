@@ -46,6 +46,12 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** Tests and `docker compose up` must work without a key; the warning stops a missing key from passing as a working setup.
 - **Alternatives:** The official PHP SDK.
 
+## K15: Human approval as a campaign state machine
+
+- **Decision:** `Campaign` is a rich model: `defineAudience()`, `setContent()`, `approve()`, `startSending()`, `complete()` and `fail()` are the only way to change `status`, which is not mass assignable. Flow: `draft → audience_ready → content_ready → approved → sending → completed | failed`. Audience and content can be redone until approval (`audience_ready` and `content_ready` accept themselves, and `content_ready` can return to `audience_ready`), because the rule is read-only and the brief is what changes. `approved → approved` is allowed, so approving twice is a no-op. Any other move throws `InvalidCampaignTransition` (HTTP 409 with `from`, `to` and `allowed`). The methods change the model in memory only; the caller saves it.
+- **Rationale:** An invalid transition fails early, next to the data it protects. Idempotent approval makes a double click harmless.
+- **Alternatives:** A rule editor (YAGNI); status set from services or controllers.
+
 ## Setup notes (Phase 2)
 
 - **API only:** no web routes, views or Vite in the backend; errors share one `{error:{code,message,details}}` body.
