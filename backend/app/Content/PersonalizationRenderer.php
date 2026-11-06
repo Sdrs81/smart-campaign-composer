@@ -63,8 +63,19 @@ final class PersonalizationRenderer
     /** What the reader counts: a Turkish letter, an emoji or a family emoji (joined with zero-width joiners) is 1. */
     public function visibleLength(string $text): int
     {
-        // grapheme_strlen returns null for invalid UTF-8; JSON-decoded model output cannot be, so the code point count is a safe fallback.
-        return grapheme_strlen($text) ?? mb_strlen($text);
+        $length = grapheme_strlen($text);
+
+        // The PHP manual: it returns null or false on failure, such as invalid UTF-8. JSON-decoded text
+        // cannot be invalid, so the code point count is a safe fallback.
+        return is_int($length) ? $length : mb_strlen($text);
+    }
+
+    /** True when "{{" or "}}" is left over after the well-formed placeholders are removed, e.g. "{{first_name" or "{{ }}". */
+    public function hasMalformedBraces(string $template): bool
+    {
+        $rest = (string) preg_replace(self::PLACEHOLDER, '', $template);
+
+        return str_contains($rest, '{{') || str_contains($rest, '}}');
     }
 
     private function valueOrFallback(string $name, ?string $value): string

@@ -71,6 +71,12 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** The case rewards reliable structured output. Failures, retries and latency stay visible and measurable (`llm:eval`, metrics), and a decorator adds this without touching the clients (OCP).
 - **Alternatives:** A single attempt with no repair; unlimited retries; logging inside each client; storing the full prompt.
 
+## K13: Limits count what the recipient sees
+
+- **Decision:** SMS body ≤ 160, email subject ≤ 80 and email body (plain text) ≤ 2000, counted in visible characters (`grapheme_strlen`; the frontend uses `Intl.Segmenter`). The count is the worst case after personalisation: each variable is filled with the longest value in the audience for that channel (`AudienceService`), or its fallback if that is longer. Model output and a person's edit both become a `MessageContent` and go through the same `ContentValidator`, which returns every problem with the field path (`sms.body`, `email.subject`). The limits live only in `config/delivery.php` and are read when the validator is resolved. The sending step checks again. Operator segments (GSM-7 vs UCS-2) are not modelled.
+- **Rationale:** The limit must hold on the recipient's phone, not just on the template. One validator and one config stop the model, the editor and the frontend from drifting apart.
+- **Alternatives:** Counting the template length, a fixed budget per variable, counting GSM segments.
+
 ## K14: Personalisation with a closed variable list
 
 - **Decision:** A message may use only `{{first_name}}`, `{{last_name}}` and `{{city}}` (`Variables`), each with a fallback used when the customer has no value ("Değerli müşterimiz" for the first name). `PersonalizationRenderer` fills them in one regex pass, so cost is O(n) and a value that looks like `{{city}}` is inserted as text, never expanded. An unknown placeholder is reported, not rendered. Length is counted in visible characters with `grapheme_strlen` (a Turkish letter, an emoji or a joined family emoji is 1). The worst case counts each variable as the longer of the audience's longest value and its fallback, since a customer with no value gets the fallback. Spaces inside the braces are accepted (`{{ first_name }}`).

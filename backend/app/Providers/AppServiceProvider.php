@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Content\ContentValidator;
+use App\Content\PersonalizationRenderer;
 use App\Models\Customer;
 use App\Segment\FieldRegistry;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 
@@ -23,6 +27,15 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(FieldRegistry::class, fn (): FieldRegistry => new FieldRegistry(
             fn (): array => $this->cachedCities(),
+        ));
+
+        // Limits are read when the validator is resolved, from the single config (K13). Config::integer
+        // throws on a wrong type instead of casting it silently.
+        $this->app->bind(ContentValidator::class, fn (Application $app): ContentValidator => new ContentValidator(
+            $app->make(PersonalizationRenderer::class),
+            Config::integer('delivery.limits.sms_body_max'),
+            Config::integer('delivery.limits.email_subject_max'),
+            Config::integer('delivery.limits.email_body_max'),
         ));
     }
 

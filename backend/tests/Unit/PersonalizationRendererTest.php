@@ -79,6 +79,25 @@ it('counts visible characters, not bytes or code points', function (string $text
     'empty' => ['', 0],
 ]);
 
+it('falls back to the code point count for invalid UTF-8 instead of failing', function (): void {
+    // The PHP manual: grapheme_strlen returns null or false for invalid UTF-8.
+    expect((new PersonalizationRenderer)->visibleLength("ab\xFF"))->toBeInt();
+});
+
+it('detects leftover braces after the well-formed placeholders are removed', function (string $template, bool $malformed): void {
+    expect((new PersonalizationRenderer)->hasMalformedBraces($template))->toBe($malformed);
+})->with([
+    'clean' => ['Merhaba {{first_name}} {{ city }}', false],
+    'no braces' => ['Merhaba', false],
+    'unclosed' => ['Merhaba {{first_name', true],
+    'closing only' => ['first_name}} Merhaba', true],
+    'empty' => ['{{}}', true],
+    'blank' => ['{{ }}', true],
+    'space in name' => ['{{first name}}', true],
+    'digit first' => ['{{1abc}}', true],
+    'unknown but well-formed' => ['{{unknown}}', false],
+]);
+
 it('shows why code points are the wrong unit: the family emoji is five of them', function (): void {
     expect(mb_strlen(FAMILY_EMOJI))->toBe(5)
         ->and((new PersonalizationRenderer)->visibleLength(FAMILY_EMOJI))->toBe(1);
