@@ -42,7 +42,7 @@ Each decision is written when the first task that needs it lands. Use this templ
 
 ## K6: Segment language is a flat AND list
 
-- **Decision:** A segment rule is a flat list of conditions joined by AND, with a schema `version`. Multiple values use `in` / `not_in`. Operators per field type live in `FieldType::allowedOperators()`: `enum` takes `eq, neq, in, not_in, is_null, not_null`; `number` takes `eq, neq, gt, gte, lt, lte, between, is_null, not_null`; `date` takes `within_last_days, not_within_last_days, between, is_null, not_null`. `not_within_last_days` also matches null dates. Value limits (`in` ≤ 50 items, days 1-365) are constants on `FieldDefinition`.
+- **Decision:** A segment rule is a flat list of conditions joined by AND, with a schema `version`. Multiple values use `in` / `not_in`. Operators per field type live in `FieldType::allowedOperators()`: `enum` takes `eq, neq, in, not_in, is_null, not_null`; `number` takes `eq, neq, gt, gte, lt, lte, between, is_null, not_null`; `date` takes `within_last_days, not_within_last_days, between, is_null, not_null`. `not_within_last_days`, `neq` and `not_in` also match null values (never bought, no favorite category), because "not X" should include people who have no X at all. Value limits (`in` ≤ 50 items, days 1-365) are constants on `FieldDefinition`.
 - **Rationale:** Typical briefs fit AND lists, so validation and the prompt stay short (YAGNI), and an AND/OR tree can be added later without breaking the version field.
 - **Alternatives:** A nested AND/OR tree; JSON Logic.
 
