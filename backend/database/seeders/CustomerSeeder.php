@@ -88,6 +88,14 @@ class CustomerSeeder extends Seeder
 
     private const AGE_YEARS_RANGE = [18, 70];
 
+    /** Spreads birthdays over the year so ages do not all turn over on the same day. */
+    private const BIRTHDAY_EXTRA_DAYS_MAX = 364;
+
+    private const FEMALE_SHARE = 0.5;
+
+    /** Probabilities are compared on a 0..9999 scale, so 0.0001 is the smallest step. */
+    private const CHANCE_RESOLUTION = 10000;
+
     private const CART_ITEMS_RANGE = [1, 6];
 
     private const CART_UNIT_PRICE_CENTS_RANGE = [5000, 80000];
@@ -131,9 +139,9 @@ class CustomerSeeder extends Seeder
             'email' => sprintf('musteri%d@example.com', $number),
             'phone' => sprintf('+90500%07d', $number), // reserved-looking range, never routable
             'city' => $this->weighted(self::CITY_WEIGHTS),
-            'gender' => $this->chance(0.5) ? 'female' : 'male',
+            'gender' => $this->chance(self::FEMALE_SHARE) ? 'female' : 'male',
             'birth_date' => $this->now->subYears($this->between(...self::AGE_YEARS_RANGE))
-                ->subDays($this->between(0, 364))->toDateString(),
+                ->subDays($this->between(0, self::BIRTHDAY_EXTRA_DAYS_MAX))->toDateString(),
             'language' => $this->chance(self::ENGLISH_SHARE) ? 'en' : 'tr',
             'registered_at' => $this->timestamp($registeredDaysAgo),
             'last_login_at' => $this->timestamp($this->between(0, $loginDaysAgoMax)),
@@ -229,7 +237,7 @@ class CustomerSeeder extends Seeder
 
     private function chance(float $probability): bool
     {
-        return $this->between(0, 9999) < (int) round($probability * 10000);
+        return $this->between(0, self::CHANCE_RESOLUTION - 1) < (int) round($probability * self::CHANCE_RESOLUTION);
     }
 
     /**
