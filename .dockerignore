@@ -1,0 +1,16 @@
+# Never bake real env files, dependencies or local runtime state into an image.
+.git
+.claude
+ai-sessions
+docs
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules
+backend/vendor
+backend/storage/logs
+backend/storage/framework/cache/data
+backend/storage/framework/sessions
+backend/storage/framework/views
+backend/bootstrap/cache/*.php
+frontend/dist

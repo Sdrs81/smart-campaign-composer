@@ -1,27 +1,50 @@
 # Smart Campaign Composer
 
-> **Draft.** Written during the Phase 1 dry run. Sections marked _TBD_ are filled in by the phase that builds them.
+> **Work in progress.** Sections marked _TBD_ are filled in by the phase that builds them.
 
 A marketer writes a campaign brief in plain language. Claude turns it into a segment rule and SMS/email copy, a human previews, edits and approves it, the messages go through a queue to a mock provider, and a dashboard shows delivery status live.
 
 ## Setup
 
-_TBD (Phase 2): `docker compose up` starts everything, with migrations and seed data applied automatically._
+Requirements: Docker. Node, PHP and Composer are not needed on the host.
 
-- Copy `.env.example` to `.env`. `ANTHROPIC_API_KEY` is optional: without it the app runs on a built-in fake LLM.
-- Requirements: Docker. On Windows, where `make` is usually missing, use the `docker compose` equivalents listed here once the Makefile exists.
+```
+cp .env.example .env
+docker compose up -d --build
+```
+
+Then open <http://localhost:8080>. The API health check is at <http://localhost:8080/api/health>.
+
+- Migrations run automatically when the `app` container starts. Seed data is added once a seed table exists.
+- `ANTHROPIC_API_KEY` is optional. Without it the app runs on a built-in fake LLM and logs a warning.
 - There is no authentication: this is a single-marketer local demo.
+
+### Commands
+
+`make` targets and their `docker compose` equivalents, for machines without `make` (Windows):
+
+| Target               | Equivalent                                                                                                                                            |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `make up`            | `docker compose up -d --build`                                                                                                                        |
+| `make down`          | `docker compose down`                                                                                                                                 |
+| `make logs`          | `docker compose logs -f --tail=100`                                                                                                                   |
+| `make fresh`         | `docker compose exec app php artisan migrate:fresh --seed --force`                                                                                    |
+| `make test-backend`  | `docker compose run --rm app vendor/bin/pest`                                                                                                         |
+| `make lint-backend`  | `docker compose run --rm app sh -c "vendor/bin/pint --test && vendor/bin/phpstan --memory-limit=1G"`                                                  |
+| `make test-frontend` | `docker build --target build -t smart-campaign-frontend:tools -f frontend/Dockerfile .` then `docker run --rm smart-campaign-frontend:tools npm test` |
+| `make lint-frontend` | same image, `npm run lint && npm run type-check && npm run format:check`                                                                              |
 
 ## Architecture
 
-_TBD (Phase 2 and later): diagram and component overview._
+_TBD (later phases): diagram and component overview._
 
-- Backend: Laravel 12, JSON API only.
-- Data and queue: PostgreSQL 17, Redis 7.
-- Frontend: Vue 3 and TypeScript.
-- Mock provider: a separate container that injects delays and failures.
+- **Backend:** Laravel 12 on FrankenPHP (classic mode), JSON API only.
+- **Data and queue:** PostgreSQL 17; Redis 7 for the queue (separate `sms` and `email` queues), the rate limiter and locks.
+- **Workers:** the backend image runs again as `worker-sms` and `worker-email`; the replica count per channel comes from `WORKERS_PER_CHANNEL`.
+- **Frontend:** Vue 3, TypeScript and Tailwind, served by nginx, which also proxies `/api` to the backend.
+- **Mock provider:** a separate container that injects delays and failures (added in Phase 7).
 
-The decisions behind these choices are recorded in `DECISIONS.md`.
+The decisions behind these choices are recorded in [DECISIONS.md](DECISIONS.md).
 
 ## Flow
 
@@ -29,9 +52,11 @@ _TBD._ Brief, then audience, then content, then approval, then sending, then das
 
 ## Tests
 
-_TBD (Phase 2): `make test`, `make lint`, `make smoke`, `make e2e`._
+`make test` runs the backend (Pest) and frontend (Vitest) suites inside Docker. Backend integration tests use the real Postgres and Redis containers, in a separate `campaign_test` database and Redis db, so development data is never touched. `make lint` runs Pint, Larastan, ESLint, the type check and Prettier.
 
-The Claude Code tooling has its own tests today:
+_TBD (later phases): `make smoke`, `make e2e`._
+
+The Claude Code tooling has its own tests:
 
 ```
 node scripts/test-guard.mjs
