@@ -40,12 +40,21 @@ final class SegmentQueryCompiler
      */
     public function withChannelConsent(Builder $query, Channel $channel): Builder
     {
+        return $query->whereRaw($this->consentSql($channel));
+    }
+
+    /**
+     * The one definition of "may receive this channel" as a SQL condition; AudienceService uses it in
+     * COUNT(*) FILTER so counting and filtering cannot disagree. It holds no user input.
+     */
+    public function consentSql(Channel $channel): string
+    {
         [$optInColumn, $addressColumn] = match ($channel) {
             Channel::Sms => ['sms_opt_in', 'phone'],
             Channel::Email => ['email_opt_in', 'email'],
         };
 
-        return $query->where($optInColumn, true)->whereNotNull($addressColumn)->where($addressColumn, '<>', '');
+        return "({$optInColumn} AND {$addressColumn} IS NOT NULL AND {$addressColumn} <> '')";
     }
 
     /** @param  Builder<Customer>  $query */

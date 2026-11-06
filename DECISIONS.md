@@ -52,6 +52,12 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** The case requires it, and one registry feeding the parser, compiler, prompt and JSON schema stops them drifting apart (DRY).
 - **Alternatives:** Asking the LLM for SQL or a `where` string.
 
+## K8: Consent is checked twice
+
+- **Decision:** Opt-in is checked when the audience is counted and frozen, and again right before sending; a customer whose consent changed in between is `skipped`. "May receive a channel" (opt-in set and a non-empty address) is defined once, as `SegmentQueryCompiler::consentSql()`. Both the channel filter and the `COUNT(*) FILTER` aggregates in `AudienceService` use it, so counting and filtering cannot disagree. `AudienceService` counts in two queries: one aggregate scan (per-channel counts, unique total, longest personalisation values) and one sample.
+- **Rationale:** Consent can change between approval and sending, so a single check is not enough (defensive). One SQL definition stops the count the marketer sees from drifting from the people who are actually sent to.
+- **Alternatives:** Checking consent only when the audience is counted; a separate query per channel.
+
 ## K9: LLM driver chosen from the API key
 
 - **Decision:** `LLM_DRIVER=auto` resolves to `claude` when `ANTHROPIC_API_KEY` is set, otherwise to `fake` with a logged warning. The model comes from `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`).
