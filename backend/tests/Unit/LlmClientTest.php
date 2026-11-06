@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Llm\ClaudeLlmClient;
 use App\Llm\FakeLlmClient;
 use App\Llm\LlmChunk;
 use App\Llm\LlmClient;
@@ -71,13 +72,7 @@ it('binds the fake client for the fake driver, as a shared instance', function (
 });
 
 it('binds the claude client for the claude driver with a key', function (): void {
-    $app = new Application(dirname(__DIR__, 2));
-    $app->instance('config', new Repository(['llm' => ['driver' => 'claude', 'anthropic' => ['api_key' => 'test-key']]]));
-    $stub = new FakeLlmClient;
-    $app->instance(LlmServiceProvider::CLAUDE_CLIENT, $stub);
-    $app->register(LlmServiceProvider::class);
-
-    expect($app->make(LlmClient::class))->toBe($stub);
+    expect(llmClientFor('claude', 'test-key'))->toBeInstanceOf(ClaudeLlmClient::class);
 });
 
 it('refuses the claude driver without a key', function (): void {
