@@ -123,7 +123,9 @@ final class SegmentQueryCompiler
         };
 
         $bounds = function (Builder $group) use ($column, $today, $minAge, $maxAge): void {
-            if ($minAge !== null && $maxAge !== null && $minAge > $maxAge) {
+            // Nobody is younger than 0, and "at most -1" must not turn into "born after today".
+            $nobodyFits = $maxAge !== null && ($maxAge < 0 || ($minAge !== null && $minAge > $maxAge));
+            if ($nobodyFits) {
                 $group->whereRaw('1 = 0');
 
                 return;

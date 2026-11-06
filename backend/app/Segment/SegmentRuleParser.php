@@ -14,6 +14,8 @@ final class SegmentRuleParser
 
     private const BETWEEN_BOUNDS = 2;
 
+    private const MAX_ECHOED_CHARS = 40;
+
     private const ROOT_KEYS = ['version', 'conditions'];
 
     private const CONDITION_KEYS = ['field', 'operator', 'value'];
@@ -100,7 +102,7 @@ final class SegmentRuleParser
     {
         $field = is_string($name) ? $this->registry->find($name) : null;
         if ($field === null) {
-            $shown = is_string($name) ? "'{$name}'" : get_debug_type($name);
+            $shown = $this->describe($name);
             $errors[] = $this->error("{$path}.field", "unknown field {$shown}; allowed: ".implode(', ', array_keys($this->registry->all())).'.');
         }
 
@@ -115,7 +117,7 @@ final class SegmentRuleParser
             return $operator;
         }
 
-        $shown = is_string($name) ? "'{$name}'" : get_debug_type($name);
+        $shown = $this->describe($name);
         $allowed = implode(', ', array_map(fn (Operator $allowed): string => $allowed->value, $field->allowedOperators()));
         $errors[] = $this->error("{$path}.operator", "operator {$shown} is not allowed for {$field->type->value} field '{$field->name}'; allowed: {$allowed}.");
 
@@ -263,8 +265,16 @@ final class SegmentRuleParser
         return "{$min}-{$max}";
     }
 
+    /**
+     * Error messages go back into the repair prompt, so untrusted text is cut short: a long or
+     * instruction-like value from the LLM must not be copied into the next prompt in full.
+     */
     private function describe(mixed $value): string
     {
+        if (is_string($value)) {
+            return "'".mb_strimwidth($value, 0, self::MAX_ECHOED_CHARS, '…')."'";
+        }
+
         return is_scalar($value) ? var_export($value, true) : get_debug_type($value);
     }
 }

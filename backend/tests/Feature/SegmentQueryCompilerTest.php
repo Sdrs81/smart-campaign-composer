@@ -160,3 +160,35 @@ it('filters by channel consent and a usable address, separately from the rule', 
         ->and(matchedLabels($compiler->withChannelConsent(clone $everyone, Channel::Sms)))->toBe(['both', 'no-email', 'no-email-consent'])
         ->and(matchedLabels($compiler->withChannelConsent(clone $everyone, Channel::Email)))->toBe(['both', 'empty-phone', 'no-phone', 'no-sms-consent']);
 });
+
+it('matches nobody for an age below zero instead of customers born in the future', function (): void {
+    customer('future-born', ['birth_date' => now()->addYear()]);
+    customer('adult', ['birth_date' => now()->subYears(30)->subMonth()]);
+
+    $lessThanZero = compiledQuery([['field' => 'age', 'operator' => 'lt', 'value' => 0]]);
+
+    expect(matchedLabels($lessThanZero))->toBe([]);
+});
+
+it('agrees with Customer::canReceive about who may receive each channel', function (): void {
+    $variants = [
+        [],
+        ['sms_opt_in' => false],
+        ['email_opt_in' => false],
+        ['phone' => null],
+        ['phone' => ''],
+        ['email' => null],
+        ['sms_opt_in' => false, 'email_opt_in' => false],
+    ];
+    foreach ($variants as $index => $attributes) {
+        customer("variant-{$index}", $attributes);
+    }
+
+    $compiler = new SegmentQueryCompiler;
+    foreach (Channel::cases() as $channel) {
+        $bySql = matchedLabels($compiler->withChannelConsent(Customer::query(), $channel));
+        $byModel = Customer::all()->filter(fn (Customer $customer): bool => $customer->canReceive($channel))->pluck('last_name')->sort()->values()->all();
+
+        expect($bySql)->toBe($byModel);
+    }
+});
