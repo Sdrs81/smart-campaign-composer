@@ -40,6 +40,24 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** An event-collection pipeline is out of scope, and indexed column comparisons keep audience counting simple (KISS).
 - **Alternatives:** Event tables queried with `EXISTS`.
 
+## K6: Segment language is a flat AND list
+
+- **Decision:** A segment rule is a flat list of conditions joined by AND, with a schema `version`. Multiple values use `in` / `not_in`. Operators per field type live in `FieldType::allowedOperators()`: `enum` takes `eq, neq, in, not_in, is_null, not_null`; `number` takes `eq, neq, gt, gte, lt, lte, between, is_null, not_null`; `date` takes `within_last_days, not_within_last_days, between, is_null, not_null`. `not_within_last_days`, `neq` and `not_in` also match null values (never bought, no favorite category), because "not X" should include people who have no X at all. Value limits (`in` ≤ 50 items, days 1-365) are constants on `FieldDefinition`.
+- **Rationale:** Typical briefs fit AND lists, so validation and the prompt stay short (YAGNI), and an AND/OR tree can be added later without breaking the version field.
+- **Alternatives:** A nested AND/OR tree; JSON Logic.
+
+## K7: LLM output never becomes SQL
+
+- **Decision:** `FieldRegistry` is the single source for fields, columns, types, operators, value limits and Turkish labels. The flow is registry → `SegmentRuleParser` (an invalid `SegmentRule` cannot exist) → a query builder with bound values. Column names reach SQL only through the registry. `age` is registered against `birth_date` with `derivedFromBirthDate`; the compiler (4.3) turns it into a date comparison. The city list is read lazily from the DB and cached for an hour (`FieldRegistry` takes a closure, so unit tests need no database). Contact details, names and consent flags are not registered; consent is a separate channel filter.
+- **Rationale:** The case requires it, and one registry feeding the parser, compiler, prompt and JSON schema stops them drifting apart (DRY).
+- **Alternatives:** Asking the LLM for SQL or a `where` string.
+
+## K8: Consent is checked twice
+
+- **Decision:** Opt-in is checked when the audience is counted and frozen, and again right before sending; a customer whose consent changed in between is `skipped`. "May receive a channel" (opt-in set and a non-empty address) is defined once, as `SegmentQueryCompiler::consentSql()`. Both the channel filter and the `COUNT(*) FILTER` aggregates in `AudienceService` use it, so counting and filtering cannot disagree. `AudienceService` counts in two queries: one aggregate scan (per-channel counts, unique total, longest personalisation values) and one sample.
+- **Rationale:** Consent can change between approval and sending, so a single check is not enough (defensive). One SQL definition stops the count the marketer sees from drifting from the people who are actually sent to.
+- **Alternatives:** Checking consent only when the audience is counted; a separate query per channel.
+
 ## K9: LLM driver chosen from the API key
 
 - **Decision:** `LLM_DRIVER=auto` resolves to `claude` when `ANTHROPIC_API_KEY` is set, otherwise to `fake` with a logged warning. The model comes from `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`).
