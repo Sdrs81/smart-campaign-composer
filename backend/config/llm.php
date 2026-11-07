@@ -31,7 +31,29 @@ return [
         'timeout' => (int) env('ANTHROPIC_TIMEOUT', 60),
     ],
 
+    // With the fake driver, a call that finds the scenario queue empty is answered from resources/llm-fixtures,
+    // so the app runs end to end without a key (5.11). Tests switch this off to keep their scenarios exact.
+    'fake' => [
+        'dev_scenarios' => (bool) env('LLM_FAKE_DEV_SCENARIOS', true),
+    ],
+
     // Validation failures are fed back to the model at most this many times (K11).
     'max_repair_attempts' => 2,
+
+    // Marketer brief accepted by the segment extractor, in characters.
+    'brief' => [
+        'min_length' => 10,
+        'max_length' => 1000,
+    ],
+
+    // The answer is short JSON, but thinking tokens count against max_tokens, so leave room for them.
+    'segment' => [
+        'max_tokens' => 4096,
+    ],
+
+    // An SMS plus an email of up to 2000 characters in Turkish, with room for thinking tokens.
+    'content' => [
+        'max_tokens' => 8192,
+    ],
 
 ];

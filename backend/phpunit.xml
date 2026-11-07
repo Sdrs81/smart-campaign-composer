@@ -25,10 +25,14 @@
         <server name="DB_CONNECTION" value="pgsql" force="true"/>
         <server name="DB_DATABASE" value="campaign_test" force="true"/>
         <server name="REDIS_DB" value="1" force="true"/>
+        <!-- The container sets CACHE_STORE=redis, and a plain <env> does not override it: tests then shared
+             (and flushed) the development cache, for example the city list. -->
+        <server name="CACHE_STORE" value="array" force="true"/>
+        <!-- Tests queue their own fake LLM scenarios; the ready-made dev answers would hide a missing one. -->
+        <server name="LLM_FAKE_DEV_SCENARIOS" value="false" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
-        <env name="CACHE_STORE" value="array"/>
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>

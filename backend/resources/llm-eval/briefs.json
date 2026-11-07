@@ -1,0 +1,386 @@
+{
+    "comment": "Golden briefs for `php artisan llm:eval`. Expectations are hand-written from the brief, not taken from a model. The briefs deliberately differ from the worked examples in resources/prompts/segment.v1.md (except `example`, the case's sample brief). With the fake driver, `fake_segment` and `fake_content` are the scripted ideal answers, so a fake run checks the pipeline (oracle), not a model.",
+    "tone": "samimi ve profesyonel",
+    "fake_content": {
+        "sms": {
+            "body": "Merhaba {{first_name}}, sana özel kampanyamızı kaçırma! Detaylar için bizi ziyaret et."
+        },
+        "email": {
+            "subject": "Sana özel kampanya",
+            "body": "Merhaba {{first_name}},\n\nSana özel hazırladığımız kampanya yayında. Detayları görmek için bizi ziyaret edebilirsin.\n\nKeyifli alışverişler dileriz."
+        }
+    },
+    "briefs": [
+        {
+            "id": "example",
+            "brief": "Son 30 gün içinde sepetine ürün ekleyip alışveriş yapmayan müşterilere hatırlatma kampanyası hazırla",
+            "expect": {
+                "conditions": [
+                    {
+                        "field": "last_cart_add_at",
+                        "operator": "within_last_days",
+                        "value": 30
+                    },
+                    {
+                        "field": "last_purchase_at",
+                        "operator": "not_within_last_days",
+                        "value": 30
+                    }
+                ],
+                "unsupported": false
+            },
+            "fake_segment": {
+                "rule": {
+                    "version": 1,
+                    "conditions": [
+                        {
+                            "field": "last_cart_add_at",
+                            "operator": "within_last_days",
+                            "value": 30
+                        },
+                        {
+                            "field": "last_purchase_at",
+                            "operator": "not_within_last_days",
+                            "value": 30
+                        }
+                    ]
+                },
+                "unsupported_criteria": [],
+                "explanation": "Son 30 günde sepete ürün ekleyip aynı sürede satın alma yapmayanlar seçildi."
+            }
+        },
+        {
+            "id": "silver-orders",
+            "brief": "Silver üyelerimizden son 90 günde alışveriş yapmış ve toplamda en az 3 sipariş vermiş olanlara teşekkür et",
+            "expect": {
+                "conditions": [
+                    {
+                        "field": "loyalty_tier",
+                        "operator": "eq",
+                        "value": "silver"
+                    },
+                    {
+                        "field": "last_purchase_at",
+                        "operator": "within_last_days",
+                        "value": 90
+                    },
+                    {
+                        "any_of": [
+                            {
+                                "field": "orders_count",
+                                "operator": "gte",
+                                "value": 3
+                            },
+                            {
+                                "field": "orders_count",
+                                "operator": "gt",
+                                "value": 2
+                            }
+                        ]
+                    }
+                ],
+                "unsupported": false
+            },
+            "fake_segment": {
+                "rule": {
+                    "version": 1,
+                    "conditions": [
+                        {
+                            "field": "loyalty_tier",
+                            "operator": "eq",
+                            "value": "silver"
+                        },
+                        {
+                            "field": "last_purchase_at",
+                            "operator": "within_last_days",
+                            "value": 90
+                        },
+                        {
+                            "field": "orders_count",
+                            "operator": "gte",
+                            "value": 3
+                        }
+                    ]
+                },
+                "unsupported_criteria": [],
+                "explanation": "Silver üyelerden son 90 günde alışveriş yapmış ve en az 3 siparişi olanlar seçildi."
+            }
+        },
+        {
+            "id": "young-android-men",
+            "brief": "18 ile 24 yaş arasındaki Android kullanan erkek müşterilere yeni uygulama özelliklerini duyur",
+            "expect": {
+                "conditions": [
+                    {
+                        "field": "age",
+                        "operator": "between",
+                        "value": [18, 24]
+                    },
+                    {
+                        "field": "platform",
+                        "operator": "eq",
+                        "value": "android"
+                    },
+                    { "field": "gender", "operator": "eq", "value": "male" }
+                ],
+                "unsupported": false
+            },
+            "fake_segment": {
+                "rule": {
+                    "version": 1,
+                    "conditions": [
+                        {
+                            "field": "age",
+                            "operator": "between",
+                            "value": [18, 24]
+                        },
+                        {
+                            "field": "platform",
+                            "operator": "eq",
+                            "value": "android"
+                        },
+                        { "field": "gender", "operator": "eq", "value": "male" }
+                    ]
+                },
+                "unsupported_criteria": [],
+                "explanation": "18-24 yaş arası, Android kullanan erkek müşteriler seçildi."
+            }
+        },
+        {
+            "id": "low-order-value",
+            "brief": "Ortalama sipariş tutarı 750 TL'nin altında kalan ve 5 veya daha fazla siparişi bulunan müşterilere sepet indirimi duyur",
+            "expect": {
+                "conditions": [
+                    {
+                        "field": "avg_order_value",
+                        "operator": "lt",
+                        "value": 750
+                    },
+                    {
+                        "any_of": [
+                            {
+                                "field": "orders_count",
+                                "operator": "gte",
+                                "value": 5
+                            },
+                            {
+                                "field": "orders_count",
+                                "operator": "gt",
+                                "value": 4
+                            }
+                        ]
+                    }
+                ],
+                "unsupported": false
+            },
+            "fake_segment": {
+                "rule": {
+                    "version": 1,
+                    "conditions": [
+                        {
+                            "field": "avg_order_value",
+                            "operator": "lt",
+                            "value": 750
+                        },
+                        {
+                            "field": "orders_count",
+                            "operator": "gte",
+                            "value": 5
+                        }
+                    ]
+                },
+                "unsupported_criteria": [],
+                "explanation": "Ortalama sipariş tutarı 750 TL'nin altında olan ve en az 5 siparişi bulunan müşteriler seçildi."
+            }
+        },
+        {
+            "id": "never-bought-recent-login",
+            "brief": "Hiç alışveriş yapmamış ama son 14 gün içinde uygulamaya giriş yapmış müşterilere ilk sipariş teşviki gönder",
+            "expect": {
+                "conditions": [
+                    {
+                        "any_of": [
+                            {
+                                "field": "last_purchase_at",
+                                "operator": "is_null",
+                                "value": null
+                            },
+                            {
+                                "field": "first_purchase_at",
+                                "operator": "is_null",
+                                "value": null
+                            },
+                            {
+                                "field": "orders_count",
+                                "operator": "eq",
+                                "value": 0
+                            }
+                        ]
+                    },
+                    {
+                        "field": "last_login_at",
+                        "operator": "within_last_days",
+                        "value": 14
+                    }
+                ],
+                "unsupported": false
+            },
+            "fake_segment": {
+                "rule": {
+                    "version": 1,
+                    "conditions": [
+                        {
+                            "field": "last_purchase_at",
+                            "operator": "is_null",
+                            "value": null
+                        },
+                        {
+                            "field": "last_login_at",
+                            "operator": "within_last_days",
+                            "value": 14
+                        }
+                    ]
+                },
+                "unsupported_criteria": [],
+                "explanation": "Hiç alışveriş yapmamış ve son 14 günde giriş yapmış müşteriler seçildi."
+            }
+        },
+        {
+            "id": "registered-in-2024",
+            "brief": "2024 yılında kayıt olan müşterilere birinci yıl dönümü mesajı gönder",
+            "expect": {
+                "conditions": [
+                    {
+                        "field": "registered_at",
+                        "operator": "between",
+                        "value": ["2024-01-01", "2024-12-31"]
+                    }
+                ],
+                "unsupported": false
+            },
+            "fake_segment": {
+                "rule": {
+                    "version": 1,
+                    "conditions": [
+                        {
+                            "field": "registered_at",
+                            "operator": "between",
+                            "value": ["2024-01-01", "2024-12-31"]
+                        }
+                    ]
+                },
+                "unsupported_criteria": [],
+                "explanation": "2024 yılı içinde kayıt olan müşteriler seçildi."
+            }
+        },
+        {
+            "id": "web-books",
+            "brief": "Web sitesinden alışveriş yapan ve favori kategorisi kitap olan müşterilere yeni çıkanları duyur",
+            "expect": {
+                "conditions": [
+                    { "field": "platform", "operator": "eq", "value": "web" },
+                    {
+                        "field": "favorite_category",
+                        "operator": "eq",
+                        "value": "kitap"
+                    }
+                ],
+                "unsupported": false
+            },
+            "fake_segment": {
+                "rule": {
+                    "version": 1,
+                    "conditions": [
+                        {
+                            "field": "platform",
+                            "operator": "eq",
+                            "value": "web"
+                        },
+                        {
+                            "field": "favorite_category",
+                            "operator": "eq",
+                            "value": "kitap"
+                        }
+                    ]
+                },
+                "unsupported_criteria": [],
+                "explanation": "Web platformunu kullanan ve favori kategorisi kitap olan müşteriler seçildi."
+            }
+        },
+        {
+            "id": "cart-value",
+            "brief": "Sepetinde en az 2 ürün bulunan ve sepet tutarı 1500 TL'yi aşan müşterilere ücretsiz kargo hatırlatması yap",
+            "expect": {
+                "conditions": [
+                    {
+                        "any_of": [
+                            {
+                                "field": "cart_items_count",
+                                "operator": "gte",
+                                "value": 2
+                            },
+                            {
+                                "field": "cart_items_count",
+                                "operator": "gt",
+                                "value": 1
+                            }
+                        ]
+                    },
+                    { "field": "cart_value", "operator": "gt", "value": 1500 }
+                ],
+                "unsupported": false
+            },
+            "fake_segment": {
+                "rule": {
+                    "version": 1,
+                    "conditions": [
+                        {
+                            "field": "cart_items_count",
+                            "operator": "gte",
+                            "value": 2
+                        },
+                        {
+                            "field": "cart_value",
+                            "operator": "gt",
+                            "value": 1500
+                        }
+                    ]
+                },
+                "unsupported_criteria": [],
+                "explanation": "Sepetinde en az 2 ürün olan ve sepet tutarı 1500 TL'yi aşan müşteriler seçildi."
+            }
+        },
+        {
+            "id": "unsupported-mixed",
+            "brief": "Ankara'da yaşayan ve geçen ay e-postalarımızı açmış müşterilere özel teklif sun",
+            "expect": {
+                "conditions": [
+                    { "field": "city", "operator": "eq", "value": "Ankara" }
+                ],
+                "unsupported": true
+            },
+            "fake_segment": {
+                "rule": {
+                    "version": 1,
+                    "conditions": [
+                        { "field": "city", "operator": "eq", "value": "Ankara" }
+                    ]
+                },
+                "unsupported_criteria": ["geçen ay e-postalarımızı açmış"],
+                "explanation": "Ankara'da yaşayan müşteriler seçildi; e-posta açma bilgisi desteklenmediği için dışarıda bırakıldı."
+            }
+        },
+        {
+            "id": "unsupported-only",
+            "brief": "Instagram'da markamızı takip eden müşterilere teşekkür mesajı gönder",
+            "expect": {
+                "outcome": "unsupported_only"
+            },
+            "fake_segment": {
+                "rule": { "version": 1, "conditions": [] },
+                "unsupported_criteria": ["Instagram'da markamızı takip eden"],
+                "explanation": "Sosyal medya takibi desteklenen bir alan olmadığı için hiçbir koşul kurulamadı."
+            }
+        }
+    ]
+}
