@@ -95,6 +95,12 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** Each layer covers a failure the others cannot: duplicate rows, concurrent workers, and an ambiguous network failure.
 - **Alternatives:** A Redis set; only `ShouldBeUnique` jobs.
 
+## K20: Mock provider as a separate plain-PHP container
+
+- **Decision:** `mock-provider/` is its own container: plain PHP (`php -S`, 16 workers, no framework) with counters in Redis. A missing `Idempotency-Key` or a bad recipient is a 400 (permanent for the main app). `/stats` reports per channel `total`, `duplicates_prevented` and `peak_per_second`.
+- **Rationale:** Independent counters prove nothing was sent twice, and real network failures happen between containers.
+- **Alternatives:** A route inside the Laravel app; a framework.
+
 ## Setup notes (Phase 2)
 
 - **API only:** no web routes, views or Vite in the backend; errors share one `{error:{code,message,details}}` body.
