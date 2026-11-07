@@ -86,12 +86,23 @@ class Campaign extends Model
         $this->transitionTo(CampaignStatus::Failed);
     }
 
+    /** Lets a caller refuse before doing expensive work (an LLM call) that defineAudience() would reject afterwards. */
+    public function assertAudienceCanBeDefined(): void
+    {
+        $this->assertCanTransitionTo(CampaignStatus::AudienceReady);
+    }
+
     private function transitionTo(CampaignStatus $next): void
+    {
+        $this->assertCanTransitionTo($next);
+
+        $this->status = $next;
+    }
+
+    private function assertCanTransitionTo(CampaignStatus $next): void
     {
         if (! $this->status->canTransitionTo($next)) {
             throw InvalidCampaignTransition::between($this->status, $next);
         }
-
-        $this->status = $next;
     }
 }
