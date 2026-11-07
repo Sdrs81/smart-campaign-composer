@@ -24,21 +24,11 @@ final class UpdateCampaignContent
     {
         $this->assertEditable($campaign);
 
-        $longestValues = AudienceSummary::fromArray($campaign->audience_counts ?? [])->longestValues;
-        $problems = [];
-        foreach ([$sms, $email] as $content) {
-            foreach ($this->validator->validate($content, $longestValues[$content->channel->value] ?? [])->errors ?? [] as $error) {
-                $problems[$error['path']][] = $error['message'];
-            }
-        }
-        if ($problems !== []) {
-            throw ValidationException::withMessages($problems);
-        }
-
         return DB::transaction(function () use ($campaign, $sms, $email): Campaign {
+            // Status and audience are read under the lock, so the text is checked against the audience it is saved for.
             $locked = Campaign::query()->lockForUpdate()->findOrFail($campaign->id);
-            // Approval may have happened since the request was read.
             $this->assertEditable($locked);
+            $this->assertValid($locked, [$sms, $email]);
 
             foreach ([$sms, $email] as $content) {
                 $message = $locked->messages()->firstOrNew(['channel' => $content->channel->value]);
@@ -52,6 +42,22 @@ final class UpdateCampaignContent
 
             return $locked->load('messages');
         });
+    }
+
+    /** @param  list<MessageContent>  $contents */
+    private function assertValid(Campaign $campaign, array $contents): void
+    {
+        $longestValues = AudienceSummary::fromArray($campaign->audience_counts ?? [])->longestValues;
+        $problems = [];
+        foreach ($contents as $content) {
+            foreach ($this->validator->validate($content, $longestValues[$content->channel->value] ?? [])->errors ?? [] as $error) {
+                $problems[$error['path']][] = $error['message'];
+            }
+        }
+
+        if ($problems !== []) {
+            throw ValidationException::withMessages($problems);
+        }
     }
 
     private function assertEditable(Campaign $campaign): void

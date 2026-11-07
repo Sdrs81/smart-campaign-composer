@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Content\GenerateCampaignContent;
+use App\Exceptions\ApiException;
 use App\Http\Requests\StreamCampaignContentRequest;
 use App\Llm\ContentEvent;
 use App\Models\Campaign;
@@ -29,6 +30,9 @@ class CampaignContentStreamController extends Controller
                         return;
                     }
                 }
+            } catch (ApiException $conflict) {
+                // An expected race, e.g. approval while the model was writing: tell the client why, no crash report.
+                $this->send(ContentEvent::FAILED, ['code' => $conflict->errorCode(), 'message' => $conflict->getMessage(), 'errors' => []]);
             } catch (Throwable $failure) {
                 report($failure);
                 $this->send(ContentEvent::FAILED, ['code' => 'server_error', 'message' => 'Content generation failed unexpectedly.', 'errors' => []]);

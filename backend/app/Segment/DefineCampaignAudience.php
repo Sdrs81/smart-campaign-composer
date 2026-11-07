@@ -33,6 +33,8 @@ final class DefineCampaignAudience
             $locked = Campaign::query()->lockForUpdate()->findOrFail($campaign->id);
             $locked->defineAudience($extraction->rule->toArray(), $extraction->unsupported, $summary->toArray());
             $locked->save();
+            // The text was checked against the old audience's longest values, so it cannot stay as if still valid.
+            $locked->messages()->delete();
 
             return $locked;
         });

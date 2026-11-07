@@ -61,6 +61,20 @@ it('can be run again with a changed brief before approval', function (): void {
     $this->postJson("/api/campaigns/{$campaign->id}/audience")->assertOk();
 });
 
+it('drops the saved messages when the audience is defined again', function (): void {
+    fakeLlm()->enqueue(femaleSegmentAnswer());
+    $campaign = draftCampaign();
+    $campaign->defineAudience(['version' => 1, 'conditions' => []], [], []);
+    $campaign->setContent();
+    $campaign->save();
+    $campaign->messages()->create(['channel' => 'sms', 'subject' => null, 'body' => 'Merhaba', 'source' => 'llm']);
+
+    $this->postJson("/api/campaigns/{$campaign->id}/audience")->assertOk();
+
+    expect($campaign->fresh()->messages)->toHaveCount(0)
+        ->and($campaign->fresh()->status)->toBe(CampaignStatus::AudienceReady);
+});
+
 it('answers 422 with the problem list when the model never produces a valid rule', function (): void {
     fakeLlm()->enqueue('bu bir JSON değil', 'bu da değil', 'yine değil');
     $campaign = draftCampaign();
