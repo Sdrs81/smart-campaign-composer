@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Content\ContentValidator;
 use App\Llm\ClaudeLlmClient;
+use App\Llm\ContentGenerator;
 use App\Llm\FakeLlmClient;
 use App\Llm\LlmClient;
+use App\Llm\Prompts\ContentPrompt;
 use App\Llm\Prompts\SegmentPrompt;
 use App\Llm\RecordingLlmClient;
 use App\Llm\SegmentExtractor;
 use App\Segment\SegmentRuleParser;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
 
@@ -41,6 +45,14 @@ class LlmServiceProvider extends ServiceProvider
             (int) config('llm.segment.max_tokens'),
             (int) config('llm.brief.min_length'),
             (int) config('llm.brief.max_length'),
+        ));
+
+        $this->app->bind(ContentGenerator::class, fn (Application $app): ContentGenerator => new ContentGenerator(
+            $app->make(RecordingLlmClient::class),
+            $app->make(ContentPrompt::class),
+            $app->make(ContentValidator::class),
+            Config::integer('llm.max_repair_attempts'),
+            Config::integer('llm.content.max_tokens'),
         ));
     }
 

@@ -45,4 +45,9 @@ return [
         'max_tokens' => 4096,
     ],
 
+    // An SMS plus an email of up to 2000 characters in Turkish, with room for thinking tokens.
+    'content' => [
+        'max_tokens' => 8192,
+    ],
+
 ];
