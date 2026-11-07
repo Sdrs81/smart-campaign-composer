@@ -93,6 +93,12 @@ it('joins multi-line data fields with a newline before decoding', function (): v
     expect(parseInPieces([$stream]))->toEqual([new LlmChunk('', 'end_turn', new LlmUsage(3, 1))]);
 });
 
+it('rejects a stop_reason that is not a string as a bad response', function (): void {
+    $stream = "event: message_delta\ndata: {\"delta\":{\"stop_reason\":{\"x\":1}},\"usage\":{\"output_tokens\":1}}\n\n";
+
+    expect(fn () => parseInPieces([$stream]))->toThrow(LlmBadResponse::class, 'stop_reason that is not a string');
+});
+
 it('ignores ping events and comment lines', function (): void {
     expect(array_filter(parseInPieces([streamFixture()]), fn (LlmChunk $chunk): bool => $chunk->text === 'ping'))
         ->toBeEmpty();

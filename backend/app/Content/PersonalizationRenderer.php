@@ -75,7 +75,9 @@ final class PersonalizationRenderer
     {
         $rest = (string) preg_replace(self::PLACEHOLDER, '', $template);
 
-        return str_contains($rest, '{{') || str_contains($rest, '}}');
+        // Triple braces would leave a stray single brace behind after the placeholder is removed.
+        return str_contains($rest, '{{') || str_contains($rest, '}}')
+            || str_contains($template, '{{{') || str_contains($template, '}}}');
     }
 
     private function valueOrFallback(string $name, ?string $value): string

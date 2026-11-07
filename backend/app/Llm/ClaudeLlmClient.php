@@ -13,6 +13,8 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
+use Psr\Http\Message\StreamInterface;
+use RuntimeException;
 
 /**
  * Calls the Anthropic Messages API over Laravel's HTTP client (K9).
@@ -56,13 +58,23 @@ final class ClaudeLlmClient implements LlmClient
 
         // Retries cover only the connection phase; once bytes flow, a failure surfaces as an exception.
         while (! $body->eof()) {
-            foreach ($parser->feed($body->read(self::STREAM_READ_BYTES)) as $chunk) {
+            foreach ($parser->feed($this->readStream($body)) as $chunk) {
                 yield $this->guardedChunk($chunk);
             }
         }
 
         foreach ($parser->finish() as $chunk) {
             yield $this->guardedChunk($chunk);
+        }
+    }
+
+    /** A dropped connection or read timeout mid-stream must surface as the typed error callers handle. */
+    private function readStream(StreamInterface $body): string
+    {
+        try {
+            return $body->read(self::STREAM_READ_BYTES);
+        } catch (RuntimeException $exception) {
+            throw new LlmUnavailable('Claude stream was interrupted: '.$exception->getMessage(), 0, $exception);
         }
     }
 

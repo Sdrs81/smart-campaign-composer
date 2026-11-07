@@ -141,7 +141,11 @@ final class SseParser
             case 'content_block_delta':
                 return $this->textDelta($payload);
             case 'message_delta':
-                $this->stopReason = $payload['delta']['stop_reason'] ?? $this->stopReason;
+                $stopReason = $payload['delta']['stop_reason'] ?? null;
+                if ($stopReason !== null && ! is_string($stopReason)) {
+                    throw new LlmBadResponse('Claude stream sent a stop_reason that is not a string.');
+                }
+                $this->stopReason = $stopReason ?? $this->stopReason;
                 $this->outputTokens = (int) ($payload['usage']['output_tokens'] ?? $this->outputTokens);
 
                 return null;

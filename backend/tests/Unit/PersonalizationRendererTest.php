@@ -96,6 +96,7 @@ it('detects leftover braces after the well-formed placeholders are removed', fun
     'space in name' => ['{{first name}}', true],
     'digit first' => ['{{1abc}}', true],
     'unknown but well-formed' => ['{{unknown}}', false],
+    'triple braces' => ['Merhaba {{{first_name}}}', true],
 ]);
 
 it('shows why code points are the wrong unit: the family emoji is five of them', function (): void {

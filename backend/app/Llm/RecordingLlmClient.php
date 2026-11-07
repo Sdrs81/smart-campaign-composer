@@ -6,6 +6,7 @@ namespace App\Llm;
 
 use App\Enums\LlmCallOutcome;
 use App\Models\LlmCall;
+use Illuminate\Database\QueryException;
 use Throwable;
 
 /**
@@ -90,7 +91,24 @@ final class RecordingLlmClient implements LlmClient
         ?string $rawOutput = null,
         ?Throwable $error = null,
     ): void {
-        $this->lastCall = LlmCall::create([
+        // Logging is best-effort: a failed write must not discard a paid answer or hide the original error.
+        try {
+            $this->lastCall = $this->createRow($request, $startedAt, $outcome, $usage, $rawOutput, $error);
+        } catch (QueryException $exception) {
+            $this->lastCall = null;
+            report($exception);
+        }
+    }
+
+    private function createRow(
+        LlmRequest $request,
+        int $startedAt,
+        LlmCallOutcome $outcome,
+        ?LlmUsage $usage,
+        ?string $rawOutput,
+        ?Throwable $error,
+    ): LlmCall {
+        return LlmCall::create([
             'purpose' => $request->purpose,
             'prompt_version' => $request->promptVersion,
             'model' => $this->model,

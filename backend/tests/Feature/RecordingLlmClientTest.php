@@ -12,6 +12,7 @@ use App\Llm\LlmUsage;
 use App\Llm\RecordingLlmClient;
 use App\Models\LlmCall;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
 
@@ -38,6 +39,15 @@ it('records one succeeded row with usage, raw output and latency', function (): 
         ->and($call->raw_output)->toBe('{"ok":true}')
         ->and($call->error_message)->toBeNull()
         ->and($call->latency_ms)->toBeGreaterThan(0);
+});
+
+it('still returns the answer when the call log cannot be written', function (): void {
+    // Rolled back with the test transaction; the table is gone so the insert fails.
+    Schema::drop('llm_calls');
+    $client = new RecordingLlmClient((new FakeLlmClient)->enqueue(new LlmResponse('{"ok":true}', new LlmUsage(1, 1))), 'claude-sonnet-5-5');
+
+    expect($client->complete(recordedRequest())->text)->toBe('{"ok":true}')
+        ->and($client->lastCall())->toBeNull();
 });
 
 it('records one failed row and rethrows the original exception', function (): void {
