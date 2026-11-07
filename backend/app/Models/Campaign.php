@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\CampaignStatus;
 use App\Exceptions\InvalidCampaignTransition;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property string $brief
@@ -35,6 +36,14 @@ class Campaign extends Model
             'unsupported_criteria' => 'array',
             'audience_counts' => 'array',
         ];
+    }
+
+    /**
+     * @return HasMany<CampaignMessage, $this>
+     */
+    public function messages(): HasMany
+    {
+        return $this->hasMany(CampaignMessage::class);
     }
 
     /**

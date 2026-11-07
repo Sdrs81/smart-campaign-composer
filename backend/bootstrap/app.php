@@ -8,6 +8,7 @@ use App\Llm\Exceptions\LlmException;
 use App\Llm\Exceptions\LlmRefused;
 use App\Llm\Exceptions\LlmTruncated;
 use App\Llm\Exceptions\LlmUnavailable;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -43,6 +44,13 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return ErrorResponse::make($code, $e->getMessage(), $status);
         });
+
+        $exceptions->render(fn (ModelNotFoundException $e) => ErrorResponse::make(
+            'not_found',
+            class_basename($e->getModel()).' not found.',
+            404,
+            ['ids' => $e->getIds()],
+        ));
 
         $exceptions->render(fn (ValidationException $e) => ErrorResponse::make(
             'validation_failed',
