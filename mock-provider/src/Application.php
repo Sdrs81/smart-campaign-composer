@@ -16,6 +16,7 @@ final class Application
 
     public function __construct(
         private readonly Stats $stats,
+        private readonly IdempotencyStore $idempotency,
         private readonly RecipientValidator $recipients,
     ) {}
 
@@ -25,7 +26,7 @@ final class Application
         // getenv, not $_ENV: variables_order may omit E under php -S.
         $redis->connect((string) (getenv('REDIS_HOST') ?: 'redis'), (int) (getenv('REDIS_PORT') ?: 6379));
 
-        return new self(new Stats($redis), new RecipientValidator);
+        return new self(new Stats($redis), new IdempotencyStore($redis), new RecipientValidator);
     }
 
     /**
@@ -78,13 +79,32 @@ final class Application
             return;
         }
 
-        $this->stats->recordAccepted($channel, time());
-        $this->json(200, ['id' => bin2hex(random_bytes(16)), 'status' => 'accepted']);
+        $result = $this->idempotency->remember(
+            $channel,
+            $key,
+            $payload,
+            ['id' => bin2hex(random_bytes(16)), 'status' => 'accepted'],
+        );
+
+        if ($result->outcome === IdempotencyOutcome::Conflict) {
+            $this->error(422, 'idempotency_key_reused', "The Idempotency-Key '{$key}' was already used with a different {$channel->value} request body.");
+
+            return;
+        }
+
+        if ($result->outcome === IdempotencyOutcome::Created) {
+            $this->stats->recordAccepted($channel, time());
+        } else {
+            $this->stats->recordDuplicate($channel);
+        }
+
+        $this->json(200, $result->response);
     }
 
     private function resetStats(): void
     {
         $this->stats->reset();
+        $this->idempotency->forgetAll();
         $this->json(200, ['status' => 'reset']);
     }
 

@@ -42,6 +42,11 @@ final class Stats
         );
     }
 
+    public function recordDuplicate(Channel $channel): void
+    {
+        $this->redis->incr(self::PREFIX.$channel->value.':duplicates');
+    }
+
     /**
      * @return array<string, array{total: int, duplicates_prevented: int, peak_per_second: int}>
      */

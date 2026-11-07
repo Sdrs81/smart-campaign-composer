@@ -528,6 +528,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 - **İş:** Aynı key → kaydedilmiş aynı yanıt, sayaca tekrar eklenmez (`SET NX`); aynı key farklı gövde → 422.
 - **Dosyalar:** `mock-provider/src/IdempotencyStore.php`, test
 - **Bağımlı:** 7.1
+- **Not:** Testler projenin geneliyle aynı şekilde Pest ile yazılır. Mock provider'da Composer yok; testler backend imajındaki Pest ile çalışır (`mock-provider/phpunit.xml`, `tests/bootstrap.php`). `DELETE /stats` idempotency kayıtlarını da siler.
 - **Kabul:** Aynı key ile 3 istek → `/stats` toplam 1, `duplicates_prevented` 2.
 
 ### 7.3 Hata üretimi ve kendi rate limit'i
@@ -535,8 +536,8 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 - **İş:** `FaultPolicy` (rastgele kaynağı enjekte edilir): gecikme aralığı, 500, 429 (+`Retry-After`), timeout, "kabul edip 500". Oranlar env'den; deterministik test için `X-Mock-Fault` header'ı. Kanal başına >100/sn → 429 (saniyelik Redis `INCR`).
 - **Dosyalar:** `mock-provider/src/FaultPolicy.php`, `RateLimiter.php`, test
 - **Bağımlı:** 7.2
-- **Not:** Mock provider testleri `make test-mock` hedefiyle `make test`'e eklenir.
-- **Kabul:** `make test` mock provider testlerini de çalıştırır. PHPUnit: sabit rastgele kaynakla beklenen dağılım; `X-Mock-Fault: 429` → 429 ve `Retry-After`; "kabul edip 500" sonrası aynı key ile tekrar → 200 ve kayıt 1.
+- **Not:** Mock provider testleri (Pest, bkz. 7.2) `make test-mock` hedefiyle `make test`'e eklenir.
+- **Kabul:** `make test` mock provider testlerini de çalıştırır. Pest: sabit rastgele kaynakla beklenen dağılım; `X-Mock-Fault: 429` → 429 ve `Retry-After`; "kabul edip 500" sonrası aynı key ile tekrar → 200 ve kayıt 1.
 
 ---
 
