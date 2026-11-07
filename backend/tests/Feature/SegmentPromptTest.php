@@ -21,41 +21,6 @@ function segmentPrompt(): SegmentPrompt
     return new SegmentPrompt(promptRegistry());
 }
 
-/** Keywords Anthropic structured outputs accept; anything else would be rejected or ignored. */
-const SUPPORTED_SCHEMA_KEYWORDS = ['type', 'properties', 'required', 'additionalProperties', 'items', 'enum', 'anyOf'];
-
-const SCHEMA_TYPES = ['object', 'array', 'string', 'number', 'integer', 'boolean', 'null'];
-
-/** @param  array<string, mixed>  $node */
-function assertSchemaNode(array $node, string $path): void
-{
-    expect(array_diff(array_keys($node), SUPPORTED_SCHEMA_KEYWORDS))->toBe([], "{$path} uses an unsupported keyword");
-
-    if (isset($node['type'])) {
-        expect(SCHEMA_TYPES)->toContain($node['type']);
-    }
-
-    if (isset($node['enum'])) {
-        expect($node['enum'])->not->toBeEmpty()->and($node['enum'])->toBe(array_values(array_unique($node['enum'])));
-    }
-
-    if (($node['type'] ?? null) === 'object') {
-        expect($node['additionalProperties'])->toBeFalse("{$path} must set additionalProperties: false")
-            ->and($node['required'])->toBe(array_keys($node['properties']), "{$path} must require every property");
-        foreach ($node['properties'] as $name => $child) {
-            assertSchemaNode($child, "{$path}.{$name}");
-        }
-    }
-
-    if (($node['type'] ?? null) === 'array') {
-        assertSchemaNode($node['items'], "{$path}[]");
-    }
-
-    foreach ($node['anyOf'] ?? [] as $index => $option) {
-        assertSchemaNode($option, "{$path}|{$index}");
-    }
-}
-
 it('matches the stored snapshot of the fixed system prompt', function (): void {
     expect(str_replace("\r\n", "\n", segmentPrompt()->system()))
         ->toBe(str_replace("\r\n", "\n", (string) file_get_contents(SEGMENT_PROMPT_SNAPSHOT)));

@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Content\ContentValidator;
 use App\Content\PersonalizationRenderer;
+use App\Llm\Prompts\ContentPrompt;
 use App\Models\Customer;
 use App\Segment\FieldRegistry;
 use Illuminate\Contracts\Foundation\Application;
@@ -33,6 +34,13 @@ class AppServiceProvider extends ServiceProvider
         // throws on a wrong type instead of casting it silently.
         $this->app->bind(ContentValidator::class, fn (Application $app): ContentValidator => new ContentValidator(
             $app->make(PersonalizationRenderer::class),
+            Config::integer('delivery.limits.sms_body_max'),
+            Config::integer('delivery.limits.email_subject_max'),
+            Config::integer('delivery.limits.email_body_max'),
+        ));
+
+        // The prompt quotes the same limits the validator enforces, so it reads them from the same config.
+        $this->app->bind(ContentPrompt::class, fn (): ContentPrompt => new ContentPrompt(
             Config::integer('delivery.limits.sms_body_max'),
             Config::integer('delivery.limits.email_subject_max'),
             Config::integer('delivery.limits.email_body_max'),
