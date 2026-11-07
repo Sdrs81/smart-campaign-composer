@@ -31,6 +31,22 @@ services:
       timeout: 3s
       retries: 10
 
+  # Stands in for the real SMS/email provider; the service name is what PROVIDER_URL expects.
+  mock-provider:
+    build:
+      context: .
+      dockerfile: mock-provider/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8080/health') === false ? 1 : 0);"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   # Web role: migrates and seeds on start, then serves the API.
   app:
     <<: *backend

@@ -89,11 +89,23 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** An invalid transition fails early, next to the data it protects. Idempotent approval makes a double click harmless.
 - **Alternatives:** A rule editor (YAGNI); status set from services or controllers.
 
+## K17: One rate limit per channel, enforced on both sides
+
+- **Decision:** Sending is limited to 100 per second per channel (`SEND_RATE_PER_SECOND`). The mock provider enforces the same limit itself, with a per-second Redis `INCR` counter per channel, and answers 429 with `Retry-After: 1` when it is exceeded. The main app's limiter (task 8.4) uses `Redis::throttle(...)->block()` so a worker waits instead of burning a retry.
+- **Rationale:** The provider limit is the case requirement. Testing the sender against a provider that really refuses proves the throttle, rather than trusting it. Fixed one-second windows allow a short burst at a boundary, which is measured in 8.8.
+- **Alternatives:** A token bucket in Lua; a batch dispatcher that sends once per second.
+
 ## K19: Three layers against double sends
 
 - **Decision:** (1) A DB unique key on `deliveries` (`campaign_id`, `customer_id`, `channel`) means a row exists once; the snapshot uses `ON CONFLICT DO NOTHING`. (2) An atomic claim, a conditional `UPDATE` from `pending` (or a stale `sending`) to `sending`, means two workers cannot take the same row. (3) The provider `Idempotency-Key` (sha256 of campaign, customer and channel, unique on the row) deduplicates a retry after a timeout. Different campaigns may reach the same customer (no frequency cap). `Delivery` is a rich model: `markSent()`, `markFailed()`, `scheduleRetry()` (back to `pending`) and `skip()` are the only way to change its status, and `sent`, `failed` and `skipped` are final. `attempts` counts finished provider attempts (sent, retry, failed), not skips. The database fills `created_at` and `updated_at`, because the snapshot is a raw `INSERT … SELECT`.
 - **Rationale:** Each layer covers a failure the others cannot: duplicate rows, concurrent workers, and an ambiguous network failure.
 - **Alternatives:** A Redis set; only `ShouldBeUnique` jobs.
+
+## K20: Mock provider as a separate plain-PHP container
+
+- **Decision:** `mock-provider/` is its own container: plain PHP (`php -S`, 16 workers, no framework) with counters in Redis. A missing `Idempotency-Key` or a bad recipient is a 400 (permanent for the main app). `/stats` reports per channel `total`, `duplicates_prevented` and `peak_per_second`.
+- **Rationale:** Independent counters prove nothing was sent twice, and real network failures happen between containers.
+- **Alternatives:** A route inside the Laravel app; a framework.
 
 ## Setup notes (Phase 2)
 

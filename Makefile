@@ -1,7 +1,7 @@
 COMPOSE := docker compose
 FRONTEND_IMAGE := smart-campaign-frontend:tools
 
-.PHONY: up down fresh logs test test-backend test-frontend lint lint-backend lint-frontend smoke e2e frontend-tools
+.PHONY: up down fresh logs test test-backend test-mock test-frontend lint lint-backend lint-frontend smoke e2e frontend-tools
 
 # A fresh clone has no .env; compose and the containers read it.
 .env:
@@ -21,10 +21,14 @@ logs:
 	$(COMPOSE) logs -f --tail=100
 
 # Tests run inside Docker so the host needs no PHP or Node setup (K4).
-test: test-backend test-frontend
+test: test-backend test-mock test-frontend
 
 test-backend: .env
 	$(COMPOSE) run --rm app vendor/bin/pest
+
+# The mock provider has no Composer; its tests run with the backend image's Pest against Redis db 1.
+test-mock: .env
+	$(COMPOSE) run --rm -v "$(CURDIR)/mock-provider:/mock" -w /mock app /app/vendor/bin/pest --configuration=/mock/phpunit.xml
 
 test-frontend: frontend-tools
 	docker run --rm $(FRONTEND_IMAGE) npm test
