@@ -19,4 +19,4 @@ Application::fromEnvironment()->handle(
     is_string($path) ? $path : '/',
     (string) file_get_contents('php://input'),
     $_SERVER,
-);
+)->emit();

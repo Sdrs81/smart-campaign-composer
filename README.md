@@ -23,16 +23,17 @@ Then open <http://localhost:8080>. The API health check is at <http://localhost:
 
 `make` targets and their `docker compose` equivalents, for machines without `make` (Windows):
 
-| Target               | Equivalent                                                                                                                                            |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `make up`            | `docker compose up -d --build`                                                                                                                        |
-| `make down`          | `docker compose down`                                                                                                                                 |
-| `make logs`          | `docker compose logs -f --tail=100`                                                                                                                   |
-| `make fresh`         | `docker compose exec app php artisan migrate:fresh --seed --force`                                                                                    |
-| `make test-backend`  | `docker compose run --rm app vendor/bin/pest`                                                                                                         |
-| `make lint-backend`  | `docker compose run --rm app sh -c "vendor/bin/pint --test && vendor/bin/phpstan --memory-limit=1G"`                                                  |
-| `make test-frontend` | `docker build --target build -t smart-campaign-frontend:tools -f frontend/Dockerfile .` then `docker run --rm smart-campaign-frontend:tools npm test` |
-| `make lint-frontend` | same image, `npm run lint && npm run type-check && npm run format:check`                                                                              |
+| Target               | Equivalent                                                                                                                                                        |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `make up`            | `docker compose up -d --build`                                                                                                                                    |
+| `make down`          | `docker compose down`                                                                                                                                             |
+| `make logs`          | `docker compose logs -f --tail=100`                                                                                                                               |
+| `make fresh`         | `docker compose exec app php artisan migrate:fresh --seed --force`                                                                                                |
+| `make test-backend`  | `docker compose run --rm app vendor/bin/pest`                                                                                                                     |
+| `make test-mock`     | `docker compose run --rm -v ./mock-provider:/mock -w /mock app /app/vendor/bin/pest --configuration=/mock/phpunit.xml` (use an absolute host path for the volume) |
+| `make lint-backend`  | `docker compose run --rm app sh -c "vendor/bin/pint --test && vendor/bin/phpstan --memory-limit=1G"`                                                              |
+| `make test-frontend` | `docker build --target build -t smart-campaign-frontend:tools -f frontend/Dockerfile .` then `docker run --rm smart-campaign-frontend:tools npm test`             |
+| `make lint-frontend` | same image, `npm run lint && npm run type-check && npm run format:check`                                                                                          |
 
 ## Architecture
 
@@ -52,7 +53,7 @@ _TBD._ Brief, then audience, then content, then approval, then sending, then das
 
 ## Tests
 
-`make test` runs the backend (Pest) and frontend (Vitest) suites inside Docker. Backend integration tests use the real Postgres and Redis containers, in a separate `campaign_test` database and Redis db, so development data is never touched. `make lint` runs Pint, Larastan, ESLint, the type check and Prettier.
+`make test` runs the backend (Pest), mock provider (Pest, Redis db 1) and frontend (Vitest) suites inside Docker. Backend integration tests use the real Postgres and Redis containers, in a separate `campaign_test` database and Redis db, so development data is never touched. `make lint` runs Pint, Larastan, ESLint, the type check and Prettier.
 
 _TBD (later phases): `make smoke`, `make e2e`._
 

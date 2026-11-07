@@ -9,3 +9,6 @@ spl_autoload_register(static function (string $class): void {
         require __DIR__.'/../src/'.substr($class, strlen($prefix)).'.php';
     }
 });
+
+// Not tests/Pest.php: Pest looks for that next to its own binary (the backend's), not here.
+require __DIR__.'/Helpers.php';
