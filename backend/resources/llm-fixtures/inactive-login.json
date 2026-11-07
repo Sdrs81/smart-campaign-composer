@@ -1,0 +1,27 @@
+{
+    "name": "inactive-login",
+    "keywords": ["giris", "uzun suredir", "pasif", "ozledik"],
+    "segment": {
+        "rule": {
+            "version": 1,
+            "conditions": [
+                {
+                    "field": "last_login_at",
+                    "operator": "not_within_last_days",
+                    "value": 90
+                }
+            ]
+        },
+        "unsupported_criteria": [],
+        "explanation": "Son 90 günde giriş yapmamış müşteriler seçildi (hiç giriş yapmamışlar dahil)."
+    },
+    "content": {
+        "sms": {
+            "body": "Merhaba {{first_name}}, seni özledik! Hesabına giriş yap, yeni fırsatları kaçırma."
+        },
+        "email": {
+            "subject": "Seni özledik, geri dön",
+            "body": "Merhaba {{first_name}},\n\nUzun süredir seni göremedik. Hesabına giriş yaparak yeni ürünlere ve fırsatlara göz atabilirsin.\n\nSeni tekrar aramızda görmek isteriz."
+        }
+    }
+}

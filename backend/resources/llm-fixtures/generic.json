@@ -1,0 +1,27 @@
+{
+    "name": "generic",
+    "keywords": [],
+    "segment": {
+        "rule": {
+            "version": 1,
+            "conditions": [
+                {
+                    "field": "registered_at",
+                    "operator": "not_within_last_days",
+                    "value": 1
+                }
+            ]
+        },
+        "unsupported_criteria": [],
+        "explanation": "Brief belirli bir kitle belirtmediği için kayıtlı tüm müşteriler seçildi."
+    },
+    "content": {
+        "sms": {
+            "body": "Merhaba {{first_name}}, sana özel yeni kampanyamızı kaçırma! Detaylar için bizi ziyaret et."
+        },
+        "email": {
+            "subject": "Sana özel yeni kampanya",
+            "body": "Merhaba {{first_name}},\n\nSana özel hazırladığımız yeni kampanya yayında. Detayları görmek için bizi ziyaret edebilirsin.\n\nKeyifli alışverişler dileriz."
+        }
+    }
+}

@@ -1,0 +1,32 @@
+{
+    "name": "category",
+    "keywords": ["kategori", "elektronik", "teknoloji"],
+    "segment": {
+        "rule": {
+            "version": 1,
+            "conditions": [
+                {
+                    "field": "favorite_category",
+                    "operator": "eq",
+                    "value": "elektronik"
+                },
+                {
+                    "field": "last_login_at",
+                    "operator": "within_last_days",
+                    "value": 60
+                }
+            ]
+        },
+        "unsupported_criteria": [],
+        "explanation": "Favori kategorisi elektronik olan ve son 60 günde giriş yapmış müşteriler seçildi."
+    },
+    "content": {
+        "sms": {
+            "body": "Merhaba {{first_name}}, elektronikte yeni ürünler geldi! Seçili modellere göz atmak için bizi ziyaret et."
+        },
+        "email": {
+            "subject": "Elektronikte yeni ürünler seni bekliyor",
+            "body": "Merhaba {{first_name}},\n\nElektronik kategorisinde yeni ürünlerimiz yayında. Senin için seçtiğimiz modellere göz atabilirsin.\n\nKeyifli alışverişler dileriz."
+        }
+    }
+}

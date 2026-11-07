@@ -27,6 +27,8 @@
         <server name="REDIS_DB" value="1" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
+        <!-- Tests queue their own fake LLM scenarios; the ready-made dev answers would hide a missing one. -->
+        <env name="LLM_FAKE_DEV_SCENARIOS" value="false"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_URL" value=""/>

@@ -31,6 +31,12 @@ return [
         'timeout' => (int) env('ANTHROPIC_TIMEOUT', 60),
     ],
 
+    // With the fake driver, a call that finds the scenario queue empty is answered from resources/llm-fixtures,
+    // so the app runs end to end without a key (5.11). Tests switch this off to keep their scenarios exact.
+    'fake' => [
+        'dev_scenarios' => (bool) env('LLM_FAKE_DEV_SCENARIOS', true),
+    ],
+
     // Validation failures are fed back to the model at most this many times (K11).
     'max_repair_attempts' => 2,
 

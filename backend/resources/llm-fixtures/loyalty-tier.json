@@ -1,0 +1,27 @@
+{
+    "name": "loyalty-tier",
+    "keywords": ["sadakat", "uye", "gold", "platinum", "seviye"],
+    "segment": {
+        "rule": {
+            "version": 1,
+            "conditions": [
+                {
+                    "field": "loyalty_tier",
+                    "operator": "in",
+                    "value": ["gold", "platinum"]
+                }
+            ]
+        },
+        "unsupported_criteria": [],
+        "explanation": "Gold ve platinum sadakat seviyesindeki müşteriler seçildi."
+    },
+    "content": {
+        "sms": {
+            "body": "Merhaba {{first_name}}, sadık müşterimiz olduğun için teşekkürler! Sana özel avantajlar seni bekliyor."
+        },
+        "email": {
+            "subject": "Sadakatin için teşekkür ederiz",
+            "body": "Merhaba {{first_name}},\n\nBizimle olduğun için çok teşekkür ederiz. Üyelik seviyene özel avantajları hesabında görebilirsin.\n\nKeyifli alışverişler dileriz."
+        }
+    }
+}

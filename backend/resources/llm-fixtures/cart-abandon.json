@@ -1,0 +1,32 @@
+{
+    "name": "cart-abandon",
+    "keywords": ["sepet", "terk", "unuttu"],
+    "segment": {
+        "rule": {
+            "version": 1,
+            "conditions": [
+                {
+                    "field": "last_cart_add_at",
+                    "operator": "within_last_days",
+                    "value": 30
+                },
+                {
+                    "field": "last_purchase_at",
+                    "operator": "not_within_last_days",
+                    "value": 30
+                }
+            ]
+        },
+        "unsupported_criteria": [],
+        "explanation": "Son 30 günde sepete ürün ekleyip aynı sürede satın alma yapmayan müşteriler seçildi (hiç alışveriş yapmamışlar dahil)."
+    },
+    "content": {
+        "sms": {
+            "body": "Merhaba {{first_name}}, sepetindeki ürünler seni bekliyor! Siparişini tamamlamak için hemen göz at."
+        },
+        "email": {
+            "subject": "Sepetindeki ürünler seni bekliyor",
+            "body": "Merhaba {{first_name}},\n\nSepetine eklediğin ürünleri henüz tamamlamadığını fark ettik. Siparişini birkaç adımda tamamlayabilirsin.\n\nKeyifli alışverişler dileriz."
+        }
+    }
+}
