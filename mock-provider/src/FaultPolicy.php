@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MockProvider;
 
+use InvalidArgumentException;
+
 /**
  * Decides what happens to one request: how long it takes and whether it fails.
  * One random draw is split by the rates, so they add up and never overlap.
@@ -21,7 +23,16 @@ final class FaultPolicy
         private readonly float $rateLimitedRate,
         private readonly float $timeoutRate,
         private readonly float $acceptThenServerErrorRate,
-    ) {}
+    ) {
+        // Fail at start-up: a bad rate would otherwise starve later faults and look like a healthy run.
+        $rates = [$serverErrorRate, $rateLimitedRate, $timeoutRate, $acceptThenServerErrorRate];
+        if (min($rates) < 0.0 || array_sum($rates) > 1.0) {
+            throw new InvalidArgumentException('Fault rates must each be at least 0 and add up to at most 1, got '.implode(', ', $rates).'.');
+        }
+        if ($latencyMinMilliseconds < 0 || $latencyMinMilliseconds > $latencyMaxMilliseconds) {
+            throw new InvalidArgumentException("Latency must satisfy 0 <= min <= max, got min {$latencyMinMilliseconds} ms and max {$latencyMaxMilliseconds} ms.");
+        }
+    }
 
     public static function fromEnvironment(RandomSource $random): self
     {
@@ -41,8 +52,14 @@ final class FaultPolicy
     private static function setting(string $name, string $default): string
     {
         $value = getenv($name);
+        if ($value === false || $value === '') {
+            return $default;
+        }
+        if (! is_numeric($value)) {
+            throw new InvalidArgumentException("Environment variable {$name} must be a number, got '{$value}'.");
+        }
 
-        return $value === false || $value === '' ? $default : $value;
+        return $value;
     }
 
     /**

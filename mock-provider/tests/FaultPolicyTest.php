@@ -50,6 +50,17 @@ it('makes a timeout last longer than the client waits', function (): void {
         ->and($decision->latencyMilliseconds)->toBe(FaultPolicy::TIMEOUT_MILLISECONDS);
 });
 
+it('refuses rates that cannot be drawn from one chance', function (float $serverError, float $rateLimited): void {
+    new FaultPolicy(scriptedRandom(fn () => 0.0), 10, 80, $serverError, $rateLimited, 0.0, 0.0);
+})->with([
+    'a negative rate' => [-0.1, 0.0],
+    'rates adding up to more than 1' => [0.9, 0.5],
+])->throws(InvalidArgumentException::class);
+
+it('refuses a latency range where the minimum is above the maximum', function (): void {
+    new FaultPolicy(scriptedRandom(fn () => 0.0), 80, 10, 0.0, 0.0, 0.0, 0.0);
+})->throws(InvalidArgumentException::class);
+
 it('uses a forced fault without latency or chance', function (): void {
     $policy = new FaultPolicy(scriptedRandom(fn () => 0.0, between: 42), 10, 80, 1.0, 0.0, 0.0, 0.0);
 
