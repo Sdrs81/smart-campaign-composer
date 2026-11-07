@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\CampaignStatus;
 use App\Exceptions\InvalidCampaignTransition;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property string $brief
@@ -35,6 +36,14 @@ class Campaign extends Model
             'unsupported_criteria' => 'array',
             'audience_counts' => 'array',
         ];
+    }
+
+    /**
+     * @return HasMany<CampaignMessage, $this>
+     */
+    public function messages(): HasMany
+    {
+        return $this->hasMany(CampaignMessage::class);
     }
 
     /**
@@ -77,12 +86,29 @@ class Campaign extends Model
         $this->transitionTo(CampaignStatus::Failed);
     }
 
+    /** Lets a caller refuse before doing expensive work (an LLM call) that defineAudience() would reject afterwards. */
+    public function assertAudienceCanBeDefined(): void
+    {
+        $this->assertCanTransitionTo(CampaignStatus::AudienceReady);
+    }
+
+    /** Content needs a counted audience, so a draft is refused here before any stream is opened. */
+    public function assertContentCanBeSet(): void
+    {
+        $this->assertCanTransitionTo(CampaignStatus::ContentReady);
+    }
+
     private function transitionTo(CampaignStatus $next): void
+    {
+        $this->assertCanTransitionTo($next);
+
+        $this->status = $next;
+    }
+
+    private function assertCanTransitionTo(CampaignStatus $next): void
     {
         if (! $this->status->canTransitionTo($next)) {
             throw InvalidCampaignTransition::between($this->status, $next);
         }
-
-        $this->status = $next;
     }
 }

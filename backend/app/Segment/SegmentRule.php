@@ -15,4 +15,21 @@ final readonly class SegmentRule
 
     /** @param  non-empty-list<Condition>  $conditions */
     public function __construct(public int $version, public array $conditions) {}
+
+    /**
+     * The stored form; SegmentRuleParser reads the same shape back.
+     *
+     * @return array{version: int, conditions: list<array{field: string, operator: string, value: string|int|float|list<string|int|float>|null}>}
+     */
+    public function toArray(): array
+    {
+        return [
+            'version' => $this->version,
+            'conditions' => array_map(fn (Condition $condition): array => [
+                'field' => $condition->field->name,
+                'operator' => $condition->operator->value,
+                'value' => $condition->value,
+            ], $this->conditions),
+        ];
+    }
 }
