@@ -54,6 +54,9 @@ return [
     // An SMS plus an email of up to 2000 characters in Turkish, with room for thinking tokens.
     'content' => [
         'max_tokens' => 8192,
+        // Used when the marketer does not name a tone; the tone limit keeps it a style hint, not a second brief.
+        'default_tone' => 'samimi ve profesyonel',
+        'tone_max_length' => 100,
     ],
 
 ];

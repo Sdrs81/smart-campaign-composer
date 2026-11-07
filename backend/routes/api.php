@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\CampaignAudienceController;
+use App\Http\Controllers\CampaignContentStreamController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\HealthController;
 use Illuminate\Support\Facades\Route;
@@ -15,3 +16,4 @@ Route::post('/campaigns', [CampaignController::class, 'store']);
 // whereNumber: a non-numeric id would otherwise reach Postgres and fail as a query error, not a 404.
 Route::get('/campaigns/{campaign}', [CampaignController::class, 'show'])->whereNumber('campaign');
 Route::post('/campaigns/{campaign}/audience', CampaignAudienceController::class)->whereNumber('campaign');
+Route::post('/campaigns/{campaign}/content/stream', CampaignContentStreamController::class)->whereNumber('campaign');

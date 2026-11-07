@@ -92,6 +92,12 @@ class Campaign extends Model
         $this->assertCanTransitionTo(CampaignStatus::AudienceReady);
     }
 
+    /** Content needs a counted audience, so a draft is refused here before any stream is opened. */
+    public function assertContentCanBeSet(): void
+    {
+        $this->assertCanTransitionTo(CampaignStatus::ContentReady);
+    }
+
     private function transitionTo(CampaignStatus $next): void
     {
         $this->assertCanTransitionTo($next);

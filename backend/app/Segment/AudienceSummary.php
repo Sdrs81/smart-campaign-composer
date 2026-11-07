@@ -19,4 +19,25 @@ final readonly class AudienceSummary
         public array $sample,
         public array $longestValues,
     ) {}
+
+    /**
+     * The form kept in campaigns.audience_counts.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        return [
+            'channel_counts' => $this->channelCounts,
+            'unique_total' => $this->uniqueTotal,
+            'sample' => $this->sample,
+            'longest_values' => $this->longestValues,
+        ];
+    }
+
+    /** @param  array<string, mixed>  $stored  the output of toArray(), read back from the database */
+    public static function fromArray(array $stored): self
+    {
+        return new self($stored['channel_counts'], $stored['unique_total'], $stored['sample'], $stored['longest_values']);
+    }
 }

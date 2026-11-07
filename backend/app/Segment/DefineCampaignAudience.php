@@ -31,12 +31,7 @@ final class DefineCampaignAudience
         // The model call took seconds; re-read under a lock so an approval made meanwhile is not overwritten.
         return DB::transaction(function () use ($campaign, $extraction, $summary): Campaign {
             $locked = Campaign::query()->lockForUpdate()->findOrFail($campaign->id);
-            $locked->defineAudience($extraction->rule->toArray(), $extraction->unsupported, [
-                'channel_counts' => $summary->channelCounts,
-                'unique_total' => $summary->uniqueTotal,
-                'sample' => $summary->sample,
-                'longest_values' => $summary->longestValues,
-            ]);
+            $locked->defineAudience($extraction->rule->toArray(), $extraction->unsupported, $summary->toArray());
             $locked->save();
 
             return $locked;
