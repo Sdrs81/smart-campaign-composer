@@ -98,6 +98,21 @@ services:
       timeout: 3s
       retries: 3
 
+  # Takes StartCampaignJob (the default queue): freezes the audience and queues the send jobs. One is enough,
+  # because it only moves ids; the channel workers do the slow part.
+  worker-campaign:
+    <<: *backend
+    command: ["php", "artisan", "queue:work", "redis", "--queue=default", "--sleep=0", "--max-time=3600"]
+    stop_grace_period: 60s
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q queue:work /proc/1/cmdline"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
   web:
     build:
       context: .
