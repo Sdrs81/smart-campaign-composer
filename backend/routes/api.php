@@ -12,10 +12,13 @@ use App\Http\Controllers\CampaignStatsController;
 use App\Http\Controllers\CampaignStatsStreamController;
 use App\Http\Controllers\ContentRulesController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\MetricsController;
 use Illuminate\Support\Facades\Route;
 
 // JSON API routes (prefix /api). Endpoints are added per plan task.
 Route::get('/health', HealthController::class);
+
+Route::get('/metrics', MetricsController::class);
 
 Route::get('/campaigns', [CampaignController::class, 'index']);
 Route::post('/campaigns', [CampaignController::class, 'store']);
