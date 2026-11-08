@@ -15,7 +15,9 @@ class HealthController extends Controller
         $report = $health->report();
 
         if (! $report['healthy']) {
-            $down = implode(', ', array_keys(array_filter($report['checks'], fn (string $state) => $state === 'down')));
+            // The provider is not critical, so it never appears in the "required" list.
+            $critical = array_intersect_key($report['checks'], array_flip(['database', 'redis']));
+            $down = implode(', ', array_keys(array_filter($critical, fn (string $state) => $state === 'down')));
 
             throw new DependencyUnavailableException("Required dependency is down: {$down}.", [
                 'checks' => $report['checks'],
@@ -24,8 +26,9 @@ class HealthController extends Controller
         }
 
         return response()->json([
-            'status' => 'ok',
+            'status' => $report['status'],
             'checks' => $report['checks'],
+            'queues' => $report['queues'],
             'llm_driver' => $report['llm_driver'],
         ]);
     }

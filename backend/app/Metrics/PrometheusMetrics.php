@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Metrics;
 
+use App\Delivery\QueueDepths;
 use App\Enums\CampaignStatus;
 use App\Enums\Channel;
 use App\Enums\DeliveryStatus;
 use App\Models\Campaign;
 use App\Models\Delivery;
 use App\Models\LlmCall;
-use Illuminate\Support\Facades\Queue;
 
 /**
  * Prometheus text exposition, computed from the tables and Redis on every scrape (K21):
@@ -21,11 +21,7 @@ class PrometheusMetrics
 {
     public const CONTENT_TYPE = 'text/plain; version=0.0.4; charset=utf-8';
 
-    // The queue backend is Redis in every environment; the test default (sync) cannot report a depth.
-    private const QUEUE_CONNECTION = 'redis';
-
-    // Campaign start jobs run on the default queue; deliveries run on the queue named after their channel.
-    private const CAMPAIGN_QUEUE = 'default';
+    public function __construct(private readonly QueueDepths $queueDepths) {}
 
     public function __invoke(): string
     {
@@ -77,11 +73,9 @@ class PrometheusMetrics
 
     private function queueDepth(): string
     {
-        $queues = [self::CAMPAIGN_QUEUE, ...array_map(static fn (Channel $channel): string => $channel->value, Channel::cases())];
-
         $samples = [];
-        foreach ($queues as $queue) {
-            $samples[] = [['queue' => $queue], Queue::connection(self::QUEUE_CONNECTION)->size($queue)];
+        foreach (($this->queueDepths)() as $queue => $depth) {
+            $samples[] = [['queue' => $queue], $depth];
         }
 
         return $this->metric('queue_depth', 'gauge', 'Jobs waiting, delayed or being worked in each queue.', $samples);
