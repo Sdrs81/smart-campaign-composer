@@ -7,6 +7,7 @@ namespace App\Llm;
 use App\Enums\LlmCallOutcome;
 use App\Models\LlmCall;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -33,8 +34,29 @@ final class RecordingLlmClient implements LlmClient
     /** @param  list<string>  $errors  path-based validation messages for the most recent call */
     public function markLastCallInvalid(array $errors): void
     {
-        $this->lastCall?->markInvalid($errors);
-        $this->lastCall?->save();
+        if ($this->lastCall === null) {
+            return;
+        }
+
+        $this->lastCall->markInvalid($errors);
+        $this->lastCall->save();
+        $this->log($this->lastCall);
+    }
+
+    /** The prompt, the brief and the raw answer stay in the table only; the line carries ids, sizes and the outcome. */
+    private function log(LlmCall $call): void
+    {
+        Log::log($call->outcome === LlmCallOutcome::Succeeded ? 'info' : 'warning', "llm.call.{$call->outcome->value}", [
+            'llm_call_id' => $call->id,
+            'purpose' => $call->purpose,
+            'attempt' => $call->attempt,
+            'model' => $call->model,
+            'latency_ms' => $call->latency_ms,
+            'input_tokens' => $call->input_tokens,
+            'output_tokens' => $call->output_tokens,
+            'error' => $call->error_message,
+            'validation_errors' => $call->validation_errors,
+        ]);
     }
 
     public function complete(LlmRequest $request): LlmResponse
@@ -94,6 +116,7 @@ final class RecordingLlmClient implements LlmClient
         // Logging is best-effort: a failed write must not discard a paid answer or hide the original error.
         try {
             $this->lastCall = $this->createRow($request, $startedAt, $outcome, $usage, $rawOutput, $error);
+            $this->log($this->lastCall);
         } catch (QueryException $exception) {
             $this->lastCall = null;
             report($exception);

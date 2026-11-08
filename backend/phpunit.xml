@@ -28,6 +28,9 @@
         <!-- The container sets CACHE_STORE=redis, and a plain <env> does not override it: tests then shared
              (and flushed) the development cache, for example the city list. -->
         <server name="CACHE_STORE" value="array" force="true"/>
+        <!-- Logs go to stderr as JSON in the containers; a test run must not print them. Tests that check
+             logging spy on the Log facade. -->
+        <server name="LOG_CHANNEL" value="null" force="true"/>
         <!-- Tests queue their own fake LLM scenarios; the ready-made dev answers would hide a missing one. -->
         <server name="LLM_FAKE_DEV_SCENARIOS" value="false" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>

@@ -12,6 +12,7 @@ use App\Llm\LlmUsage;
 use App\Llm\RecordingLlmClient;
 use App\Models\LlmCall;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
@@ -39,6 +40,21 @@ it('records one succeeded row with usage, raw output and latency', function (): 
         ->and($call->raw_output)->toBe('{"ok":true}')
         ->and($call->error_message)->toBeNull()
         ->and($call->latency_ms)->toBeGreaterThan(0);
+});
+
+it('logs the call with its llm_call_id but without the raw answer', function (): void {
+    Log::spy();
+    $client = new RecordingLlmClient((new FakeLlmClient)->enqueue(new LlmResponse('gizli cevap metni', new LlmUsage(11, 4))), 'claude-sonnet-5-5');
+
+    $client->complete(recordedRequest());
+
+    $call = LlmCall::query()->sole();
+    Log::shouldHaveReceived('log')->once()->withArgs(fn (string $level, string $message, array $context): bool => $level === 'info'
+        && $message === 'llm.call.succeeded'
+        && $context['llm_call_id'] === $call->id
+        && $context['purpose'] === 'segment'
+        && $context['input_tokens'] === 11
+        && ! str_contains(json_encode($context, JSON_THROW_ON_ERROR), 'gizli cevap metni'));
 });
 
 it('still returns the answer when the call log cannot be written', function (): void {

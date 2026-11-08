@@ -120,6 +120,12 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** Independent counters prove nothing was sent twice, and real network failures happen between containers.
 - **Alternatives:** A route inside the Laravel app; a framework.
 
+## K21: Live status from one grouped query, computed on request
+
+- **Decision:** `GET /api/campaigns/{id}/stats` (`CampaignStats`, 9.1) reads progress with a single `GROUP BY channel, status` over `deliveries` (served by the `campaign_id, channel, status` index) that also sums `attempts`. Every channel and status is returned, zero when absent. Retries are `SUM(attempts)` minus one per `sent` or `failed` delivery, because the last attempt of those is not a retry (a `pending` delivery with attempts has that many scheduled retries). The send rate is the `sent` rows with `sent_at` in the last 5 seconds divided by 5. Recent errors are the 10 newest deliveries with a `last_error`, by `updated_at`, without any customer column. The SSE stream (9.2), `/api/metrics` (9.3) and health (9.4) follow the same rule: computed at request time, no extra counter state, no extra container.
+- **Rationale:** One indexed query keeps the cost constant per poll, and derived counters could drift from the rows. Leaving customer data out keeps phone numbers and emails out of the API and logs.
+- **Alternatives:** Redis counters; several count queries; Reverb/WebSockets.
+
 ## Setup notes (Phase 2)
 
 - **API only:** no web routes, views or Vite in the backend; errors share one `{error:{code,message,details}}` body.

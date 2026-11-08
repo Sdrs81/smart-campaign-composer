@@ -29,9 +29,9 @@ Then open <http://localhost:8080>. The API health check is at <http://localhost:
 | `make down`          | `docker compose down`                                                                                                                                             |
 | `make logs`          | `docker compose logs -f --tail=100`                                                                                                                               |
 | `make fresh`         | `docker compose exec app php artisan migrate:fresh --seed --force`                                                                                                |
-| `make test-backend`  | `docker compose run --rm app vendor/bin/pest`                                                                                                                     |
+| `make test-backend`  | `docker compose build app`, then `docker compose run --rm app vendor/bin/pest` (the code is baked into the image, so build first)                                 |
 | `make test-mock`     | `docker compose run --rm -v ./mock-provider:/mock -w /mock app /app/vendor/bin/pest --configuration=/mock/phpunit.xml` (use an absolute host path for the volume) |
-| `make lint-backend`  | `docker compose run --rm app sh -c "vendor/bin/pint --test && vendor/bin/phpstan --memory-limit=1G"`                                                              |
+| `make lint-backend`  | `docker compose build app`, then `docker compose run --rm app sh -c "vendor/bin/pint --test && vendor/bin/phpstan --memory-limit=1G"`                             |
 | `make test-frontend` | `docker build --target build -t smart-campaign-frontend:tools -f frontend/Dockerfile .` then `docker run --rm smart-campaign-frontend:tools npm test`             |
 | `make lint-frontend` | same image, `npm run lint && npm run type-check && npm run format:check`                                                                                          |
 

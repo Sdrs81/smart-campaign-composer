@@ -42,6 +42,12 @@ enum CampaignStatus: string
         return in_array($this, [self::Approved, self::Sending, self::Completed], true);
     }
 
+    /** Nothing changes after this, so a live status stream can end. */
+    public function isTerminal(): bool
+    {
+        return $this->allowedNext() === [];
+    }
+
     public function canTransitionTo(self $next): bool
     {
         return in_array($next, $this->allowedNext(), true);

@@ -15,6 +15,7 @@ use App\Models\Delivery;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -58,7 +59,7 @@ class SendDeliveryJob implements ShouldQueue
         }
 
         $delivery->markFailed("The send job failed after repeated errors: {$exception->getMessage()}");
-        $delivery->save();
+        $this->saveAndLog($delivery);
         Campaign::completeIfFinished($delivery->campaign_id);
     }
 
@@ -104,7 +105,7 @@ class SendDeliveryJob implements ShouldQueue
         // Opt-in is checked again here because consent may have been withdrawn since the audience was frozen.
         if (! $customer->canReceive($delivery->channel)) {
             $delivery->skip("The customer can no longer receive {$delivery->channel->value} messages (consent withdrawn or no address).");
-            $delivery->save();
+            $this->saveAndLog($delivery);
 
             return;
         }
@@ -115,7 +116,7 @@ class SendDeliveryJob implements ShouldQueue
             ->first();
         if ($message === null) {
             $delivery->markFailed("The campaign has no {$delivery->channel->value} message to send.");
-            $delivery->save();
+            $this->saveAndLog($delivery);
 
             return;
         }
@@ -124,7 +125,7 @@ class SendDeliveryJob implements ShouldQueue
         $lengthProblem = $this->lengthProblem($delivery->channel, $payload, $renderer);
         if ($lengthProblem !== null) {
             $delivery->markFailed($lengthProblem);
-            $delivery->save();
+            $this->saveAndLog($delivery);
 
             return;
         }
@@ -213,11 +214,31 @@ class SendDeliveryJob implements ShouldQueue
         return null;
     }
 
+    /**
+     * Every outcome is saved and logged in one place. The line carries ids and the reason only: the
+     * recipient and the rendered text stay out, and the formatter masks anything that slips in.
+     */
+    private function saveAndLog(Delivery $delivery): void
+    {
+        $delivery->save();
+
+        // A delivery back in "pending" after a send is a scheduled retry, not a new delivery.
+        $event = $delivery->status === DeliveryStatus::Pending ? 'retry_scheduled' : $delivery->status->value;
+
+        Log::log($delivery->status === DeliveryStatus::Failed ? 'warning' : 'info', "delivery.{$event}", [
+            'campaign_id' => $delivery->campaign_id,
+            'delivery_id' => $delivery->id,
+            'attempt' => $delivery->attempts,
+            'channel' => $delivery->channel->value,
+            'reason' => $delivery->status === DeliveryStatus::Sent ? null : $delivery->last_error,
+        ]);
+    }
+
     private function recordResult(Delivery $delivery, SendResult $result, RetryPolicy $retryPolicy): void
     {
         if ($result->outcome === SendOutcome::Sent) {
             $delivery->markSent((string) $result->providerMessageId);
-            $delivery->save();
+            $this->saveAndLog($delivery);
 
             return;
         }
@@ -227,14 +248,14 @@ class SendDeliveryJob implements ShouldQueue
 
         if (! $decision->shouldRetry()) {
             $delivery->markFailed((string) $decision->reason);
-            $delivery->save();
+            $this->saveAndLog($delivery);
 
             return;
         }
 
         $delay = (int) $decision->delayMilliseconds;
         $delivery->scheduleRetry(now()->addMilliseconds($delay), (string) $result->reason);
-        $delivery->save();
+        $this->saveAndLog($delivery);
 
         $this->release((int) ceil($delay / self::MILLISECONDS_PER_SECOND));
     }
