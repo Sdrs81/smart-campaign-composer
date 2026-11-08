@@ -23,7 +23,9 @@ logs:
 # Tests run inside Docker so the host needs no PHP or Node setup (K4).
 test: test-backend test-mock test-frontend
 
+# The backend code is baked into the image (no bind mount), so rebuild first or the run tests stale code.
 test-backend: .env
+	$(COMPOSE) build app
 	$(COMPOSE) run --rm app vendor/bin/pest
 
 # The mock provider has no Composer; its tests run with the backend image's Pest against Redis db 1.
@@ -36,6 +38,7 @@ test-frontend: frontend-tools
 lint: lint-backend lint-frontend
 
 lint-backend: .env
+	$(COMPOSE) build app
 	$(COMPOSE) run --rm app sh -c "vendor/bin/pint --test && vendor/bin/phpstan --memory-limit=1G"
 
 lint-frontend: frontend-tools
