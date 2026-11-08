@@ -107,3 +107,25 @@ it('accepts a normal request', function (): void {
     expect($response->status)->toBe(200)
         ->and(smsStats($this->application)['total'])->toBe(1);
 });
+
+it('counts an accepted message in the second it arrived, even when its latency crosses into the next one', function (): void {
+    $redis = testRedis();
+    $application = new Application(
+        new Stats($redis),
+        new IdempotencyStore($redis),
+        new RecipientValidator,
+        new FaultPolicy(scriptedRandom(fn () => 0.99), 0, 0, 0.0, 0.0, 0.0, 0.0),
+        new RateLimiter($redis, 100),
+        // A real pause longer than a second, so the answer is certainly accepted in a later clock second.
+        static fn (int $milliseconds) => usleep(1_100_000),
+    );
+    $application->handle('DELETE', '/stats', '', []);
+
+    // Start just after a second begins, so reading the clock before the call cannot straddle a boundary.
+    usleep(1_000_000 - (int) ((microtime(true) - floor(microtime(true))) * 1_000_000) + 50_000);
+    $arrivedAt = time();
+
+    expect(postSms($application, freshKey())->status)->toBe(200)
+        ->and((int) $redis->get("mock:stats:sms:second:{$arrivedAt}"))->toBe(1)
+        ->and((int) $redis->get('mock:stats:sms:second:'.($arrivedAt + 1)))->toBe(0);
+});

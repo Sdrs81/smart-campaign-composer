@@ -45,8 +45,9 @@ lint-frontend: frontend-tools
 frontend-tools:
 	docker build --target build -t $(FRONTEND_IMAGE) -f frontend/Dockerfile .
 
+# Needs the stack from "make up". Sends to the mock provider with its fault injection on.
 smoke:
-	@echo "make smoke is added in task 8.8" && exit 1
+	node scripts/smoke.mjs
 
 e2e:
 	@echo "make e2e is added in task 10.8" && exit 1

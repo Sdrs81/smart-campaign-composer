@@ -33,6 +33,15 @@ enum CampaignStatus: string
         };
     }
 
+    /**
+     * True once a person has approved the campaign and it is still alive or done, so a repeated approval has
+     * nothing left to do. A failed campaign is excluded: approving it must be refused, not answered with success.
+     */
+    public function isApprovedOrLater(): bool
+    {
+        return in_array($this, [self::Approved, self::Sending, self::Completed], true);
+    }
+
     public function canTransitionTo(self $next): bool
     {
         return in_array($next, $this->allowedNext(), true);

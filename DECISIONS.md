@@ -88,12 +88,25 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Decision:** `Campaign` is a rich model: `defineAudience()`, `setContent()`, `approve()`, `startSending()`, `complete()` and `fail()` are the only way to change `status`, which is not mass assignable. Flow: `draft → audience_ready → content_ready → approved → sending → completed | failed`. Audience and content can be redone until approval (`audience_ready` and `content_ready` accept themselves, and `content_ready` can return to `audience_ready`), because the rule is read-only and the brief is what changes. `approved → approved` is allowed, so approving twice is a no-op. Any other move throws `InvalidCampaignTransition` (HTTP 409 with `from`, `to` and `allowed`). The methods change the model in memory only; the caller saves it.
 - **Rationale:** An invalid transition fails early, next to the data it protects. Idempotent approval makes a double click harmless.
 - **Alternatives:** A rule editor (YAGNI); status set from services or controllers.
+- **One exception (task 8.6):** `Campaign::completeIfFinished()` writes `sending → completed` with a single conditional `UPDATE … WHERE NOT EXISTS (pending/sending deliveries)` instead of `complete()`. The check and the change must be one statement, or two workers finishing together could complete the campaign early or twice. It stays inside the model and only makes the transition `CampaignStatus` already allows.
+
+## K16: Freeze the audience in SQL at approval, dispatch from a job
+
+- **Decision:** `POST /api/campaigns/{id}/approve` takes a `Cache::lock` on the campaign, re-reads it under the lock, and only moves a `content_ready` campaign to `approved` (any other pre-approval state is a 409). It refuses an audience of 0 with 422 `audience_empty`, and re-validates both messages with the same `ContentValidator` against the stored longest values. It then queues one `StartCampaignJob` and returns; a repeat after approval returns 200 with the current state and queues nothing. `StartCampaignJob` runs `AudienceSnapshotter` (one `INSERT … SELECT … ON CONFLICT DO NOTHING` per channel, with the consent condition applied again and the idempotency key `sha256("campaign:customer:channel")` computed in SQL), moves the campaign to `sending`, and streams the pending delivery ids with `lazyById(1000)`, queuing one `SendDeliveryJob` each on the `sms` or `email` queue. A second run adds no rows and re-queues only deliveries still pending, so a crash during dispatch is recovered by running the job again. A held lock gives 409 `approval_in_progress` after `approval_lock_wait_seconds`.
+- **Rationale:** The freeze is one statement inside Postgres, so no customer row reaches PHP and memory stays flat. Doing it in a job keeps the request fast and lets a failed start be repeated safely. The lock plus the status re-read turns two clicks into one approval.
+- **Alternatives:** Looping over customers in PHP; one batch job for the whole campaign; a `DB::transaction` with `lockForUpdate` instead of a cache lock (the lock must also cover the dispatch).
 
 ## K17: One rate limit per channel, enforced on both sides
 
 - **Decision:** Sending is limited to 100 per second per channel (`SEND_RATE_PER_SECOND`). The mock provider enforces the same limit itself, with a per-second Redis `INCR` counter per channel, and answers 429 with `Retry-After: 1` when it is exceeded. The main app's limiter (task 8.4) uses `Redis::throttle(...)->block()` so a worker waits instead of burning a retry.
 - **Rationale:** The provider limit is the case requirement. Testing the sender against a provider that really refuses proves the throttle, rather than trusting it. Fixed one-second windows allow a short burst at a boundary, which is measured in 8.8.
 - **Alternatives:** A token bucket in Lua; a batch dispatcher that sends once per second.
+
+## K18: Retry by failure class, with full jitter
+
+- **Decision:** `HttpMessageProvider` (8.1) sorts every answer into one of four classes: 2xx `Sent`, 429 `RateLimited` (with the `Retry-After` seconds when usable), 5xx / timeout / connection error `Transient`, any other 4xx `Permanent`. `RetryPolicy` (8.2) is a pure class that turns a failed result and the number of finished attempts into a `RetryDecision`: `Transient` waits a random time between 0 and `min(cap, base · 2^(n-1))` (full jitter, n = finished attempts); `RateLimited` waits `max(Retry-After, that backoff)`; `Permanent` never retries; after the 5th failed attempt every class gives up. The random source is injected. Base (200 ms), cap (10 s) and the 5 attempts live in `config/delivery.php` and are estimates to tune. A permanent or exhausted delivery stays `failed` and shows on the dashboard.
+- **Rationale:** Retrying a permanent error wastes calls; retrying all failures at one fixed interval makes workers come back together. Full jitter spreads them, and honouring `Retry-After` avoids a second refusal. A pure class is unit-tested without time or network.
+- **Alternatives:** A fixed interval; a circuit breaker (YAGNI).
 
 ## K19: Three layers against double sends
 

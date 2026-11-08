@@ -33,7 +33,18 @@ return [
     // Global outbound limit per channel, shared by all workers (K17).
     'rate_per_second' => (int) env('SEND_RATE_PER_SECOND', 100),
 
+    // Kept well under claim_timeout_seconds: a worker waits holding a claim, and a longer wait would let
+    // another worker take the row over.
+    'rate_limit_max_wait_seconds' => 30,
+
     'workers_per_channel' => (int) env('WORKERS_PER_CHANNEL', 8),
+
+    // The approval lock outlives a normal approval; a second click waits this long before getting a 409.
+    'approval_lock_seconds' => 10,
+    'approval_lock_wait_seconds' => 5,
+
+    // A delivery stuck in "sending" longer than this is taken over by another worker (K19 layer two).
+    'claim_timeout_seconds' => 60,
 
     'provider' => [
         'url' => env('PROVIDER_URL', 'http://mock-provider:8080'),

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\CampaignStatus;
+use App\Enums\DeliveryStatus;
 use App\Exceptions\InvalidCampaignTransition;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -79,6 +80,28 @@ class Campaign extends Model
     public function complete(): void
     {
         $this->transitionTo(CampaignStatus::Completed);
+    }
+
+    /**
+     * Completes a sending campaign when no delivery is left pending or sending. One conditional UPDATE,
+     * so concurrent workers cannot complete it twice or too early: each caller has already saved its own
+     * delivery, so whoever finishes last sees all of them final. Unlike the methods above it writes at once,
+     * because the check and the change must be one statement. Sending to completed is the transition
+     * CampaignStatus allows.
+     *
+     * @return bool true when this call completed the campaign
+     */
+    public static function completeIfFinished(int $campaignId): bool
+    {
+        return self::query()
+            ->whereKey($campaignId)
+            ->where('status', CampaignStatus::Sending->value)
+            ->whereNotExists(fn ($unfinished) => $unfinished
+                ->from('deliveries')
+                ->selectRaw('1')
+                ->whereColumn('deliveries.campaign_id', 'campaigns.id')
+                ->whereIn('deliveries.status', [DeliveryStatus::Pending->value, DeliveryStatus::Sending->value]))
+            ->update(['status' => CampaignStatus::Completed->value]) === 1;
     }
 
     public function fail(): void
