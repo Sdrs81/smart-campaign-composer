@@ -95,6 +95,12 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** The provider limit is the case requirement. Testing the sender against a provider that really refuses proves the throttle, rather than trusting it. Fixed one-second windows allow a short burst at a boundary, which is measured in 8.8.
 - **Alternatives:** A token bucket in Lua; a batch dispatcher that sends once per second.
 
+## K18: Retry by failure class, with full jitter
+
+- **Decision:** `HttpMessageProvider` (8.1) sorts every answer into one of four classes: 2xx `Sent`, 429 `RateLimited` (with the `Retry-After` seconds when usable), 5xx / timeout / connection error `Transient`, any other 4xx `Permanent`. `RetryPolicy` (8.2) is a pure class that turns a failed result and the number of finished attempts into a `RetryDecision`: `Transient` waits a random time between 0 and `min(cap, base · 2^(n-1))` (full jitter, n = finished attempts); `RateLimited` waits `max(Retry-After, that backoff)`; `Permanent` never retries; after the 5th failed attempt every class gives up. The random source is injected. Base (200 ms), cap (10 s) and the 5 attempts live in `config/delivery.php` and are estimates to tune. A permanent or exhausted delivery stays `failed` and shows on the dashboard.
+- **Rationale:** Retrying a permanent error wastes calls; retrying all failures at one fixed interval makes workers come back together. Full jitter spreads them, and honouring `Retry-After` avoids a second refusal. A pure class is unit-tested without time or network.
+- **Alternatives:** A fixed interval; a circuit breaker (YAGNI).
+
 ## K19: Three layers against double sends
 
 - **Decision:** (1) A DB unique key on `deliveries` (`campaign_id`, `customer_id`, `channel`) means a row exists once; the snapshot uses `ON CONFLICT DO NOTHING`. (2) An atomic claim, a conditional `UPDATE` from `pending` (or a stale `sending`) to `sending`, means two workers cannot take the same row. (3) The provider `Idempotency-Key` (sha256 of campaign, customer and channel, unique on the row) deduplicates a retry after a timeout. Different campaigns may reach the same customer (no frequency cap). `Delivery` is a rich model: `markSent()`, `markFailed()`, `scheduleRetry()` (back to `pending`) and `skip()` are the only way to change its status, and `sent`, `failed` and `skipped` are final. `attempts` counts finished provider attempts (sent, retry, failed), not skips. The database fills `created_at` and `updated_at`, because the snapshot is a raw `INSERT … SELECT`.
