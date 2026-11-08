@@ -163,6 +163,19 @@ it('refuses a campaign that is not content_ready with 409', function (): void {
     Queue::assertNothingPushed();
 });
 
+it('refuses to approve a campaign that already failed instead of answering success', function (): void {
+    Queue::fake();
+    seedAudience();
+    $campaign = campaignInState();
+    Campaign::query()->whereKey($campaign->id)->update(['status' => CampaignStatus::Failed->value]);
+
+    $this->postJson("/api/campaigns/{$campaign->id}/approve")
+        ->assertStatus(409)
+        ->assertJsonPath('error.code', 'invalid_campaign_transition');
+
+    Queue::assertNothingPushed();
+});
+
 it('refuses text that no longer fits the limits', function (): void {
     Queue::fake();
     seedAudience();

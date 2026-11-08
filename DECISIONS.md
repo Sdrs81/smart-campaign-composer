@@ -88,6 +88,7 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Decision:** `Campaign` is a rich model: `defineAudience()`, `setContent()`, `approve()`, `startSending()`, `complete()` and `fail()` are the only way to change `status`, which is not mass assignable. Flow: `draft → audience_ready → content_ready → approved → sending → completed | failed`. Audience and content can be redone until approval (`audience_ready` and `content_ready` accept themselves, and `content_ready` can return to `audience_ready`), because the rule is read-only and the brief is what changes. `approved → approved` is allowed, so approving twice is a no-op. Any other move throws `InvalidCampaignTransition` (HTTP 409 with `from`, `to` and `allowed`). The methods change the model in memory only; the caller saves it.
 - **Rationale:** An invalid transition fails early, next to the data it protects. Idempotent approval makes a double click harmless.
 - **Alternatives:** A rule editor (YAGNI); status set from services or controllers.
+- **One exception (task 8.6):** `Campaign::completeIfFinished()` writes `sending → completed` with a single conditional `UPDATE … WHERE NOT EXISTS (pending/sending deliveries)` instead of `complete()`. The check and the change must be one statement, or two workers finishing together could complete the campaign early or twice. It stays inside the model and only makes the transition `CampaignStatus` already allows.
 
 ## K16: Freeze the audience in SQL at approval, dispatch from a job
 

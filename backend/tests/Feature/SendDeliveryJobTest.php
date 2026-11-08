@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Delivery\ChannelRateLimiter;
 use App\Delivery\MessageProvider;
 use App\Delivery\RetryPolicy;
 use App\Delivery\SendDeliveryJob;
@@ -15,8 +16,14 @@ use App\Models\Customer;
 use App\Models\Delivery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
 
 uses(RefreshDatabase::class);
+
+// The real limiter shares Redis keys across tests, so every test starts with an empty window.
+beforeEach(function (): void {
+    Redis::del('send:sms', 'send:email');
+});
 
 /** A provider that answers from a script and records every call, so the tests see what was sent. */
 final class ScriptedProvider implements MessageProvider
@@ -231,4 +238,68 @@ it('fails without calling the provider when the rendered text is too long', func
     expect($provider->calls)->toBeEmpty()
         ->and($stored->status)->toBe(DeliveryStatus::Failed)
         ->and($stored->last_error)->toContain('limit is 160');
+});
+
+it('gives the claim back and tries again later when the channel stays saturated', function (): void {
+    $provider = useProvider([SendResult::sent('msg-1')]);
+    $delivery = pendingDelivery();
+    Redis::del('send:sms');
+    config()->set('delivery.rate_per_second', 1);
+    config()->set('delivery.rate_limit_max_wait_seconds', 0);
+    app(ChannelRateLimiter::class)->await(Channel::Sms);
+
+    $job = runJob($delivery);
+
+    $stored = $delivery->fresh();
+    expect($provider->calls)->toBeEmpty()
+        ->and($stored->status)->toBe(DeliveryStatus::Pending)
+        ->and($stored->claimed_at)->toBeNull()
+        ->and($stored->attempts)->toBe(0);
+    $job->assertReleased(delay: 1);
+});
+
+it('retries an unexpected exception only after the claim has gone stale, then sends', function (): void {
+    $broken = new class implements MessageProvider
+    {
+        public function send(Channel $channel, array $payload, string $idempotencyKey): SendResult
+        {
+            throw new RuntimeException('connection reset');
+        }
+    };
+    app()->instance(MessageProvider::class, $broken);
+    $delivery = pendingDelivery();
+
+    expect(fn () => runJob($delivery))->toThrow(RuntimeException::class, 'connection reset');
+    expect($delivery->fresh()->status)->toBe(DeliveryStatus::Sending)
+        ->and((new SendDeliveryJob($delivery->id))->backoff())->toBeGreaterThan((int) config('delivery.claim_timeout_seconds'));
+
+    // The queue retries after the backoff, by which time the claim is older than the timeout.
+    DB::table('deliveries')->where('id', $delivery->id)->update(['claimed_at' => DB::raw("now() - interval '2 minutes'")]);
+    $provider = useProvider([SendResult::sent('msg-1')]);
+    runJob($delivery);
+
+    expect($provider->calls)->toHaveCount(1)
+        ->and($delivery->fresh()->status)->toBe(DeliveryStatus::Sent);
+});
+
+it('fails the delivery and finishes the campaign when the job gives up on a stale claim', function (): void {
+    $delivery = pendingDelivery();
+    Campaign::query()->whereKey($delivery->campaign_id)->update(['status' => 'sending']);
+    DB::table('deliveries')->where('id', $delivery->id)->update(['status' => 'sending', 'claimed_at' => DB::raw("now() - interval '2 minutes'")]);
+
+    (new SendDeliveryJob($delivery->id))->failed(new RuntimeException('connection reset'));
+
+    $stored = $delivery->fresh();
+    expect($stored->status)->toBe(DeliveryStatus::Failed)
+        ->and($stored->last_error)->toContain('connection reset')
+        ->and(Campaign::find($delivery->campaign_id)->status->value)->toBe('completed');
+});
+
+it('leaves a fresh claim alone when the job gives up', function (): void {
+    $delivery = pendingDelivery();
+    DB::table('deliveries')->where('id', $delivery->id)->update(['status' => 'sending', 'claimed_at' => DB::raw('now()')]);
+
+    (new SendDeliveryJob($delivery->id))->failed(new RuntimeException('connection reset'));
+
+    expect($delivery->fresh()->status)->toBe(DeliveryStatus::Sending);
 });

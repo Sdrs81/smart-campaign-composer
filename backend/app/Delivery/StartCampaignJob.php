@@ -21,6 +21,11 @@ class StartCampaignJob implements ShouldQueue
 
     private const DISPATCH_CHUNK_SIZE = 1000;
 
+    // Without these a worker drops the job after one exception and the campaign stays approved for good.
+    public int $tries = 3;
+
+    public int $backoff = 5;
+
     public function __construct(public readonly int $campaignId) {}
 
     public function handle(AudienceSnapshotter $snapshotter): void

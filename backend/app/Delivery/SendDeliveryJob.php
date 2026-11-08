@@ -15,6 +15,7 @@ use App\Models\Delivery;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Sends one delivery. The attempt count lives in the database (K18), so Laravel's own attempt counter
@@ -26,6 +27,8 @@ class SendDeliveryJob implements ShouldQueue
 
     private const MILLISECONDS_PER_SECOND = 1000;
 
+    private const SATURATED_CHANNEL_RETRY_SECONDS = 1;
+
     /** 0 means unlimited; the retry policy decides when to stop. */
     public int $tries = 0;
 
@@ -33,6 +36,31 @@ class SendDeliveryJob implements ShouldQueue
     public int $maxExceptions = 3;
 
     public function __construct(public readonly int $deliveryId) {}
+
+    /**
+     * After an unexpected exception the row is still "sending", and claim() only takes it once the claim is
+     * stale. Retrying sooner would find it held and drop the job, leaving the delivery stuck.
+     */
+    public function backoff(): int
+    {
+        return (int) config('delivery.claim_timeout_seconds') + 1;
+    }
+
+    /** Runs when the job gives up after repeated exceptions, so the delivery ends as failed instead of stuck. */
+    public function failed(Throwable $exception): void
+    {
+        $delivery = Delivery::query()->find($this->deliveryId);
+        $claimIsStale = $delivery?->claimed_at?->lt(now()->subSeconds((int) config('delivery.claim_timeout_seconds'))) === true;
+
+        // A fresh claim belongs to another worker that is still sending.
+        if ($delivery === null || $delivery->status !== DeliveryStatus::Sending || ! $claimIsStale) {
+            return;
+        }
+
+        $delivery->markFailed("The send job failed after repeated errors: {$exception->getMessage()}");
+        $delivery->save();
+        Campaign::completeIfFinished($delivery->campaign_id);
+    }
 
     public function handle(
         MessageProvider $provider,
@@ -101,8 +129,16 @@ class SendDeliveryJob implements ShouldQueue
             return;
         }
 
-        // Waiting here, not retrying after a 429, keeps the attempt count for real failures.
-        $rateLimiter->await($delivery->channel);
+        // Waiting here, not sending into a 429, avoids most refusals and the retry attempts they would use up.
+        try {
+            $rateLimiter->await($delivery->channel);
+        } catch (ChannelRateLimitTimeout) {
+            // Nothing was sent, so this is not an attempt: hand the row back and look again shortly.
+            $this->releaseClaim($delivery);
+            $this->release(self::SATURATED_CHANNEL_RETRY_SECONDS);
+
+            return;
+        }
 
         $result = $provider->send($delivery->channel, $payload, $delivery->idempotency_key);
 
@@ -122,6 +158,15 @@ class SendDeliveryJob implements ShouldQueue
             ->update(['status' => DeliveryStatus::Sending->value, 'claimed_at' => DB::raw('now()')]);
 
         return $claimed === 1;
+    }
+
+    /** The counterpart of claim(): sending back to pending, so the job released for later can claim it again. */
+    private function releaseClaim(Delivery $delivery): void
+    {
+        Delivery::query()
+            ->whereKey($delivery->getKey())
+            ->where('status', DeliveryStatus::Sending->value)
+            ->update(['status' => DeliveryStatus::Pending->value, 'claimed_at' => null]);
     }
 
     /** @return array<string, string> "to" and "body", plus "subject" for email */
