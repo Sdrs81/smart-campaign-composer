@@ -33,6 +33,12 @@ enum CampaignStatus: string
         };
     }
 
+    /** True once a person has approved the campaign, so a repeated approval has nothing left to do. */
+    public function isApprovedOrLater(): bool
+    {
+        return in_array($this, [self::Approved, self::Sending, self::Completed, self::Failed], true);
+    }
+
     public function canTransitionTo(self $next): bool
     {
         return in_array($next, $this->allowedNext(), true);

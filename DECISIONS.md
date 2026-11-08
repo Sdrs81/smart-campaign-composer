@@ -89,6 +89,12 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** An invalid transition fails early, next to the data it protects. Idempotent approval makes a double click harmless.
 - **Alternatives:** A rule editor (YAGNI); status set from services or controllers.
 
+## K16: Freeze the audience in SQL at approval, dispatch from a job
+
+- **Decision:** `POST /api/campaigns/{id}/approve` takes a `Cache::lock` on the campaign, re-reads it under the lock, and only moves a `content_ready` campaign to `approved` (any other pre-approval state is a 409). It refuses an audience of 0 with 422 `audience_empty`, and re-validates both messages with the same `ContentValidator` against the stored longest values. It then queues one `StartCampaignJob` and returns; a repeat after approval returns 200 with the current state and queues nothing. `StartCampaignJob` runs `AudienceSnapshotter` (one `INSERT … SELECT … ON CONFLICT DO NOTHING` per channel, with the consent condition applied again and the idempotency key `sha256("campaign:customer:channel")` computed in SQL), moves the campaign to `sending`, and streams the pending delivery ids with `lazyById(1000)`, queuing one `SendDeliveryJob` each on the `sms` or `email` queue. A second run adds no rows and re-queues only deliveries still pending, so a crash during dispatch is recovered by running the job again. A held lock gives 409 `approval_in_progress` after `approval_lock_wait_seconds`.
+- **Rationale:** The freeze is one statement inside Postgres, so no customer row reaches PHP and memory stays flat. Doing it in a job keeps the request fast and lets a failed start be repeated safely. The lock plus the status re-read turns two clicks into one approval.
+- **Alternatives:** Looping over customers in PHP; one batch job for the whole campaign; a `DB::transaction` with `lockForUpdate` instead of a cache lock (the lock must also cover the dispatch).
+
 ## K17: One rate limit per channel, enforced on both sides
 
 - **Decision:** Sending is limited to 100 per second per channel (`SEND_RATE_PER_SECOND`). The mock provider enforces the same limit itself, with a per-second Redis `INCR` counter per channel, and answers 429 with `Retry-After: 1` when it is exceeded. The main app's limiter (task 8.4) uses `Redis::throttle(...)->block()` so a worker waits instead of burning a retry.

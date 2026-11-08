@@ -39,6 +39,10 @@ return [
 
     'workers_per_channel' => (int) env('WORKERS_PER_CHANNEL', 8),
 
+    // The approval lock outlives a normal approval; a second click waits this long before getting a 409.
+    'approval_lock_seconds' => 10,
+    'approval_lock_wait_seconds' => 5,
+
     // A delivery stuck in "sending" longer than this is taken over by another worker (K19 layer two).
     'claim_timeout_seconds' => 60,
 
