@@ -9,6 +9,7 @@ use App\Http\Controllers\CampaignContentStreamController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\CampaignPreviewController;
 use App\Http\Controllers\CampaignStatsController;
+use App\Http\Controllers\CampaignStatsStreamController;
 use App\Http\Controllers\ContentRulesController;
 use App\Http\Controllers\HealthController;
 use Illuminate\Support\Facades\Route;
@@ -25,5 +26,6 @@ Route::post('/campaigns/{campaign}/approve', CampaignApprovalController::class)-
 Route::put('/campaigns/{campaign}/content', [CampaignContentController::class, 'update'])->whereNumber('campaign');
 Route::get('/campaigns/{campaign}/preview', CampaignPreviewController::class)->whereNumber('campaign');
 Route::get('/campaigns/{campaign}/stats', CampaignStatsController::class)->whereNumber('campaign');
+Route::get('/campaigns/{campaign}/stats/stream', CampaignStatsStreamController::class)->whereNumber('campaign');
 Route::get('/content/rules', ContentRulesController::class);
 Route::post('/campaigns/{campaign}/content/stream', CampaignContentStreamController::class)->whereNumber('campaign');
