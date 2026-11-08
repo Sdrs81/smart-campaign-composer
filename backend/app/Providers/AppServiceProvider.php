@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Content\ContentValidator;
 use App\Content\PersonalizationRenderer;
+use App\Delivery\ChannelRateLimiter;
 use App\Delivery\HttpMessageProvider;
 use App\Delivery\MessageProvider;
 use App\Delivery\RetryPolicy;
@@ -45,6 +46,7 @@ class AppServiceProvider extends ServiceProvider
         // Both are built from config because they take scalars and a closure the container cannot guess.
         $this->app->bind(MessageProvider::class, fn (): MessageProvider => HttpMessageProvider::fromConfig());
         $this->app->bind(RetryPolicy::class, fn (): RetryPolicy => RetryPolicy::fromConfig());
+        $this->app->bind(ChannelRateLimiter::class, fn (): ChannelRateLimiter => ChannelRateLimiter::fromConfig());
 
         // The prompt quotes the same limits the validator enforces, so it reads them from the same config.
         $this->app->bind(ContentPrompt::class, fn (): ContentPrompt => new ContentPrompt(

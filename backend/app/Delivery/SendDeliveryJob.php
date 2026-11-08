@@ -33,8 +33,12 @@ class SendDeliveryJob implements ShouldQueue
 
     public function __construct(public readonly int $deliveryId) {}
 
-    public function handle(MessageProvider $provider, RetryPolicy $retryPolicy, PersonalizationRenderer $renderer): void
-    {
+    public function handle(
+        MessageProvider $provider,
+        RetryPolicy $retryPolicy,
+        PersonalizationRenderer $renderer,
+        ChannelRateLimiter $rateLimiter,
+    ): void {
         $delivery = Delivery::query()->find($this->deliveryId);
 
         // A repeated or late job finds the row already final and does nothing (idempotent).
@@ -77,6 +81,9 @@ class SendDeliveryJob implements ShouldQueue
 
             return;
         }
+
+        // Waiting here, not retrying after a 429, keeps the attempt count for real failures.
+        $rateLimiter->await($delivery->channel);
 
         $result = $provider->send($delivery->channel, $payload, $delivery->idempotency_key);
 
