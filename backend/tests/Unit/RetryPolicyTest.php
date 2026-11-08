@@ -83,5 +83,5 @@ it('never retries a permanent failure', function (): void {
 });
 
 it('refuses to decide for a message that was sent', function (): void {
-    retryPolicyPicking()->decide(SendResult::sent(), 1);
+    retryPolicyPicking()->decide(SendResult::sent('msg-1'), 1);
 })->throws(InvalidArgumentException::class, 'needs no retry decision');

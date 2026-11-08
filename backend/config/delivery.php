@@ -35,6 +35,9 @@ return [
 
     'workers_per_channel' => (int) env('WORKERS_PER_CHANNEL', 8),
 
+    // A delivery stuck in "sending" longer than this is taken over by another worker (K19 layer two).
+    'claim_timeout_seconds' => 60,
+
     'provider' => [
         'url' => env('PROVIDER_URL', 'http://mock-provider:8080'),
         'connect_timeout' => 1,

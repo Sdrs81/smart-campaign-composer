@@ -10,11 +10,12 @@ final readonly class SendResult
         public SendOutcome $outcome,
         public ?int $retryAfterSeconds = null,
         public ?string $reason = null,
+        public ?string $providerMessageId = null,
     ) {}
 
-    public static function sent(): self
+    public static function sent(string $providerMessageId): self
     {
-        return new self(SendOutcome::Sent);
+        return new self(SendOutcome::Sent, providerMessageId: $providerMessageId);
     }
 
     /**

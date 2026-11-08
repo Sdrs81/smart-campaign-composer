@@ -50,7 +50,7 @@ final readonly class HttpMessageProvider implements MessageProvider
         $reason = "Provider answered {$status}: {$response->body()}";
 
         return match (true) {
-            $response->successful() => SendResult::sent(),
+            $response->successful() => SendResult::sent((string) $response->json('id')),
             $status === 429 => SendResult::rateLimited($this->retryAfterSeconds($response), $reason),
             $response->serverError() => SendResult::transient($reason),
             default => SendResult::permanent($reason),

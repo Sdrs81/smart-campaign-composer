@@ -24,7 +24,10 @@ function sendSms(): SendResult
 it('classifies a 2xx answer as sent and sends the Idempotency-Key header', function (): void {
     Http::fake(['provider.test/*' => Http::response(['id' => 'abc', 'status' => 'accepted'], 200)]);
 
-    expect(sendSms()->outcome)->toBe(SendOutcome::Sent);
+    $result = sendSms();
+
+    expect($result->outcome)->toBe(SendOutcome::Sent)
+        ->and($result->providerMessageId)->toBe('abc');
 
     Http::assertSent(fn (Request $request): bool => $request->url() === 'http://provider.test/sms'
         && $request->method() === 'POST'
