@@ -97,17 +97,21 @@ final class Application
             return $this->error(400, 'invalid_recipient', "'{$payload['to']}' is not a valid {$channel->value} recipient.");
         }
 
-        if (! $this->rateLimiter->tryAcquire($channel, time())) {
+        // One clock reading for the whole request: the limiter and the peak counter must agree on the second,
+        // or latency would move an accepted message into the next second's bucket and show a false burst.
+        $arrivedAt = time();
+
+        if (! $this->rateLimiter->tryAcquire($channel, $arrivedAt)) {
             return $this->rateLimited("The {$channel->value} channel is over its limit per second; retry later.");
         }
 
-        return $this->deliver($channel, $key, $payload, $this->faults->decide($forcedFault));
+        return $this->deliver($channel, $key, $payload, $this->faults->decide($forcedFault), $arrivedAt);
     }
 
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function deliver(Channel $channel, string $key, array $payload, FaultDecision $decision): Response
+    private function deliver(Channel $channel, string $key, array $payload, FaultDecision $decision, int $arrivedAt): Response
     {
         ($this->sleepMilliseconds)($decision->latencyMilliseconds);
 
@@ -135,7 +139,7 @@ final class Application
         }
 
         if ($result->outcome === IdempotencyOutcome::Created) {
-            $this->stats->recordAccepted($channel, time());
+            $this->stats->recordAccepted($channel, $arrivedAt);
         } else {
             $this->stats->recordDuplicate($channel);
         }
