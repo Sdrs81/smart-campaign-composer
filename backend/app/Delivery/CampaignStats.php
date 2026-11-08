@@ -6,6 +6,7 @@ namespace App\Delivery;
 
 use App\Enums\Channel;
 use App\Enums\DeliveryStatus;
+use App\Logging\SensitiveText;
 use App\Models\Campaign;
 use App\Models\Delivery;
 
@@ -114,7 +115,8 @@ class CampaignStats
                 'channel' => $delivery->channel->value,
                 'status' => $delivery->status->value,
                 'attempts' => $delivery->attempts,
-                'error' => $delivery->last_error,
+                // Provider error bodies can echo the rejected recipient; the API must not hand it out.
+                'error' => SensitiveText::mask((string) $delivery->last_error),
                 'at' => $delivery->updated_at,
             ])
             ->all();

@@ -125,6 +125,19 @@ it('keeps the error of a retried delivery that later succeeded and shows its sta
         ->and($errors[0]['error'])->toBe('Provider answered 500');
 });
 
+it('masks a rejected recipient that the provider error echoes', function (): void {
+    $campaign = statsCampaign();
+    statsDelivery($campaign, 'sms', 'failed', [
+        'last_error' => "Provider answered 400: '+905001234567' is not a valid sms recipient (ayse@example.com).",
+        'attempts' => 1,
+    ]);
+
+    $response = $this->getJson("/api/campaigns/{$campaign->id}/stats")->assertOk();
+
+    expect($response->json('data.recent_errors.0.error'))
+        ->toBe("Provider answered 400: '[REDACTED]' is not a valid sms recipient ([REDACTED]).");
+});
+
 it('answers 404 for an unknown campaign', function (): void {
     $this->getJson('/api/campaigns/999999/stats')->assertNotFound();
 });

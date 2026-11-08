@@ -17,6 +17,8 @@ class CampaignStatsStream
 {
     public const EVENT = 'stats';
 
+    public const END_EVENT = 'end';
+
     public const RECONNECT_MILLISECONDS = 3000;
 
     public const POLL_SECONDS = 1;
@@ -63,7 +65,16 @@ class CampaignStatsStream
                 yield ": heartbeat\n\n";
             }
 
-            if ($campaign->status->isTerminal() || $startedAt->diffInSeconds(now(), absolute: true) >= self::MAX_SECONDS) {
+            if ($campaign->status->isTerminal()) {
+                // Without this a plain close looks like a dropped connection and EventSource reconnects every
+                // RECONNECT_MILLISECONDS for good; the client closes its source when it sees "end".
+                yield 'event: '.self::END_EVENT."\ndata: {}\n\n";
+
+                return;
+            }
+
+            // No "end" here on purpose: an old stream is closed so the client reconnects and gets a fresh snapshot.
+            if ($startedAt->diffInSeconds(now(), absolute: true) >= self::MAX_SECONDS) {
                 return;
             }
 

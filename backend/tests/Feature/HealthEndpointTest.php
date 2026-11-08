@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Delivery\QueueDepths;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Redis;
@@ -111,6 +113,34 @@ it('probes the provider directly when redis is down, without touching the cache'
     $this->getJson('/api/health')->assertStatus(503);
 
     Http::assertSentCount(2);
+});
+
+it('answers 503 for redis, not 500, when redis answers the ping but the queue read fails', function () {
+    providerAnswers(Http::response(['status' => 'ok']));
+    app()->instance(QueueDepths::class, new class extends QueueDepths
+    {
+        public function __invoke(): array
+        {
+            throw new RuntimeException('Connection reset by peer');
+        }
+    });
+
+    $this->getJson('/api/health')
+        ->assertStatus(503)
+        ->assertJsonPath('error.message', 'Required dependency is down: redis.')
+        ->assertJsonPath('error.details.checks.redis', 'down');
+});
+
+it('probes the provider directly when the state cache fails', function () {
+    providerAnswers(Http::response(['status' => 'ok']));
+    Cache::shouldReceive('remember')->andThrow(new RuntimeException('cache backend unavailable'));
+
+    $this->getJson('/api/health')
+        ->assertOk()
+        ->assertJsonPath('status', 'ok')
+        ->assertJsonPath('checks.provider', 'up');
+
+    Http::assertSentCount(1);
 });
 
 it('never calls the model API', function () {

@@ -18,21 +18,8 @@ use Monolog\Logger as MonologLogger;
  */
 class StructuredJsonFormat
 {
-    private const MASK = '[REDACTED]';
-
     /** @var list<string> context keys whose whole value is masked */
     private const SENSITIVE_KEYS = ['password', 'secret', 'token', 'api_key', 'apikey', 'x-api-key', 'authorization', 'cookie', 'phone', 'email', 'to'];
-
-    /** @var list<string> */
-    private const PATTERNS = [
-        // Anthropic API keys. The prefix is written in two parts so this pattern is not mistaken for a real key
-        // by the commit guard that scans changes for key prefixes.
-        '{sk-'.'ant-[A-Za-z0-9_\-]+}',
-        // Phone numbers: E.164 (+905001234567) and the Turkish national form (05001234567).
-        '{\+\d{8,15}}',
-        '{\b0?5\d{9}\b}',
-        '{[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}}',
-    ];
 
     public function __invoke(Logger $logger): void
     {
@@ -48,7 +35,7 @@ class StructuredJsonFormat
                 continue;
             }
 
-            $handler->setFormatter(new RedactingFormatter(new JsonFormatter, self::SENSITIVE_KEYS, self::PATTERNS, self::MASK));
+            $handler->setFormatter(new RedactingFormatter(new JsonFormatter, self::SENSITIVE_KEYS, SensitiveText::PATTERNS, SensitiveText::MASK));
         }
     }
 }

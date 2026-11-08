@@ -57,7 +57,9 @@ it('sends one snapshot and closes for a completed campaign', function (): void {
     expect($response->headers->get('Content-Type'))->toStartWith('text/event-stream')
         ->and($content)->toStartWith("retry: 3000\n\n")
         ->and(substr_count($content, 'event: stats'))->toBe(1)
-        ->and($content)->toContain('"status":"completed"');
+        ->and($content)->toContain('"status":"completed"')
+        // The client needs an explicit end, or EventSource would reconnect to a finished campaign forever.
+        ->and($content)->toEndWith("event: end\ndata: {}\n\n");
 });
 
 it('sends a snapshot only when the numbers change and ends on the final status', function (): void {
@@ -78,12 +80,13 @@ it('sends a snapshot only when the numbers change and ends on the final status',
     });
 
     // Unchanged polls (sleeps 1 and 3) send nothing: first snapshot, the new delivery, the final status.
-    expect($frames)->toHaveCount(4)
+    expect($frames)->toHaveCount(5)
         ->and($frames[0])->toBe("retry: 3000\n\n")
         ->and(framesOfType($frames, 'event: stats'))->toBe(3)
         ->and($frames[1])->toContain('"total":0')
         ->and($frames[2])->toContain('"pending":1')
-        ->and($frames[3])->toContain('"status":"completed"');
+        ->and($frames[3])->toContain('"status":"completed"')
+        ->and($frames[4])->toBe("event: end\ndata: {}\n\n");
 });
 
 it('sends a heartbeat comment after fifteen quiet seconds', function (): void {
@@ -113,6 +116,8 @@ it('closes a stream that has run for ten minutes', function (): void {
     $frames = collectFrames($campaign);
 
     expect(framesOfType($frames, 'event: stats'))->toBe(1)
+        // An old stream just closes: the client reconnects and gets a fresh snapshot.
+        ->and(framesOfType($frames, 'event: end'))->toBe(0)
         ->and(framesOfType($frames, ': heartbeat'))->toBe(intdiv(CampaignStatsStream::MAX_SECONDS, CampaignStatsStream::HEARTBEAT_SECONDS))
         ->and($startedAt->diffInSeconds(now(), absolute: true))->toBeGreaterThanOrEqual(CampaignStatsStream::MAX_SECONDS);
 });
