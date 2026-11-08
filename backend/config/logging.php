@@ -1,5 +1,6 @@
 <?php
 
+use App\Logging\StructuredJsonFormat;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -54,7 +55,8 @@ return [
 
         'stack' => [
             'driver' => 'stack',
-            'channels' => explode(',', (string) env('LOG_STACK', 'single')),
+            // Containers log to stderr as JSON; set LOG_STACK=single to also write storage/logs/laravel.log.
+            'channels' => explode(',', (string) env('LOG_STACK', 'stderr')),
             'ignore_exceptions' => false,
         ],
 
@@ -101,7 +103,8 @@ return [
             'handler_with' => [
                 'stream' => 'php://stderr',
             ],
-            'formatter' => env('LOG_STDERR_FORMATTER'),
+            // One JSON object per line with secrets and personal data masked (docker compose logs shows it as is).
+            'tap' => [StructuredJsonFormat::class],
             'processors' => [PsrLogMessageProcessor::class],
         ],
 
