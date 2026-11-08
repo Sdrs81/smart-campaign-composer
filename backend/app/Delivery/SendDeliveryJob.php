@@ -8,6 +8,7 @@ use App\Content\PersonalizationRenderer;
 use App\Content\Variables;
 use App\Enums\Channel;
 use App\Enums\DeliveryStatus;
+use App\Models\Campaign;
 use App\Models\CampaignMessage;
 use App\Models\Customer;
 use App\Models\Delivery;
@@ -41,17 +42,35 @@ class SendDeliveryJob implements ShouldQueue
     ): void {
         $delivery = Delivery::query()->find($this->deliveryId);
 
-        // A repeated or late job finds the row already final and does nothing (idempotent).
-        if ($delivery === null || $delivery->status->isTerminal()) {
+        if ($delivery === null) {
             return;
         }
 
-        // K19 layer two: only one worker wins the row.
-        if (! $this->claim($delivery)) {
-            return;
-        }
-        $delivery->refresh();
+        // A repeated or late job finds the row already final and sends nothing (idempotent).
+        if (! $delivery->status->isTerminal()) {
+            // K19 layer two: only one worker wins the row.
+            if (! $this->claim($delivery)) {
+                return;
+            }
+            $delivery->refresh();
 
+            $this->deliver($delivery, $provider, $retryPolicy, $renderer, $rateLimiter);
+        }
+
+        // Checked even for a row that was already final: a worker that died between saving the last
+        // delivery and completing the campaign is repaired by the repeated job.
+        if ($delivery->status->isTerminal()) {
+            Campaign::completeIfFinished($delivery->campaign_id);
+        }
+    }
+
+    private function deliver(
+        Delivery $delivery,
+        MessageProvider $provider,
+        RetryPolicy $retryPolicy,
+        PersonalizationRenderer $renderer,
+        ChannelRateLimiter $rateLimiter,
+    ): void {
         $customer = $delivery->customer;
 
         // Opt-in is checked again here because consent may have been withdrawn since the audience was frozen.

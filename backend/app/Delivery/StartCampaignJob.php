@@ -41,6 +41,9 @@ class StartCampaignJob implements ShouldQueue
         }
 
         $this->dispatchPendingDeliveries($campaign);
+
+        // An audience that emptied between approval and freezing has no delivery to finish it later.
+        Campaign::completeIfFinished($campaign->id);
     }
 
     /** Streams ids in chunks, so memory stays flat however large the audience is. */
