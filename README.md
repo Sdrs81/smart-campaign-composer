@@ -18,6 +18,7 @@ Then open <http://localhost:8080>. The API health check is at <http://localhost:
 - Migrations run automatically when the `app` container starts. Seed data is added once a seed table exists.
 - `ANTHROPIC_API_KEY` is optional. Without it the app runs on a built-in fake LLM and logs a warning.
 - There is no authentication: this is a single-marketer local demo.
+- To work on the UI with hot reload, keep the stack running and start `npm run dev` in `frontend/` (needs Node on the host), then open <http://localhost:5173>. Vite forwards `/api` to the stack on port 8080. Without hot reload, `docker compose up -d --build web` rebuilds the served app.
 
 ### Commands
 
