@@ -64,6 +64,12 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** Tests and `docker compose up` must work without a key; the warning stops a missing key from passing as a working setup.
 - **Alternatives:** The official PHP SDK.
 
+## K10: Structured output from a registry-built JSON schema
+
+- **Decision:** `ClaudeLlmClient` asks the API for structured output (`output_config.format` of type `json_schema`), with the schema built from `FieldRegistry` and the content limits. The backend validates every answer anyway (K11).
+- **Rationale:** The case requires JSON output. The schema makes a shape mismatch rare in the model, so fewer repair rounds are needed; business rules (value limits, operators per type, character limits) do not fit a schema and stay in the validators.
+- **Alternatives:** Prompt-only JSON; forced tool use as a fallback (not built: the API supports structured output, so it would be unused code).
+
 ## K11: Reliability chain and the LLM call log
 
 - **Decision:** An LLM answer goes parse → validate → typed value object. A rejected answer goes back to the model with its path-based errors, at most 2 repair rounds (`llm.max_repair_attempts`), then the caller gets the errors. Text no field can express goes to `unsupported_criteria`; an answer with no conditions and a non-empty `unsupported_criteria` ends at once, since a repair cannot fix it. A brief is 10-1000 characters and may not contain `<brief>` tags (`llm.brief`). Transport failures are never repaired: `LlmUnavailable` maps to 503, the other `LlmException`s to 502, once in `bootstrap/app.php`.
@@ -131,6 +137,12 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Decision:** `GET /api/campaigns/{id}/stats` (`CampaignStats`, 9.1) reads progress with a single `GROUP BY channel, status` over `deliveries` (served by the `campaign_id, channel, status` index) that also sums `attempts`. Every channel and status is returned, zero when absent. Retries are `SUM(attempts)` minus one per `sent` or `failed` delivery, because the last attempt of those is not a retry (a `pending` delivery with attempts has that many scheduled retries). The send rate is the `sent` rows with `sent_at` in the last 5 seconds divided by 5. Recent errors are the 10 newest deliveries with a `last_error`, by `updated_at`, without any customer column. The SSE stream (9.2), `/api/metrics` (9.3) and health (9.4) follow the same rule: computed at request time, no extra counter state, no extra container.
 - **Rationale:** One indexed query keeps the cost constant per poll, and derived counters could drift from the rows. Leaving customer data out keeps phone numbers and emails out of the API and logs.
 - **Alternatives:** Redis counters; several count queries; Reverb/WebSockets.
+
+## K22: No authentication
+
+- **Decision:** The app has no login, users or tokens. It is a single-marketer local demo, and the README says so.
+- **Rationale:** The case does not ask for it (YAGNI), and auth would add routes, state and tests that prove nothing about the campaign flow.
+- **Alternatives:** Sanctum token authentication.
 
 ## K23: Interface language is chosen in the browser with vue-i18n
 
