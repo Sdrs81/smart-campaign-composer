@@ -90,7 +90,7 @@ it('leaves out someone who withdrew consent after the audience was counted', fun
     expect(Delivery::query()->where('campaign_id', $campaign->id)->where('channel', 'sms')->count())->toBe(1);
 });
 
-it('approves once and starts one campaign job, however many times it is asked', function (): void {
+it('pushes the start job again when approval is repeated before sending has started', function (): void {
     Queue::fake();
     seedAudience();
     $campaign = campaignInState();
@@ -98,11 +98,12 @@ it('approves once and starts one campaign job, however many times it is asked', 
     $this->postJson("/api/campaigns/{$campaign->id}/approve")
         ->assertOk()
         ->assertJsonPath('data.status', 'approved');
+    // The first push may have been lost; the job is idempotent, so a second approval pushes it again.
     $this->postJson("/api/campaigns/{$campaign->id}/approve")
         ->assertOk()
         ->assertJsonPath('data.status', 'approved');
 
-    Queue::assertPushed(StartCampaignJob::class, 1);
+    Queue::assertPushed(StartCampaignJob::class, 2);
     expect(Delivery::query()->count())->toBe(0);
 });
 

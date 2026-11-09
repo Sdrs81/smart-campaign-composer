@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Llm;
 
 use App\Llm\Exceptions\SegmentExtractionFailed;
+use App\Llm\Prompts\PromptTags;
 use App\Llm\Prompts\SegmentPrompt;
 use App\Segment\SegmentRuleParser;
 use App\Segment\ValidationErrors;
@@ -24,9 +25,6 @@ final class SegmentExtractor
     private const UNSUPPORTED_MAX_LENGTH = 200;
 
     private const EXPLANATION_MAX_LENGTH = 600;
-
-    // A brief must not close the <brief> wrapper early and write instructions outside it.
-    private const BRIEF_TAG_PATTERN = '/<\/?brief\b/i';
 
     public function __construct(
         private readonly LlmClient $client,
@@ -82,7 +80,7 @@ final class SegmentExtractor
         $length = mb_strlen($brief);
         $problem = match (true) {
             $length < $this->briefMinLength || $length > $this->briefMaxLength => "must be {$this->briefMinLength} to {$this->briefMaxLength} characters, got {$length}.",
-            preg_match(self::BRIEF_TAG_PATTERN, $brief) === 1 => 'must not contain <brief> tags.',
+            PromptTags::appearIn($brief) => 'must not contain '.PromptTags::DESCRIPTION.'.',
             default => null,
         };
 

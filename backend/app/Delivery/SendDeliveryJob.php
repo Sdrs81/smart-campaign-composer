@@ -47,14 +47,16 @@ class SendDeliveryJob implements ShouldQueue
         return (int) config('delivery.claim_timeout_seconds') + 1;
     }
 
-    /** Runs when the job gives up after repeated exceptions, so the delivery ends as failed instead of stuck. */
+    /**
+     * Runs when the job gives up after repeated exceptions, so the delivery ends as failed instead of stuck.
+     * The claim is fresh here on purpose: the last attempt took it just before it threw, and no job is left
+     * to retry, so waiting for it to go stale would leave the delivery (and the campaign) in "sending" for good.
+     */
     public function failed(Throwable $exception): void
     {
         $delivery = Delivery::query()->find($this->deliveryId);
-        $claimIsStale = $delivery?->claimed_at?->lt(now()->subSeconds((int) config('delivery.claim_timeout_seconds'))) === true;
 
-        // A fresh claim belongs to another worker that is still sending.
-        if ($delivery === null || $delivery->status !== DeliveryStatus::Sending || ! $claimIsStale) {
+        if ($delivery === null || $delivery->status !== DeliveryStatus::Sending) {
             return;
         }
 
@@ -152,7 +154,10 @@ class SendDeliveryJob implements ShouldQueue
         $claimed = Delivery::query()
             ->whereKey($delivery->getKey())
             ->where(fn ($query) => $query
-                ->where('status', DeliveryStatus::Pending->value)
+                // A duplicate job (a re-run of StartCampaignJob) must not resend before the scheduled retry time.
+                ->where(fn ($pending) => $pending
+                    ->where('status', DeliveryStatus::Pending->value)
+                    ->where(fn ($due) => $due->whereNull('next_attempt_at')->orWhereRaw('next_attempt_at <= now()')))
                 ->orWhere(fn ($stale) => $stale
                     ->where('status', DeliveryStatus::Sending->value)
                     ->whereRaw("claimed_at < now() - ?::int * interval '1 second'", [config('delivery.claim_timeout_seconds')])))

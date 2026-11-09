@@ -38,9 +38,14 @@ final class RecordingLlmClient implements LlmClient
             return;
         }
 
-        $this->lastCall->markInvalid($errors);
-        $this->lastCall->save();
-        $this->log($this->lastCall);
+        // Best-effort like record(): failing to annotate the log must not discard the answer being repaired.
+        try {
+            $this->lastCall->markInvalid($errors);
+            $this->lastCall->save();
+            $this->log($this->lastCall);
+        } catch (QueryException $exception) {
+            report($exception);
+        }
     }
 
     /** The prompt, the brief and the raw answer stay in the table only; the line carries ids, sizes and the outcome. */
