@@ -7,12 +7,12 @@ export const routes = [
   {
     path: '/campaigns/new',
     name: 'campaign-new',
-    component: () => import('../views/CampaignNew.vue'),
+    component: () => import('../views/CampaignComposer.vue'),
   },
   {
     path: '/campaigns/:id(\\d+)',
     name: 'campaign',
-    component: () => import('../views/CampaignWorkflow.vue'),
+    component: () => import('../views/CampaignComposer.vue'),
     props: (route: { params: Record<string, string | string[]> }) => ({
       id: Number(route.params.id),
     }),

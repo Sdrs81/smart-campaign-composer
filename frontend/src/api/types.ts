@@ -16,17 +16,31 @@ export interface CampaignMessage {
   source: MessageSource
 }
 
-export interface ChannelAudienceCounts {
-  [counter: string]: number
+export type ConditionValue = string | number | (string | number)[] | null
+
+export interface SegmentCondition {
+  field: string
+  operator: string
+  value: ConditionValue
+}
+
+export interface SegmentRule {
+  version: number
+  conditions: SegmentCondition[]
+}
+
+export interface AudienceCounts {
+  channel_counts: Partial<Record<Channel, number>>
+  unique_total: number
 }
 
 export interface Campaign {
   id: number
   brief: string
   status: CampaignStatus
-  segment_rule: Record<string, unknown> | null
+  segment_rule: SegmentRule | null
   unsupported_criteria: string[] | null
-  audience_counts: Record<string, ChannelAudienceCounts | number> | null
+  audience_counts: AudienceCounts | null
   // Present on the detail endpoint only.
   messages?: CampaignMessage[]
   created_at: string
@@ -42,6 +56,12 @@ export interface ContentRules {
   channels: Record<string, unknown>
   limits: Record<string, number>
   variables: { name: string; fallback: string }[]
+  brief: { min_length: number; max_length: number }
+  segment: {
+    fields: { name: string; label: string }[]
+    // `template` holds a `{value}` placeholder, e.g. "son {value} gün içinde".
+    operators: { name: string; template: string }[]
+  }
 }
 
 export interface EditableContent {

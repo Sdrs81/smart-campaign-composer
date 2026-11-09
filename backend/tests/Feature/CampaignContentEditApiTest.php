@@ -6,6 +6,7 @@ use App\Enums\CampaignStatus;
 use App\Enums\MessageSource;
 use App\Models\Campaign;
 use App\Models\Customer;
+use App\Segment\Operator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -125,4 +126,15 @@ it('serves the limits and variables from the single config', function (): void {
         ->assertJsonPath('data.limits', config('delivery.limits'))
         ->assertJsonPath('data.channels', ['sms', 'email'])
         ->assertJsonPath('data.variables.0', ['name' => 'first_name', 'fallback' => 'Değerli müşterimiz']);
+});
+
+it('serves the brief limits and the segment labels for the rule chips', function (): void {
+    $response = $this->getJson('/api/content/rules')
+        ->assertOk()
+        ->assertJsonPath('data.brief', config('llm.brief'))
+        ->assertJsonFragment(['name' => 'loyalty_tier', 'label' => 'Sadakat seviyesi'])
+        ->assertJsonFragment(['name' => 'within_last_days', 'template' => 'son {value} gün içinde']);
+
+    $operators = collect($response->json('data.segment.operators'))->pluck('name')->all();
+    expect($operators)->toBe(array_map(fn (Operator $operator): string => $operator->value, Operator::cases()));
 });

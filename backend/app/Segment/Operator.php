@@ -21,6 +21,29 @@ enum Operator: string
     case IsNull = 'is_null';
     case NotNull = 'not_null';
 
+    /**
+     * How a chip reads in Turkish; `{value}` is replaced by the condition's value (a list is joined, a
+     * range is "a–b"). Kept here, next to the operators, so the UI keeps no copy of them.
+     */
+    public function template(): string
+    {
+        return match ($this) {
+            self::Eq => '{value}',
+            self::Neq => '{value} hariç',
+            self::In => '{value}',
+            self::NotIn => '{value} hariç',
+            self::Gt => '> {value}',
+            self::Gte => '≥ {value}',
+            self::Lt => '< {value}',
+            self::Lte => '≤ {value}',
+            self::Between => '{value}',
+            self::WithinLastDays => 'son {value} gün içinde',
+            self::NotWithinLastDays => 'son {value} gündür yok',
+            self::IsNull => 'boş',
+            self::NotNull => 'dolu',
+        };
+    }
+
     /** is_null / not_null take no value. */
     public function takesValue(): bool
     {

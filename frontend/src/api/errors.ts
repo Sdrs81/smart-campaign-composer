@@ -23,6 +23,25 @@ export class ApiError extends Error {
     }
     return fields
   }
+
+  /** Path-first problems the model could not fix (`details.errors` as a plain list, e.g. a failed extraction). */
+  get problems(): string[] {
+    const errors = this.details.errors
+    return Array.isArray(errors) ? errors.filter((item) => typeof item === 'string') : []
+  }
+
+  /** Parts of the brief no field can express, reported alongside a failed extraction. */
+  get unsupportedCriteria(): string[] {
+    const criteria = this.details.unsupported_criteria
+    return Array.isArray(criteria) ? criteria.filter((item) => typeof item === 'string') : []
+  }
+}
+
+/** Anything thrown by a call (a network failure included) as an ApiError the UI can show. */
+export function toApiError(failure: unknown): ApiError {
+  if (failure instanceof ApiError) return failure
+  const reason = failure instanceof Error ? failure.message : String(failure)
+  return new ApiError(0, 'network_error', `Could not reach the server: ${reason}`)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

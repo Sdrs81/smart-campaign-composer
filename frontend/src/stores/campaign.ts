@@ -2,7 +2,8 @@ import { defineStore } from 'pinia'
 import { ref, shallowRef } from 'vue'
 
 import { api, ApiError } from '../api/client'
-import type { Campaign, Paginated } from '../api/types'
+import { toApiError } from '../api/errors'
+import type { Campaign, ContentRules, Paginated } from '../api/types'
 
 export const useCampaignStore = defineStore('campaign', () => {
   // Replaced whole on every fetch, so it is not made deeply reactive.
@@ -47,5 +48,102 @@ export const useCampaignStore = defineStore('campaign', () => {
     loading.value = false
   }
 
-  return { campaigns, page, lastPage, loading, error, fetchList, cancelFetch }
+  // The campaign being composed. Replaced whole by each answer, so it is not made deeply reactive.
+  const current = shallowRef<Campaign | null>(null)
+  const rules = shallowRef<ContentRules | null>(null)
+  const composing = ref(false)
+  const composeError = shallowRef<ApiError | null>(null)
+  let loadingCurrent: AbortController | null = null
+
+  async function loadRules(): Promise<void> {
+    if (rules.value) return
+    try {
+      rules.value = await api.getContentRules()
+    } catch (failure) {
+      composeError.value = toApiError(failure)
+    }
+  }
+
+  async function loadCurrent(id: number): Promise<void> {
+    // Just created or extracted here: the held copy is newer than a refetch and keeps its error.
+    if (current.value?.id === id) return
+
+    loadingCurrent?.abort()
+    const controller = new AbortController()
+    loadingCurrent = controller
+    current.value = null
+    composeError.value = null
+    composing.value = true
+    try {
+      current.value = await api.getCampaign(id, controller.signal)
+    } catch (failure) {
+      if (!controller.signal.aborted) composeError.value = toApiError(failure)
+    } finally {
+      if (loadingCurrent === controller) {
+        composing.value = false
+        loadingCurrent = null
+      }
+    }
+  }
+
+  function leaveCurrent(): void {
+    loadingCurrent?.abort()
+    loadingCurrent = null
+    composing.value = false
+  }
+
+  function startNew(): void {
+    current.value = null
+    composeError.value = null
+  }
+
+  /** Runs the audience extraction for the held campaign. A failure is kept in `composeError`, the campaign stays. */
+  async function extractAudience(): Promise<void> {
+    const campaign = current.value
+    if (!campaign) return
+    composing.value = true
+    composeError.value = null
+    try {
+      current.value = await api.defineAudience(campaign.id)
+    } catch (failure) {
+      composeError.value = toApiError(failure)
+    } finally {
+      composing.value = false
+    }
+  }
+
+  /** Creates the campaign, then extracts its audience. Returns the new id, or null when creating failed. */
+  async function createAndExtract(brief: string): Promise<number | null> {
+    composing.value = true
+    composeError.value = null
+    try {
+      current.value = await api.createCampaign(brief)
+    } catch (failure) {
+      composeError.value = toApiError(failure)
+      composing.value = false
+      return null
+    }
+    await extractAudience()
+    return current.value?.id ?? null
+  }
+
+  return {
+    campaigns,
+    page,
+    lastPage,
+    loading,
+    error,
+    fetchList,
+    cancelFetch,
+    current,
+    rules,
+    composing,
+    composeError,
+    loadRules,
+    loadCurrent,
+    leaveCurrent,
+    startNew,
+    extractAudience,
+    createAndExtract,
+  }
 })
