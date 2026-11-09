@@ -308,13 +308,15 @@ it('fails the delivery when the job gives up right after its last attempt took t
         ->and(Campaign::find($delivery->campaign_id)->status->value)->toBe('completed');
 });
 
-it('does not claim a pending delivery before its scheduled retry time', function (): void {
+it('hands a job that runs before its retry is due back to the queue instead of dropping it', function (): void {
     $provider = useProvider([SendResult::sent('msg-1')]);
     $delivery = pendingDelivery();
     DB::table('deliveries')->where('id', $delivery->id)->update(['next_attempt_at' => DB::raw("now() + interval '1 minute'")]);
 
-    runJob($delivery);
+    $job = runJob($delivery);
 
     expect($provider->calls)->toHaveCount(0)
         ->and($delivery->fresh()->status)->toBe(DeliveryStatus::Pending);
+    // Released, not dropped. The exact delay depends on the clocks of the app and the database, so it is not pinned.
+    $job->assertReleased();
 });

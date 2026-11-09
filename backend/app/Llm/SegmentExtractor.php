@@ -147,6 +147,13 @@ final class SegmentExtractor
 
         $phrases = array_map(fn (string $phrase): string => mb_strimwidth(trim($phrase), 0, self::UNSUPPORTED_MAX_LENGTH, '…'), $value);
 
+        // These phrases reach the content prompt later, which refuses the same tags (see PromptTags).
+        if (array_filter($phrases, PromptTags::appearIn(...)) !== []) {
+            $errors[] = 'unsupported_criteria: must not contain '.PromptTags::DESCRIPTION.'.';
+
+            return [];
+        }
+
         return array_values(array_filter($phrases, fn (string $phrase): bool => $phrase !== ''));
     }
 
@@ -155,6 +162,12 @@ final class SegmentExtractor
     {
         if (! is_string($value) || trim($value) === '') {
             $errors[] = 'explanation: must be a non-empty string.';
+
+            return '';
+        }
+
+        if (PromptTags::appearIn($value)) {
+            $errors[] = 'explanation: must not contain '.PromptTags::DESCRIPTION.'.';
 
             return '';
         }

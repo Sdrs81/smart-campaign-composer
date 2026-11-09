@@ -90,7 +90,7 @@ it('leaves out someone who withdrew consent after the audience was counted', fun
     expect(Delivery::query()->where('campaign_id', $campaign->id)->where('channel', 'sms')->count())->toBe(1);
 });
 
-it('pushes the start job again when approval is repeated before sending has started', function (): void {
+it('does not queue a second start job while the first one is still waiting', function (): void {
     Queue::fake();
     seedAudience();
     $campaign = campaignInState();
@@ -98,13 +98,27 @@ it('pushes the start job again when approval is repeated before sending has star
     $this->postJson("/api/campaigns/{$campaign->id}/approve")
         ->assertOk()
         ->assertJsonPath('data.status', 'approved');
-    // The first push may have been lost; the job is idempotent, so a second approval pushes it again.
+    $this->postJson("/api/campaigns/{$campaign->id}/approve")
+        ->assertOk()
+        ->assertJsonPath('data.status', 'approved');
+
+    Queue::assertPushed(StartCampaignJob::class, 1);
+    expect(Delivery::query()->count())->toBe(0);
+});
+
+it('pushes the start job again once the first one is gone without having started the campaign', function (): void {
+    Queue::fake();
+    seedAudience();
+    $campaign = campaignInState();
+    $this->postJson("/api/campaigns/{$campaign->id}/approve")->assertOk();
+
+    // What a lost push looks like later: the uniqueness lock has expired and the campaign is still "approved".
+    Cache::lock('laravel_unique_job:'.StartCampaignJob::class.':'.$campaign->id)->forceRelease();
     $this->postJson("/api/campaigns/{$campaign->id}/approve")
         ->assertOk()
         ->assertJsonPath('data.status', 'approved');
 
     Queue::assertPushed(StartCampaignJob::class, 2);
-    expect(Delivery::query()->count())->toBe(0);
 });
 
 it('keeps an approved campaign as it is when approval is repeated after sending started', function (): void {

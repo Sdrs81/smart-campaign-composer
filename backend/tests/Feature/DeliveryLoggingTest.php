@@ -12,6 +12,7 @@ use App\Models\Campaign;
 use App\Models\Customer;
 use App\Models\Delivery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 uses(RefreshDatabase::class);
@@ -66,6 +67,8 @@ it('logs a scheduled retry with the reason and a failed delivery as a warning', 
     $delivery = loggedDelivery();
 
     sendLogged($delivery, SendResult::transient('Provider answered 500'));
+    // The released job runs after its delay; the second send only happens once the retry is due.
+    DB::table('deliveries')->where('id', $delivery->id)->update(['next_attempt_at' => DB::raw("now() - interval '1 second'")]);
     sendLogged($delivery, SendResult::permanent('Provider answered 400'));
 
     Log::shouldHaveReceived('log')->withArgs(fn (string $level, string $message, array $context): bool => $level === 'info'

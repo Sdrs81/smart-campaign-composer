@@ -30,6 +30,8 @@ class SendDeliveryJob implements ShouldQueue
 
     private const SATURATED_CHANNEL_RETRY_SECONDS = 1;
 
+    private const MINIMUM_NOT_DUE_RELEASE_SECONDS = 1;
+
     /** 0 means unlimited; the retry policy decides when to stop. */
     public int $tries = 0;
 
@@ -40,7 +42,8 @@ class SendDeliveryJob implements ShouldQueue
 
     /**
      * After an unexpected exception the row is still "sending", and claim() only takes it once the claim is
-     * stale. Retrying sooner would find it held and drop the job, leaving the delivery stuck.
+     * stale. Retrying sooner would find it held and drop the job, leaving the delivery stuck. Only the final
+     * give-up (failed()) acts on a fresh claim, because no retry is left to wait for it.
      */
     public function backoff(): int
     {
@@ -81,6 +84,8 @@ class SendDeliveryJob implements ShouldQueue
         if (! $delivery->status->isTerminal()) {
             // K19 layer two: only one worker wins the row.
             if (! $this->claim($delivery)) {
+                $this->releaseUntilDue($delivery);
+
                 return;
             }
             $delivery->refresh();
@@ -146,6 +151,20 @@ class SendDeliveryJob implements ShouldQueue
         $result = $provider->send($delivery->channel, $payload, $delivery->idempotency_key);
 
         $this->recordResult($delivery, $result, $retryPolicy);
+    }
+
+    /**
+     * A job that runs a little before its retry is due (rounding, clock differences) must not be dropped:
+     * nothing else would queue the delivery again, and the campaign would never finish.
+     */
+    private function releaseUntilDue(Delivery $delivery): void
+    {
+        $delivery->refresh();
+        if ($delivery->status !== DeliveryStatus::Pending || $delivery->next_attempt_at === null || ! $delivery->next_attempt_at->isFuture()) {
+            return;
+        }
+
+        $this->release(max(self::MINIMUM_NOT_DUE_RELEASE_SECONDS, (int) ceil(now()->diffInSeconds($delivery->next_attempt_at))));
     }
 
     /** One conditional UPDATE decides the winner: a pending row, or a "sending" row whose worker died. */

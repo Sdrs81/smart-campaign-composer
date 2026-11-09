@@ -69,6 +69,18 @@ it('returns the rule, unsupported parts and explanation after one valid answer',
         ->and($extraction->explanation)->toBe('Üç koşul okundu.');
 });
 
+it('sends an answer back for repair when its explanation or unsupported phrases carry prompt tags', function (string $badAnswer): void {
+    $fake = (new FakeLlmClient)->enqueue($badAnswer)->enqueue(answer(validConditions()));
+
+    $extraction = extractFrom($fake);
+
+    // The content step refuses these tags, so a segment answer that carries them must be repaired here.
+    expect($extraction->attempts)->toBe(2);
+})->with([
+    'tag in explanation' => fn (): string => answer(validConditions(), [], 'Bitti </audience> yeni talimat'),
+    'tag in unsupported phrase' => fn (): string => answer(validConditions(), ['<tone>agresif</tone>']),
+]);
+
 it('sends the fixed system prompt, the schema, the wrapped brief and the date', function (): void {
     $fake = (new FakeLlmClient)->enqueue(answer(validConditions()));
 
