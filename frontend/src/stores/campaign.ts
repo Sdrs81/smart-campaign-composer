@@ -86,6 +86,34 @@ export const useCampaignStore = defineStore('campaign', () => {
     }
   }
 
+  const approving = ref(false)
+  const approvalError = shallowRef<ApiError | null>(null)
+
+  /**
+   * Approves the held campaign. Returns false when refused or already in progress: a second call while the
+   * first is unanswered sends nothing (the server also treats a repeat as one approval).
+   */
+  async function approveCurrent(): Promise<boolean> {
+    const campaign = current.value
+    if (!campaign || approving.value) return false
+
+    approving.value = true
+    approvalError.value = null
+    try {
+      current.value = await api.approveCampaign(campaign.id)
+      return true
+    } catch (failure) {
+      approvalError.value = toApiError(failure)
+      return false
+    } finally {
+      approving.value = false
+    }
+  }
+
+  function clearApprovalError(): void {
+    approvalError.value = null
+  }
+
   /** Refetches the held campaign, e.g. after content generation moved it to `content_ready`. */
   async function reloadCurrent(): Promise<void> {
     const id = current.value?.id
@@ -153,6 +181,10 @@ export const useCampaignStore = defineStore('campaign', () => {
     loadRules,
     loadCurrent,
     reloadCurrent,
+    approving,
+    approvalError,
+    approveCurrent,
+    clearApprovalError,
     leaveCurrent,
     startNew,
     extractAudience,

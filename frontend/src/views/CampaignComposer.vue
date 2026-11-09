@@ -2,7 +2,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 
-import type { CampaignStatus } from '../api/types'
+import type { Campaign, CampaignStatus } from '../api/types'
+import ApproveDialog from '../components/ApproveDialog.vue'
 import AudienceCard from '../components/AudienceCard.vue'
 import BriefStep from '../components/BriefStep.vue'
 import ContentEditor from '../components/ContentEditor.vue'
@@ -50,6 +51,13 @@ async function submit(): Promise<void> {
     return
   }
   await store.extractAudience()
+}
+
+// Reported by the editor: the text fits, is saved and the server has no complaint.
+const canApprove = ref(false)
+
+async function goToDashboard(approved: Campaign): Promise<void> {
+  await router.push({ name: 'campaign-dashboard', params: { id: approved.id } })
 }
 
 // New model text replaces the editor's fields, so the editor is re-created once the campaign holds it.
@@ -137,6 +145,14 @@ onBeforeRouteLeave(() => store.leaveCurrent())
       :campaign="campaign"
       :rules="store.rules"
       @saved="store.current = $event"
+      @can-approve="canApprove = $event"
+    />
+
+    <ApproveDialog
+      v-if="campaign?.status === 'content_ready'"
+      :campaign="campaign"
+      :can-approve="canApprove"
+      @approved="goToDashboard"
     />
   </section>
 </template>
