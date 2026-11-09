@@ -1,3 +1,7 @@
+# Git Bash on Windows rewrites container paths such as "-w /mock" into host paths; this switches that off
+# and does nothing elsewhere.
+export MSYS_NO_PATHCONV := 1
+
 COMPOSE := docker compose
 FRONTEND_IMAGE := smart-campaign-frontend:tools
 
@@ -54,6 +58,7 @@ smoke:
 
 # Drives the real stack in Chromium (host needs Node). Rebuilds first so the browser sees the current code;
 # --wait returns once every service reports healthy. Screenshots land in frontend/e2e/artifacts/.
+# npm ci first: a fresh clone has no node_modules, so Playwright itself is not installed yet.
 e2e: .env
 	$(COMPOSE) up -d --build --wait
-	cd frontend && npx playwright install chromium && npx playwright test
+	cd frontend && npm ci && npx playwright install chromium && npx playwright test

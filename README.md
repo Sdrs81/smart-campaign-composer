@@ -104,7 +104,7 @@ Errors share one body: `{"error":{"code":"...","message":"...","details":{}}}`.
 | `make test-frontend` | `docker build --target build -t smart-campaign-frontend:tools -f frontend/Dockerfile .` then `docker run --rm smart-campaign-frontend:tools npm test`             |
 | `make lint-frontend` | same image, `npm run lint && npm run type-check && npm run format:check`                                                                                          |
 | `make smoke`         | `node scripts/smoke.mjs` (stack must be running)                                                                                                                  |
-| `make e2e`           | `docker compose up -d --build --wait`, then in `frontend/`: `npx playwright install chromium && npx playwright test`                                              |
+| `make e2e`           | `docker compose up -d --build --wait`, then in `frontend/`: `npm ci && npx playwright install chromium && npx playwright test`                                    |
 
 `make test` = `test-backend` + `test-mock` + `test-frontend`; `make lint` = `lint-backend` + `lint-frontend`.
 

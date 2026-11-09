@@ -22,8 +22,10 @@ COPY backend/composer.json backend/composer.lock ./
 RUN composer install --no-interaction --no-scripts --no-autoloader --prefer-dist
 
 COPY backend/ ./
-RUN composer dump-autoload --optimize --no-interaction \
-    && mkdir -p storage/logs storage/framework/cache/data storage/framework/sessions storage/framework/views bootstrap/cache \
+# The directories come first: git keeps no empty folders, so a fresh clone has no bootstrap/cache, and the
+# package:discover step of dump-autoload fails without it.
+RUN mkdir -p storage/logs storage/framework/cache/data storage/framework/sessions storage/framework/views bootstrap/cache \
+    && composer dump-autoload --optimize --no-interaction \
     && chmod -R a+rwX storage bootstrap/cache
 
 # Empty on purpose: settings come from the container environment, and a missing file
