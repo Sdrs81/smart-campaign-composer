@@ -1,3 +1,4 @@
+import { i18n } from '../i18n'
 import type { FieldErrors } from './types'
 
 /** The backend's single error shape: `{error: {code, message, details}}`. */
@@ -41,7 +42,7 @@ export class ApiError extends Error {
 export function toApiError(failure: unknown): ApiError {
   if (failure instanceof ApiError) return failure
   const reason = failure instanceof Error ? failure.message : String(failure)
-  return new ApiError(0, 'network_error', `Could not reach the server: ${reason}`)
+  return new ApiError(0, 'network_error', i18n.global.t('errors.network', { reason }))
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

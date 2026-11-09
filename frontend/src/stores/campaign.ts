@@ -3,6 +3,7 @@ import { ref, shallowRef } from 'vue'
 
 import { api, ApiError } from '../api/client'
 import { toApiError } from '../api/errors'
+import { i18n } from '../i18n'
 import type { Campaign, ContentRules, Paginated } from '../api/types'
 
 export const useCampaignStore = defineStore('campaign', () => {
@@ -33,7 +34,7 @@ export const useCampaignStore = defineStore('campaign', () => {
       error.value =
         failure instanceof ApiError
           ? failure.message
-          : `Could not load campaigns: ${String(failure)}`
+          : i18n.global.t('list.loadFailed', { reason: String(failure) })
     } finally {
       if (inFlight === controller) {
         loading.value = false

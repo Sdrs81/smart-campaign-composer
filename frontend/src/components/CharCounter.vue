@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{ count: number; max: number }>()
+const { t } = useI18n()
 
 const over = computed(() => props.count > props.max)
 </script>
@@ -13,6 +15,6 @@ const over = computed(() => props.count > props.max)
     :data-over="over"
   >
     {{ count }} / {{ max }}
-    <span v-if="over" role="status">· {{ count - max }} over the limit</span>
+    <span v-if="over" role="status">· {{ t('counter.over', { amount: count - max }) }}</span>
   </p>
 </template>

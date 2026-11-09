@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import type { Campaign, ContentRules } from '../api/types'
 import { describeCondition } from '../segment/describeCondition'
 
 const props = defineProps<{ campaign: Campaign; segment: ContentRules['segment'] }>()
+const { t } = useI18n()
 
 const chips = computed(() =>
   (props.campaign.segment_rule?.conditions ?? []).map((condition) =>
@@ -12,9 +14,9 @@ const chips = computed(() =>
   ),
 )
 const counts = computed(() => [
-  { label: 'SMS', value: props.campaign.audience_counts?.channel_counts.sms ?? 0 },
-  { label: 'Email', value: props.campaign.audience_counts?.channel_counts.email ?? 0 },
-  { label: 'Total', value: props.campaign.audience_counts?.unique_total ?? 0 },
+  { label: t('channel.sms'), value: props.campaign.audience_counts?.channel_counts.sms ?? 0 },
+  { label: t('channel.email'), value: props.campaign.audience_counts?.channel_counts.email ?? 0 },
+  { label: t('total'), value: props.campaign.audience_counts?.unique_total ?? 0 },
 ])
 const unsupported = computed(() => props.campaign.unsupported_criteria ?? [])
 </script>
@@ -24,9 +26,9 @@ const unsupported = computed(() => props.campaign.unsupported_criteria ?? [])
     aria-labelledby="audience-heading"
     class="space-y-4 rounded border border-slate-200 bg-white p-4"
   >
-    <h3 id="audience-heading" class="font-semibold">Audience</h3>
+    <h3 id="audience-heading" class="font-semibold">{{ t('audience.heading') }}</h3>
 
-    <ul class="flex flex-wrap gap-2" aria-label="Rule">
+    <ul class="flex flex-wrap gap-2" :aria-label="t('audience.rule')">
       <li
         v-for="chip in chips"
         :key="chip"
@@ -41,7 +43,7 @@ const unsupported = computed(() => props.campaign.unsupported_criteria ?? [])
       role="note"
       class="rounded border border-amber-300 bg-amber-50 p-3 text-sm"
     >
-      <p class="font-medium text-amber-900">Not applied to the audience (no matching field):</p>
+      <p class="font-medium text-amber-900">{{ t('audience.unsupported') }}</p>
       <ul class="list-disc pl-5 text-amber-900">
         <li v-for="criterion in unsupported" :key="criterion">{{ criterion }}</li>
       </ul>

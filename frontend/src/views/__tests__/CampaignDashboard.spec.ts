@@ -5,6 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 
 import type { CampaignStats, CampaignStatus } from '../../api/types'
 import ChannelProgress from '../../components/ChannelProgress.vue'
+import { setLocale } from '../../i18n'
 import { routes } from '../../router'
 import CampaignDashboard from '../CampaignDashboard.vue'
 
@@ -176,6 +177,56 @@ describe('CampaignDashboard', () => {
     expect(source.closed).toBe(true)
     expect(wrapper.text()).toContain('Finished')
     expect(wrapper.text()).toContain('Completed')
+  })
+
+  it('shows titles, channels, statuses and table headers in Turkish', async () => {
+    setLocale('tr')
+    const { wrapper, source } = await mountDashboard()
+    source.open()
+
+    source.emit(
+      'stats',
+      JSON.stringify(
+        snapshot(
+          'sending',
+          { sent: 1, pending: 9 },
+          {
+            recent_errors: [
+              {
+                delivery_id: 9,
+                channel: 'email',
+                status: 'failed',
+                attempts: 3,
+                error: 'provider 503',
+                at: '2026-01-01T10:00:00Z',
+              },
+            ],
+          },
+        ),
+      ),
+    )
+    await nextTick()
+
+    const text = wrapper.text()
+    expect(text).toContain('Kampanya #7 panosu')
+    expect(text).toContain('Canlı')
+    expect(text).toContain('Gönderiliyor')
+    expect(text).toContain('Gönderim hızı')
+    expect(text).toContain('Yeniden deneme')
+    expect(text).toContain('E-posta')
+    expect(text).toContain('toplam 10')
+    expect(wrapper.findAll('th').map((header) => header.text())).toEqual([
+      'Zaman',
+      'Kanal',
+      'Durum',
+      'Deneme',
+      'Hata',
+    ])
+    // The error text itself comes from the server and is shown as received.
+    const cells = wrapper.findAll('tbody tr td').map((cell) => cell.text())
+    expect(cells).toContain('provider 503')
+    expect(cells).toContain('Başarısız')
+    expect(text).not.toContain('Recent errors')
   })
 
   it('closes the stream when the page is left', async () => {

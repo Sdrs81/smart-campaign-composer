@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, useId } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import type { Campaign } from '../api/types'
 import { useCampaignStore } from '../stores/campaign'
@@ -8,6 +9,7 @@ const props = defineProps<{ campaign: Campaign; canApprove: boolean }>()
 const emit = defineEmits<{ approved: [campaign: Campaign] }>()
 
 const store = useCampaignStore()
+const { t } = useI18n()
 const titleId = useId()
 const open = ref(false)
 const openButton = ref<HTMLButtonElement | null>(null)
@@ -15,9 +17,9 @@ const dialog = ref<HTMLElement | null>(null)
 const cancelButton = ref<HTMLButtonElement | null>(null)
 
 const counts = computed(() => [
-  { label: 'SMS', value: props.campaign.audience_counts?.channel_counts.sms ?? 0 },
-  { label: 'Email', value: props.campaign.audience_counts?.channel_counts.email ?? 0 },
-  { label: 'Total', value: props.campaign.audience_counts?.unique_total ?? 0 },
+  { label: t('channel.sms'), value: props.campaign.audience_counts?.channel_counts.sms ?? 0 },
+  { label: t('channel.email'), value: props.campaign.audience_counts?.channel_counts.email ?? 0 },
+  { label: t('total'), value: props.campaign.audience_counts?.unique_total ?? 0 },
 ])
 const problems = computed(() => {
   const error = store.approvalError
@@ -85,10 +87,10 @@ onBeforeUnmount(() => store.clearApprovalError())
       :disabled="!canApprove"
       @click="show"
     >
-      Approve campaign
+      {{ t('approve.open') }}
     </button>
     <p v-if="!canApprove" class="mt-1 text-sm text-slate-600">
-      Fix the content and wait for it to be saved before approving.
+      {{ t('approve.blocked') }}
     </p>
 
     <div
@@ -103,9 +105,9 @@ onBeforeUnmount(() => store.clearApprovalError())
         :aria-labelledby="titleId"
         class="w-full max-w-md space-y-4 rounded bg-white p-6 shadow-lg"
       >
-        <h2 :id="titleId" class="text-lg font-semibold">Approve and send?</h2>
+        <h2 :id="titleId" class="text-lg font-semibold">{{ t('approve.title') }}</h2>
         <p class="text-sm text-slate-700">
-          Sending starts right away to everyone below. This cannot be undone.
+          {{ t('approve.warning') }}
         </p>
 
         <dl class="grid grid-cols-3 gap-3">
@@ -138,7 +140,7 @@ onBeforeUnmount(() => store.clearApprovalError())
             :disabled="store.approving"
             @click="close"
           >
-            Cancel
+            {{ t('approve.cancel') }}
           </button>
           <button
             type="button"
@@ -146,7 +148,7 @@ onBeforeUnmount(() => store.clearApprovalError())
             :disabled="store.approving"
             @click="confirm"
           >
-            {{ store.approving ? 'Approving…' : 'Approve and send' }}
+            {{ store.approving ? t('approve.approving') : t('approve.confirm') }}
           </button>
         </div>
       </div>

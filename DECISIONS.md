@@ -132,6 +132,12 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** One indexed query keeps the cost constant per poll, and derived counters could drift from the rows. Leaving customer data out keeps phone numbers and emails out of the API and logs.
 - **Alternatives:** Redis counters; several count queries; Reverb/WebSockets.
 
+## K23: Interface language is chosen in the browser with vue-i18n
+
+- **Decision:** The UI is available in English and Turkish through `vue-i18n` (Composition API, `legacy: false`). One header button switches to the other language, named in itself ("Türkçe" / "English"). The choice is saved in `localStorage` (`locale`); with nothing saved, a Turkish browser gets Turkish and everything else English. The page's `<html lang>` follows the choice. Messages live in `src/i18n/en.ts` (the master) and `tr.ts`, typed `typeof en`, so a missing or extra key fails type-check; a test also checks that both languages use the same `{parameters}` and none of the characters vue-i18n reserves (`{ } @ | $`). Only text the frontend writes is translated: error text from the API, the model-written SMS/email text, the campaign brief, and the segment chip labels (which the backend already sends in Turkish from `FieldRegistry` and `Operator::template()`) are shown as received.
+- **Rationale:** The switch is a display choice of one marketer, so it needs no server state or login, and it must not change what is sent to customers (that language is set by the brief and the model). Keeping the rule labels and API messages on the server keeps one source of truth for them (K7, K13) instead of a second copy in the frontend.
+- **Alternatives:** Translating API errors by `code` in the frontend (a second copy of every message); the backend choosing the language from an `Accept-Language` header (the content limits and rule labels would then depend on the request); a per-language route prefix (`/tr/campaigns`), which adds routes for no gain in a single-marketer demo.
+
 ## Setup notes (Phase 2)
 
 - **API only:** no web routes, views or Vite in the backend; errors share one `{error:{code,message,details}}` body.

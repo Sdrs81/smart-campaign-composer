@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, useId, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import type { Campaign, ContentRules } from '../api/types'
 import { useContentEditing } from '../composables/useContentEditing'
@@ -13,6 +14,7 @@ type FieldKey = 'smsBody' | 'emailSubject' | 'emailBody'
 const props = defineProps<{ campaign: Campaign; rules: ContentRules }>()
 const emit = defineEmits<{ saved: [campaign: Campaign]; 'can-approve': [allowed: boolean] }>()
 
+const { t } = useI18n()
 const ids = { smsBody: useId(), emailSubject: useId(), emailBody: useId() }
 const SERVER_PATH: Record<FieldKey, string> = {
   smsBody: 'sms.body',
@@ -112,13 +114,8 @@ async function insertVariable(name: string): Promise<void> {
 const messageOf = (channel: 'sms' | 'email') =>
   preview.value?.messages.find((message) => message.channel === channel)
 
-const SAVE_LABEL: Record<typeof saveState.value, string> = {
-  idle: '',
-  pending: 'Unsaved changes…',
-  saving: 'Saving…',
-  saved: 'Saved',
-  failed: 'Not saved',
-}
+// The message keys are the save states themselves; nothing is said while idle.
+const saveLabel = computed(() => (saveState.value === 'idle' ? '' : t(`editor.${saveState.value}`)))
 
 // Loaded once the text exists; refreshed by the composable after each save.
 if (props.campaign.messages?.length) void editing.loadPreview()
@@ -130,14 +127,14 @@ if (props.campaign.messages?.length) void editing.loadPreview()
     class="space-y-6 rounded border border-slate-200 bg-white p-4"
   >
     <div class="flex items-center justify-between gap-4">
-      <h3 id="editor-heading" class="font-semibold">Edit &amp; preview</h3>
+      <h3 id="editor-heading" class="font-semibold">{{ t('editor.heading') }}</h3>
       <p v-if="!locked" aria-live="polite" class="text-sm text-slate-600">
-        {{ SAVE_LABEL[saveState] }}
+        {{ saveLabel }}
       </p>
     </div>
 
     <p v-if="locked" class="rounded bg-slate-50 p-3 text-sm text-slate-700">
-      This campaign is approved; its content is locked.
+      {{ t('editor.locked') }}
     </p>
     <p
       v-if="saveError"
@@ -151,9 +148,9 @@ if (props.campaign.messages?.length) void editing.loadPreview()
       v-if="!locked"
       class="flex flex-wrap items-center gap-2"
       role="group"
-      aria-label="Insert variable"
+      :aria-label="t('editor.insertVariable')"
     >
-      <span class="text-sm text-slate-600">Insert:</span>
+      <span class="text-sm text-slate-600">{{ t('editor.insert') }}</span>
       <button
         v-for="variable in rules.variables"
         :key="variable.name"
@@ -166,7 +163,7 @@ if (props.campaign.messages?.length) void editing.loadPreview()
     </div>
 
     <div class="space-y-2">
-      <label :for="ids.smsBody" class="block text-sm font-medium">SMS text</label>
+      <label :for="ids.smsBody" class="block text-sm font-medium">{{ t('editor.smsText') }}</label>
       <textarea
         :id="ids.smsBody"
         ref="smsBodyEl"
@@ -190,7 +187,9 @@ if (props.campaign.messages?.length) void editing.loadPreview()
     </div>
 
     <div class="space-y-2">
-      <label :for="ids.emailSubject" class="block text-sm font-medium">Email subject</label>
+      <label :for="ids.emailSubject" class="block text-sm font-medium">{{
+        t('editor.emailSubject')
+      }}</label>
       <input
         :id="ids.emailSubject"
         ref="emailSubjectEl"
@@ -216,7 +215,9 @@ if (props.campaign.messages?.length) void editing.loadPreview()
     </div>
 
     <div class="space-y-2">
-      <label :for="ids.emailBody" class="block text-sm font-medium">Email body</label>
+      <label :for="ids.emailBody" class="block text-sm font-medium">{{
+        t('editor.emailBody')
+      }}</label>
       <textarea
         :id="ids.emailBody"
         ref="emailBodyEl"
@@ -241,7 +242,9 @@ if (props.campaign.messages?.length) void editing.loadPreview()
 
     <div class="space-y-4 border-t border-slate-200 pt-4">
       <div class="flex items-center gap-3">
-        <label :for="`${ids.smsBody}-customer`" class="text-sm font-medium">Preview as</label>
+        <label :for="`${ids.smsBody}-customer`" class="text-sm font-medium">{{
+          t('editor.previewAs')
+        }}</label>
         <select
           :id="`${ids.smsBody}-customer`"
           class="rounded border border-slate-300 p-2 text-sm focus:outline-2 focus:outline-indigo-600"
@@ -254,13 +257,14 @@ if (props.campaign.messages?.length) void editing.loadPreview()
             )
           "
         >
-          <option value="">First sample customer</option>
+          <option value="">{{ t('editor.firstSample') }}</option>
           <option
             v-for="person in campaign.audience_counts?.sample ?? []"
             :key="person.id"
             :value="person.id"
           >
-            {{ person.first_name ?? '(no first name)' }} {{ person.last_name }} · {{ person.city }}
+            {{ person.first_name ?? t('editor.noFirstName') }} {{ person.last_name }} ·
+            {{ person.city }}
           </option>
         </select>
       </div>
@@ -270,7 +274,7 @@ if (props.campaign.messages?.length) void editing.loadPreview()
         <div>
           <SmsPreview :body="messageOf('sms')?.body" :streaming="false" />
           <p class="mt-1 text-center text-xs text-slate-600">
-            {{ messageOf('sms')?.lengths.body }} characters
+            {{ t('editor.characters', { amount: messageOf('sms')?.lengths.body ?? 0 }) }}
           </p>
         </div>
         <div>
@@ -280,8 +284,12 @@ if (props.campaign.messages?.length) void editing.loadPreview()
             :streaming="false"
           />
           <p class="mt-1 text-xs text-slate-600">
-            Subject {{ messageOf('email')?.lengths.subject }} · body
-            {{ messageOf('email')?.lengths.body }} characters
+            {{
+              t('editor.emailLengths', {
+                subject: messageOf('email')?.lengths.subject ?? 0,
+                body: messageOf('email')?.lengths.body ?? 0,
+              })
+            }}
           </p>
         </div>
       </div>

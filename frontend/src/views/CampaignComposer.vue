@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { onBeforeRouteLeave, RouterLink, useRouter } from 'vue-router'
 
 import type { Campaign, CampaignStatus } from '../api/types'
@@ -16,6 +17,7 @@ const props = defineProps<{ id?: number }>()
 
 const store = useCampaignStore()
 const router = useRouter()
+const { t } = useI18n()
 const draftBrief = ref('')
 
 // The audience can be redone until the campaign is approved (the server answers 409 afterwards).
@@ -33,8 +35,8 @@ const briefText = computed({
   },
 })
 const submitLabel = computed(() => {
-  if (isNew.value) return 'Extract audience'
-  return campaign.value?.segment_rule ? 'Re-run extraction' : 'Extract audience'
+  if (isNew.value) return t('brief.extract')
+  return campaign.value?.segment_rule ? t('brief.rerun') : t('brief.extract')
 })
 
 async function open(): Promise<void> {
@@ -76,12 +78,14 @@ onBeforeRouteLeave(() => store.leaveCurrent())
 <template>
   <section class="mx-auto max-w-3xl space-y-6">
     <div class="flex items-center justify-between">
-      <h2 class="text-lg font-semibold">{{ isNew ? 'New campaign' : `Campaign #${id}` }}</h2>
+      <h2 class="text-lg font-semibold">
+        {{ isNew ? t('composer.newTitle') : t('composer.title', { id }) }}
+      </h2>
       <StatusBadge v-if="campaign" :status="campaign.status" />
     </div>
 
     <div aria-live="polite">
-      <p v-if="store.composing && !campaign" class="text-slate-600">Loading…</p>
+      <p v-if="store.composing && !campaign" class="text-slate-600">{{ t('composer.loading') }}</p>
     </div>
 
     <template v-if="store.rules && (isNew || campaign)">
@@ -110,24 +114,24 @@ onBeforeRouteLeave(() => store.leaveCurrent())
         class="list-disc pl-5 text-sm text-red-900"
       >
         <li v-for="criterion in store.composeError.unsupportedCriteria" :key="criterion">
-          Not expressible: {{ criterion }}
+          {{ t('composer.notExpressible', { criterion }) }}
         </li>
       </ul>
       <p
         v-if="store.composeError.status === 503 || store.composeError.status === 0"
         class="text-sm text-red-900"
       >
-        The service is unreachable right now. Use the button above to try again.
+        {{ t('composer.unreachable') }}
       </p>
     </div>
 
     <p v-if="campaign && !canExtract" class="text-sm text-slate-600">
-      This campaign is approved; its audience can no longer be changed.
+      {{ t('composer.approvedLocked') }}
       <RouterLink
         :to="{ name: 'campaign-dashboard', params: { id: campaign.id } }"
         class="ml-1 text-indigo-700 underline focus:outline-2 focus:outline-indigo-600"
       >
-        View delivery dashboard
+        {{ t('composer.viewDashboard') }}
       </RouterLink>
     </p>
 

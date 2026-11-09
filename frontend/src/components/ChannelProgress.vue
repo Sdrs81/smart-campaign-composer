@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import type { DeliveryStatus } from '../api/types'
 
 const props = defineProps<{ label: string; counts: Record<DeliveryStatus | 'total', number> }>()
+const { t } = useI18n()
 
 const BAR_WIDTH = 100
 
@@ -11,28 +13,28 @@ const BAR_WIDTH = 100
 const parts = computed(() => [
   {
     key: 'sent',
-    label: 'Sent',
+    label: t('progress.sent'),
     value: props.counts.sent,
     fill: 'fill-emerald-500',
     swatch: 'bg-emerald-500',
   },
   {
     key: 'failed',
-    label: 'Failed',
+    label: t('progress.failed'),
     value: props.counts.failed,
     fill: 'fill-red-500',
     swatch: 'bg-red-500',
   },
   {
     key: 'skipped',
-    label: 'Skipped',
+    label: t('progress.skipped'),
     value: props.counts.skipped,
     fill: 'fill-slate-400',
     swatch: 'bg-slate-400',
   },
   {
     key: 'waiting',
-    label: 'Waiting',
+    label: t('progress.waiting'),
     value: props.counts.pending + props.counts.sending,
     fill: 'fill-amber-400',
     swatch: 'bg-amber-400',
@@ -57,7 +59,7 @@ const summary = computed(() => parts.value.map((part) => `${part.label} ${part.v
   <section class="space-y-2 rounded border border-slate-200 bg-white p-4">
     <div class="flex items-baseline justify-between">
       <h3 class="font-semibold">{{ label }}</h3>
-      <p class="text-sm text-slate-600">{{ counts.total }} total</p>
+      <p class="text-sm text-slate-600">{{ t('progress.total', { amount: counts.total }) }}</p>
     </div>
 
     <svg

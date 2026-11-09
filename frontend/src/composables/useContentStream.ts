@@ -4,6 +4,7 @@ import { getCurrentScope, onScopeDispose, ref, shallowRef } from 'vue'
 import { api } from '../api/client'
 import { toApiError } from '../api/errors'
 import type { ContentStreamError, ContentStreamEvent } from '../api/types'
+import { i18n } from '../i18n'
 
 /** What the model has written so far; every field is absent until its first characters arrive. */
 export interface DraftContent {
@@ -113,7 +114,7 @@ export function useContentStream(
         cancelFrame()
         error.value = {
           code: 'stream_ended',
-          message: 'The stream ended before the content was complete.',
+          message: i18n.global.t('content.streamEnded'),
           errors: [],
         }
         status.value = 'failed'
