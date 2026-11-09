@@ -19,12 +19,15 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.4",
+    "partial-json": "^0.1.7",
     "pinia": "^4.0.3",
     "tailwindcss": "^4.3.4",
     "vue": "^3.5.42",
+    "vue-i18n": "^11.4.18",
     "vue-router": "^5.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
     "@tsconfig/node24": "^24.0.5",
     "@types/jsdom": "^30.0.0",
     "@types/node": "^24.13.4",

@@ -6,6 +6,9 @@
     // Extra safety for array and object lookups, but may have false positives.
     "noUncheckedIndexedAccess": true,
 
+    // Intl.Segmenter (grapheme counting) is typed from ES2022; every current browser ships it.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+
     // Path mapping for cleaner imports.
     "paths": {
       "@/*": ["./src/*"]

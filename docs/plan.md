@@ -1,6 +1,6 @@
 # Smart Campaign Composer: Uygulama Planı
 
-Tarih: 2026-11-04, güncelleme 2026-11-05 · Durum: onaylandı · Tasarım seçenekleri ve yanıtlanan sorular Bölüm 2'de (K1–K22)
+Tarih: 2026-11-04, güncelleme 2026-11-09 · Durum: onaylandı · Tasarım seçenekleri ve yanıtlanan sorular Bölüm 2'de (K1–K23)
 
 ## 0. Bağlam
 
@@ -15,7 +15,7 @@ Insider One case'i: pazarlamacı doğal dille bir brief yazar; Claude brief'ten 
 - **Gönderim:** Onayda kitle `deliveries` tablosuna tek bir `INSERT … SELECT` ile dondurulur (unique: kampanya + kişi + kanal) → mesaj başına job → Redis throttle (kanal başına ≤100/sn) → mock provider (`Idempotency-Key` ile). Retry: hata sınıfına göre üstel backoff + jitter, 429'da `Retry-After`.
 - **Mock provider:** Ayrı container, sade PHP + Redis. Gecikme, 500, 429, timeout ve "kabul edip 500 dön" hatalarını ayarlanabilir oranlarla üretir; tekrar eden mesajları sayar.
 - **Canlı akış:** İçerik üretimi SSE (POST + `fetch` stream), dashboard SSE (`EventSource`, değişince snapshot). `/api/health`, `/api/metrics` (Prometheus text).
-- **Frontend:** Vue 3 + TypeScript + Vite + Pinia + Vue Router + Tailwind; nginx statik servis ve `/api` reverse proxy.
+- **Frontend:** Vue 3 + TypeScript + Vite + Pinia + Vue Router + Tailwind + vue-i18n (Türkçe/İngilizce arayüz, K23); nginx statik servis ve `/api` reverse proxy.
 - **Test ve kurulum:** Pest (unit + gerçek Postgres/Redis'e karşı integration), Vitest, Playwright e2e (fake LLM). `docker compose up` (migrate + seed otomatik), `make test` (docker içinde, host bağımlılığı yok).
 
 ```
@@ -74,10 +74,11 @@ Yalnızca `DECISIONS.md`'ye girecek kararlar: case'te doğrudan geçenler, mimar
 
 ### Takip ve kapsam
 
-| #   | Karar                                                                                                                                                                                | Gerekçe (ilke)                                                                                    | Alternatifler                         | Görevler      |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- | ------------------------------------- | ------------- |
-| K21 | Canlı durum SSE ile (1 sn, yalnızca değişince, tek `GROUP BY` sorgusu); `/api/metrics` Prometheus text, sorgu anında hesaplanır; `/api/health`: DB/Redis kritik, provider `degraded` | Case şartı. Ek container ve sayaç durumu yok (KISS); `EventSource` kendiliğinden yeniden bağlanır | Polling; Reverb; sayaç tabanlı metrik | 9.1–9.4, 10.7 |
-| K22 | Kimlik doğrulama yok: tek pazarlamacı, yerel demo                                                                                                                                    | Case'te istenmiyor (YAGNI); README'de açıkça yazılır                                              | Sanctum token                         | 11.1          |
+| #   | Karar                                                                                                                                                                                                          | Gerekçe (ilke)                                                                                                                                           | Alternatifler                                                                                   | Görevler      |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------- |
+| K21 | Canlı durum SSE ile (1 sn, yalnızca değişince, tek `GROUP BY` sorgusu); `/api/metrics` Prometheus text, sorgu anında hesaplanır; `/api/health`: DB/Redis kritik, provider `degraded`                           | Case şartı. Ek container ve sayaç durumu yok (KISS); `EventSource` kendiliğinden yeniden bağlanır                                                        | Polling; Reverb; sayaç tabanlı metrik                                                           | 9.1–9.4, 10.7 |
+| K22 | Kimlik doğrulama yok: tek pazarlamacı, yerel demo                                                                                                                                                              | Case'te istenmiyor (YAGNI); README'de açıkça yazılır                                                                                                     | Sanctum token                                                                                   | 11.1          |
+| K23 | Arayüz dili tarayıcıda seçilir (vue-i18n, Türkçe/İngilizce, başlıkta tek buton, seçim `localStorage`'da); yalnızca frontend'in kendi metinleri çevrilir, API mesajları ve model içeriği olduğu gibi gösterilir | Dil bir görüntüleme tercihidir: sunucu durumu gerekmez, müşteriye giden içerik değişmez; kural etiketleri ve hata mesajları tek kaynakta (backend) kalır | `Accept-Language` ile backend çevirisi; hata kodlarını frontend'de çevirmek; dil önekli rotalar | 10.9          |
 
 ## 3. Çalışma akışı
 
@@ -87,7 +88,7 @@ Yalnızca `DECISIONS.md`'ye girecek kararlar: case'te doğrudan geçenler, mimar
 - **Faz sonu:** `/finish-phase` → `make test` + `make lint`, `review-pr`, `/code-review` (genelde `medium`; Faz 5 ve 8 için `high`), en fazla 2 tur, reddedilen bulgu listesi → dosya bazlı faz özeti → onayla push (`ask`) ve PR. Merge sende.
 - **Kararlar:** Bölüm 2'deki her karar, "Görevler" sütunundaki ilk görevin commit'inde `DECISIONS.md`'ye girer. Uygulama sırasında çıkan yeni bir önemli karar önce Bölüm 2'ye eklenir, sonra aynı şekilde yazılır.
 - **Session export:** Her oturum sonunda `/export` → `ai-sessions/phase-<N>_<konu>.md` (ör. `phase-1_setup.md`; aynı fazda ikinci oturum `phase-1_setup-2.md`); commit'ten önce `node scripts/scrub-sessions.mjs --check`.
-- **Dil:** Projenin tüm dosyaları ve içerikleri İngilizce yazılır: kod, yorumlar, config dosyaları (`.gitignore` yorumları dahil), `README.md`, `DECISIONS.md`, `CLAUDE.md`, rules/skills/agents, hook ve script mesajları, commit mesajları, PR başlığı ve açıklaması. Türkçe kalanlar: bu plan (`docs/plan.md`, çalışma belgesi), Claude'un sohbetteki raporları ve dosya bazlı özetler. Ürün içeriği (LLM'in ürettiği kampanya metni) ürün gereği Türkçe kalır (5.9, 11.1).
+- **Dil:** Projenin tüm dosyaları ve içerikleri İngilizce yazılır: kod, yorumlar, config dosyaları (`.gitignore` yorumları dahil), `README.md`, `DECISIONS.md`, `CLAUDE.md`, rules/skills/agents, hook ve script mesajları, commit mesajları, PR başlığı ve açıklaması. Türkçe kalanlar: bu plan (`docs/plan.md`, çalışma belgesi), Claude'un sohbetteki raporları ve dosya bazlı özetler. Ürün içeriği (LLM'in ürettiği kampanya metni) ürün gereği Türkçe kalır (5.9, 11.1). Arayüz metinleri ise Türkçe/İngilizce seçilebilir (K23); çeviri dosyaları (`frontend/src/i18n/tr.ts`) de bu "proje dosyaları İngilizce" kuralının bilinçli istisnasıdır.
 - **Takvim (çekirdek akış 5 günde):**
 
   | Gün | Fazlar                                  | Gün sonu ölçütü                                                                 |
@@ -666,6 +667,7 @@ Performans ilkeleri (gerektiği yerde): lazy route, stream delta'larını `reque
 - **Dosyalar:** `views/CampaignComposer.vue`, `components/BriefStep.vue`, `components/AudienceCard.vue`, test
 - **Bağımlı:** 10.2, 6.2
 - **Kabul:** Vitest (başarı, 422, 503); tarayıcıda örnek brief → sayılar.
+- **Uygulama notu:** Frontend limit ve etiket kopyası tutmasın diye `GET /api/content/rules` yanıtına `brief` limitleri ve `segment.fields/operators` (Türkçe çip kalıbı `Operator::template()`) eklendi (`ContentRulesController`, `Operator.php`, feature test); `AudienceCard` sayıları `longest_values`/`sample` ile birlikte okunur. Backend'de brief güncelleme endpoint'i yok: kayıtlı kampanyada brief salt okunur, farklı brief için yeni kampanya açılır.
 
 ### 10.4 İçerik stream adımı
 
@@ -673,6 +675,7 @@ Performans ilkeleri (gerektiği yerde): lazy route, stream delta'larını `reque
 - **Dosyalar:** `components/ContentStream.vue`, `components/SmsPreview.vue`, `components/EmailPreview.vue`, test
 - **Bağımlı:** 10.3, 6.3
 - **Kabul:** Vitest (sahte stream ile kademeli metin); tarayıcıda metin akarak gelir.
+- **Uygulama notu:** Kısmi JSON için `partial-json` (`STR | OBJ` bayrakları, kare başına bir ayrıştırma) seçildi; K12 `DECISIONS.md`'ye bu görevde yazıldı (ilk görev 6.3'te yazılmamıştı). Vite dev sunucusuna `/api` proxy'si eklendi (`npm run dev`).
 
 ### 10.5 Düzenleme ve önizleme
 
@@ -701,6 +704,14 @@ Performans ilkeleri (gerektiği yerde): lazy route, stream delta'larını `reque
 - **Dosyalar:** `frontend/e2e/core-flow.spec.ts`, `playwright.config.ts`, `Makefile`
 - **Bağımlı:** 10.7
 - **Kabul:** `make e2e` yeşil; ekran görüntüleri incelenir.
+- **Uygulama notu:** Test host'ta Node ile çalışır (`make e2e` yığını `up -d --build --wait` ile güncel kodla kaldırır, Chromium'u kurar); ekran görüntüleri `frontend/e2e/artifacts/` (gitignore'da).
+
+### 10.9 Arayüz dili (Türkçe/İngilizce) · K23
+
+- **İş:** `vue-i18n` (Composition API); başlıkta diğer dili kendi adıyla sunan tek buton; seçim `localStorage`'da, kayıt yoksa tarayıcı dili (Türkçe → `tr`, diğerleri `en`); `<html lang>` seçime uyar. Mesajlar `en.ts` (ana kaynak) ve `tr.ts` (`typeof en` ile tip denetimli); tüm görünümler, durum rozetleri, kanal adları ve saat biçimi çevrilir. API hata mesajları, model içeriği ve kural çiplerinin etiketleri (backend zaten Türkçe gönderir) olduğu gibi gösterilir.
+- **Dosyalar:** `frontend/src/i18n/*`, `components/LocaleSwitcher.vue`, mevcut bileşenler, `test-setup.ts`, `e2e/language.spec.ts`, Vitest
+- **Bağımlı:** 10.8
+- **Kabul:** Vitest: iki dilde aynı anahtar ve `{parametre}` kümesi, dil algılama ve kalıcılık, butonla Türkçe↔İngilizce geçişi; e2e: geçiş ve yenilemeden sonra kalıcılık.
 
 ---
 

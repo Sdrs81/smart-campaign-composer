@@ -52,5 +52,8 @@ frontend-tools:
 smoke:
 	node scripts/smoke.mjs
 
-e2e:
-	@echo "make e2e is added in task 10.8" && exit 1
+# Drives the real stack in Chromium (host needs Node). Rebuilds first so the browser sees the current code;
+# --wait returns once every service reports healthy. Screenshots land in frontend/e2e/artifacts/.
+e2e: .env
+	$(COMPOSE) up -d --build --wait
+	cd frontend && npx playwright install chromium && npx playwright test
