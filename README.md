@@ -64,7 +64,7 @@ stateDiagram-v2
 1. **Brief.** `POST /api/campaigns` creates a campaign from the plain-language brief.
 2. **Audience.** Claude returns a segment rule. It is parsed and checked against `FieldRegistry` and becomes a typed value object; column names never come from the model and values are bound, so model output never becomes SQL. Criteria no field can express are reported back as unsupported. Opt-in is applied while counting, and the marketer sees per-channel counts.
 3. **Content.** SMS and email copy streams to the browser over server-sent events. Model output and human edits go through the same validator (SMS ≤ 160, email subject ≤ 80, email body ≤ 2000 visible characters, counted after personalisation with the longest values in the audience).
-4. **Approval.** The human approves once. Approving twice is a no-op, and an empty audience is refused.
+4. **Approval.** The human approves once. Approving again is harmless (once sending has started it changes nothing), and an empty audience is refused.
 5. **Sending.** The audience is frozen with one `INSERT … SELECT … ON CONFLICT DO NOTHING` (opt-in is checked again), and one job per delivery goes to the `sms` or `email` queue. Right before sending, opt-in is checked a second time. A global limit of 100 per second per channel applies, failures are retried by class with full jitter, and double sends are prevented by a DB unique key, an atomic claim and the provider `Idempotency-Key`.
 6. **Dashboard.** Progress per channel and status, send rate, retries and recent errors stream live over SSE.
 
