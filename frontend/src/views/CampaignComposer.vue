@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { onBeforeRouteLeave, useRouter } from 'vue-router'
+import { onBeforeRouteLeave, RouterLink, useRouter } from 'vue-router'
 
 import type { Campaign, CampaignStatus } from '../api/types'
 import ApproveDialog from '../components/ApproveDialog.vue'
@@ -122,6 +122,12 @@ onBeforeRouteLeave(() => store.leaveCurrent())
 
     <p v-if="campaign && !canExtract" class="text-sm text-slate-600">
       This campaign is approved; its audience can no longer be changed.
+      <RouterLink
+        :to="{ name: 'campaign-dashboard', params: { id: campaign.id } }"
+        class="ml-1 text-indigo-700 underline focus:outline-2 focus:outline-indigo-600"
+      >
+        View delivery dashboard
+      </RouterLink>
     </p>
 
     <AudienceCard
