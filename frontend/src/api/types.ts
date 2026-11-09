@@ -29,9 +29,19 @@ export interface SegmentRule {
   conditions: SegmentCondition[]
 }
 
+export interface SampleCustomer {
+  id: number
+  first_name: string | null
+  last_name: string
+  city: string
+}
+
 export interface AudienceCounts {
   channel_counts: Partial<Record<Channel, number>>
   unique_total: number
+  sample: SampleCustomer[]
+  // channel => variable => the longest value among the customers who get that channel.
+  longest_values: Partial<Record<Channel, Record<string, number>>>
 }
 
 export interface Campaign {

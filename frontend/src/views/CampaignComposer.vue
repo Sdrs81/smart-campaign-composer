@@ -5,6 +5,7 @@ import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import type { CampaignStatus } from '../api/types'
 import AudienceCard from '../components/AudienceCard.vue'
 import BriefStep from '../components/BriefStep.vue'
+import ContentEditor from '../components/ContentEditor.vue'
 import ContentStream from '../components/ContentStream.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { useCampaignStore } from '../stores/campaign'
@@ -49,6 +50,13 @@ async function submit(): Promise<void> {
     return
   }
   await store.extractAudience()
+}
+
+// New model text replaces the editor's fields, so the editor is re-created once the campaign holds it.
+const contentVersion = ref(0)
+async function onContentGenerated(): Promise<void> {
+  await store.reloadCurrent()
+  contentVersion.value++
 }
 
 onMounted(open)
@@ -120,7 +128,15 @@ onBeforeRouteLeave(() => store.leaveCurrent())
       "
       :key="campaign.id"
       :campaign="campaign"
-      @completed="store.reloadCurrent()"
+      @completed="onContentGenerated"
+    />
+
+    <ContentEditor
+      v-if="campaign?.messages?.length && store.rules"
+      :key="`${campaign.id}-${contentVersion}`"
+      :campaign="campaign"
+      :rules="store.rules"
+      @saved="store.current = $event"
     />
   </section>
 </template>

@@ -1,10 +1,15 @@
 <script setup lang="ts">
+import { useId } from 'vue'
+
 defineProps<{ body: string | undefined; streaming: boolean }>()
+
+// Unique per instance: the stream cards and the editor's preview can be on the page together.
+const headingId = useId()
 </script>
 
 <template>
-  <section aria-labelledby="sms-heading" class="space-y-2">
-    <h4 id="sms-heading" class="text-sm font-medium text-slate-700">SMS</h4>
+  <section :aria-labelledby="headingId" class="space-y-2">
+    <h4 :id="headingId" class="text-sm font-medium text-slate-700">SMS</h4>
     <div class="mx-auto w-64 rounded-3xl border-4 border-slate-800 bg-slate-100 p-4">
       <div
         aria-live="polite"

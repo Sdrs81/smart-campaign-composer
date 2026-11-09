@@ -51,7 +51,12 @@ const EXTRACTED = campaign({
     ],
   },
   unsupported_criteria: ['iPhone kullananlar'],
-  audience_counts: { channel_counts: { sms: 120, email: 90 }, unique_total: 150 },
+  audience_counts: {
+    channel_counts: { sms: 120, email: 90 },
+    unique_total: 150,
+    sample: [],
+    longest_values: {},
+  },
 })
 
 async function mountComposer(path: string) {

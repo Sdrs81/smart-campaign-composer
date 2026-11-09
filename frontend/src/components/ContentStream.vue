@@ -15,20 +15,9 @@ const { status, draft, repaired, error, start, cancel } = useContentStream(
 )
 
 const streaming = computed(() => status.value === 'streaming')
-const saved = computed(() => ({
-  sms: props.campaign.messages?.find((message) => message.channel === 'sms'),
-  email: props.campaign.messages?.find((message) => message.channel === 'email'),
-}))
-// While nothing was streamed in this visit, show what the campaign already holds.
-const showDraft = computed(() => status.value !== 'idle' && status.value !== 'cancelled')
-const smsBody = computed(() => (showDraft.value ? draft.value.sms.body : saved.value.sms?.body))
-const emailSubject = computed(() =>
-  showDraft.value ? draft.value.email.subject : (saved.value.email?.subject ?? undefined),
-)
-const emailBody = computed(() =>
-  showDraft.value ? draft.value.email.body : saved.value.email?.body,
-)
-const hasContent = computed(() => saved.value.sms !== undefined || saved.value.email !== undefined)
+// The cards show the text arriving; once it is checked and saved, the editor below takes over the same text.
+const showCards = computed(() => status.value === 'streaming' || status.value === 'failed')
+const hasContent = computed(() => (props.campaign.messages?.length ?? 0) > 0)
 </script>
 
 <template>
@@ -77,9 +66,13 @@ const hasContent = computed(() => saved.value.sms !== undefined || saved.value.e
       </ul>
     </div>
 
-    <div class="grid gap-6 md:grid-cols-2">
-      <SmsPreview :body="smsBody" :streaming="streaming" />
-      <EmailPreview :subject="emailSubject" :body="emailBody" :streaming="streaming" />
+    <div v-if="showCards" class="grid gap-6 md:grid-cols-2">
+      <SmsPreview :body="draft.sms.body" :streaming="streaming" />
+      <EmailPreview
+        :subject="draft.email.subject"
+        :body="draft.email.body"
+        :streaming="streaming"
+      />
     </div>
   </section>
 </template>

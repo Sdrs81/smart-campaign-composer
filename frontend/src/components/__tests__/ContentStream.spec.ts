@@ -75,7 +75,6 @@ describe('ContentStream', () => {
     stream.finish()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Kısa metin')
     expect(wrapper.text()).not.toContain('too long draft')
     expect(wrapper.text()).toContain('rewritten automatically')
     expect(wrapper.emitted('completed')).toHaveLength(1)
@@ -113,7 +112,7 @@ describe('ContentStream', () => {
     expect(wrapper.find('[role="alert"]').text()).toContain('Model unreachable.')
   })
 
-  it('shows the content the campaign already has before anything is generated', () => {
+  it('offers to generate again when the campaign already has content', () => {
     const wrapper = mount(ContentStream, {
       props: {
         campaign: {
@@ -127,8 +126,8 @@ describe('ContentStream', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('Kayıtlı SMS')
-    expect(wrapper.text()).toContain('Kayıtlı konu')
+    // The editor shows saved text; this step only offers to write it again.
+    expect(wrapper.text()).not.toContain('Kayıtlı SMS')
     expect(wrapper.find('button').text()).toBe('Generate again')
   })
 })

@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import { useId } from 'vue'
+
 defineProps<{ subject: string | undefined; body: string | undefined; streaming: boolean }>()
+
+const headingId = useId()
 </script>
 
 <template>
-  <section aria-labelledby="email-heading" class="space-y-2">
-    <h4 id="email-heading" class="text-sm font-medium text-slate-700">Email</h4>
+  <section :aria-labelledby="headingId" class="space-y-2">
+    <h4 :id="headingId" class="text-sm font-medium text-slate-700">Email</h4>
     <div aria-live="polite" :aria-busy="streaming" class="rounded border border-slate-200 bg-white">
       <p class="border-b border-slate-200 px-4 py-3 font-medium">
         <span class="mr-2 text-sm font-normal text-slate-500">Subject</span>
