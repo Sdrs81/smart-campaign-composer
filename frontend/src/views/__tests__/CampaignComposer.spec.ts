@@ -59,8 +59,8 @@ const EXTRACTED = campaign({
   },
 })
 
-async function mountComposer(path: string) {
-  vi.spyOn(api, 'getContentRules').mockResolvedValue(RULES)
+async function mountComposer(path: string, rules: Partial<ContentRules> = {}) {
+  vi.spyOn(api, 'getContentRules').mockResolvedValue({ ...RULES, ...rules })
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push(path)
   await router.isReady()
@@ -174,5 +174,39 @@ describe('CampaignComposer', () => {
     expect(wrapper.find('button[type="submit"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('can no longer be changed')
     expect(wrapper.findAll('ul[aria-label="Rule"] li')).toHaveLength(2)
+  })
+
+  it('approves from the confirmation and moves on to the dashboard', async () => {
+    // Regression: the page used to swap the campaign to "approved" first, which removed the dialog
+    // before it could report the approval, so nobody navigated.
+    const ready: Campaign = {
+      ...EXTRACTED,
+      status: 'content_ready',
+      messages: [
+        { channel: 'sms', subject: null, body: 'Merhaba!', source: 'llm' },
+        { channel: 'email', subject: 'Konu', body: 'Gövde', source: 'llm' },
+      ],
+    }
+    vi.spyOn(api, 'getCampaign').mockResolvedValue(ready)
+    vi.spyOn(api, 'previewCampaign').mockResolvedValue({ customer: { id: null }, messages: [] })
+    const approve = vi
+      .spyOn(api, 'approveCampaign')
+      .mockResolvedValue({ ...ready, status: 'approved' })
+    const { wrapper, router } = await mountComposer('/campaigns/5', {
+      limits: { sms_body_max: 160, email_subject_max: 80, email_body_max: 2000 },
+    })
+
+    const open = wrapper.findAll('button').find((button) => button.text() === 'Approve campaign')!
+    await open.trigger('click')
+    const confirm = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Approve and send')!
+    await confirm.trigger('click')
+    await flushPromises()
+
+    expect(approve).toHaveBeenCalledExactlyOnceWith(5)
+    // The dashboard page is a lazy import, so the navigation finishes a moment after the click.
+    await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('campaign-dashboard'))
+    expect(router.currentRoute.value.params.id).toBe('5')
   })
 })

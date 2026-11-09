@@ -47,9 +47,9 @@ function close(): void {
 
 async function confirm(): Promise<void> {
   const approved = await store.approveCurrent()
-  if (!approved || !store.current) return
+  if (!approved) return
   open.value = false
-  emit('approved', store.current)
+  emit('approved', approved)
 }
 
 function onKeydown(event: KeyboardEvent): void {

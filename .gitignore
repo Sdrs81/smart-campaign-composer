@@ -29,6 +29,7 @@ backend/storage/framework/views/
 # Playwright
 frontend/playwright-report/
 frontend/test-results/
+frontend/e2e/artifacts/
 
 # Claude hook logs
 .claude/logs/

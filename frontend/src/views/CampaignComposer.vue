@@ -57,6 +57,7 @@ async function submit(): Promise<void> {
 const canApprove = ref(false)
 
 async function goToDashboard(approved: Campaign): Promise<void> {
+  store.current = approved
   await router.push({ name: 'campaign-dashboard', params: { id: approved.id } })
 }
 

@@ -90,21 +90,22 @@ export const useCampaignStore = defineStore('campaign', () => {
   const approvalError = shallowRef<ApiError | null>(null)
 
   /**
-   * Approves the held campaign. Returns false when refused or already in progress: a second call while the
-   * first is unanswered sends nothing (the server also treats a repeat as one approval).
+   * Approves the held campaign and returns the approved campaign, or null when refused or already in progress:
+   * a second call while the first is unanswered sends nothing (the server also treats a repeat as one approval).
+   * It does not replace `current`: that would remove the approval dialog before it could report the result,
+   * so the caller applies the answer.
    */
-  async function approveCurrent(): Promise<boolean> {
+  async function approveCurrent(): Promise<Campaign | null> {
     const campaign = current.value
-    if (!campaign || approving.value) return false
+    if (!campaign || approving.value) return null
 
     approving.value = true
     approvalError.value = null
     try {
-      current.value = await api.approveCampaign(campaign.id)
-      return true
+      return await api.approveCampaign(campaign.id)
     } catch (failure) {
       approvalError.value = toApiError(failure)
-      return false
+      return null
     } finally {
       approving.value = false
     }
