@@ -23,6 +23,7 @@ export function useContentEditing(campaignId: () => number, onSaved: (campaign: 
   let timer: ReturnType<typeof setTimeout> | null = null
   let queued: EditableContent | null = null
   let saving = false
+  let disposed = false
   let previewRequest: AbortController | null = null
 
   function hasQueuedEdit(): boolean {
@@ -49,6 +50,9 @@ export function useContentEditing(campaignId: () => number, onSaved: (campaign: 
 
     try {
       const saved = await api.updateContent(campaignId(), content)
+      // The last edit of a closed editor is still saved, but its answer must not reach the page: by then
+      // the page may show another campaign, or newly generated text this editor never saw.
+      if (disposed) return
       fieldErrors.value = {}
       saveError.value = null
       onSaved(saved)
@@ -88,6 +92,7 @@ export function useContentEditing(campaignId: () => number, onSaved: (campaign: 
 
   if (getCurrentScope()) {
     onScopeDispose(() => {
+      disposed = true
       if (timer !== null) clearTimeout(timer)
       timer = null
       previewRequest?.abort()

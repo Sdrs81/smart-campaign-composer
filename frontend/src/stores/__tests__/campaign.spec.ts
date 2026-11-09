@@ -55,6 +55,35 @@ describe('campaign store', () => {
     expect(store.loading).toBe(false)
   })
 
+  it('uses the copy it just created once, then refetches on every later visit', async () => {
+    // Regression: the held copy used to be shown again on a revisit, however old it had become.
+    vi.spyOn(api, 'createCampaign').mockResolvedValue(campaign(5))
+    vi.spyOn(api, 'defineAudience').mockResolvedValue({ ...campaign(5), status: 'audience_ready' })
+    const fetchOne = vi
+      .spyOn(api, 'getCampaign')
+      .mockResolvedValue({ ...campaign(5), status: 'completed' })
+    const store = useCampaignStore()
+
+    await store.createAndExtract('Sepeti terk edenlere indirim')
+    await store.loadCurrent(5)
+    expect(fetchOne).not.toHaveBeenCalled()
+    expect(store.current?.status).toBe('audience_ready')
+
+    await store.loadCurrent(5)
+    expect(fetchOne).toHaveBeenCalledExactlyOnceWith(5, expect.any(AbortSignal))
+    expect(store.current?.status).toBe('completed')
+  })
+
+  it('fetches a campaign it did not create', async () => {
+    const fetchOne = vi.spyOn(api, 'getCampaign').mockResolvedValue(campaign(9))
+    const store = useCampaignStore()
+
+    await store.loadCurrent(9)
+
+    expect(fetchOne).toHaveBeenCalledOnce()
+    expect(store.current?.id).toBe(9)
+  })
+
   it('ignores the answer of a request that a newer one replaced', async () => {
     const answers: ((value: ReturnType<typeof pageOf>) => void)[] = []
     vi.spyOn(api, 'listCampaigns').mockImplementation(

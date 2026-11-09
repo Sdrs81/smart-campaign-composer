@@ -13,7 +13,11 @@ import LocaleSwitcher from './components/LocaleSwitcher.vue'
       <LocaleSwitcher />
     </header>
     <main class="px-6 py-8">
-      <RouterView />
+      <!-- Keyed by path (it holds the campaign id): a page for one campaign must not be reused for another,
+           or it would keep the first campaign's open stream and data. A query or hash change keeps the page. -->
+      <RouterView v-slot="{ Component, route }">
+        <component :is="Component" :key="route.path" />
+      </RouterView>
     </main>
   </div>
 </template>

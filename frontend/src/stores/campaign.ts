@@ -55,6 +55,9 @@ export const useCampaignStore = defineStore('campaign', () => {
   const composing = ref(false)
   const composeError = shallowRef<ApiError | null>(null)
   let loadingCurrent: AbortController | null = null
+  // True only between creating a campaign here and the page that opens it: that copy is newer than a
+  // refetch and carries the extraction error. Every later visit must fetch, or it shows a stale copy.
+  let adoptHeldCopy = false
 
   async function loadRules(): Promise<void> {
     if (rules.value) return
@@ -66,8 +69,11 @@ export const useCampaignStore = defineStore('campaign', () => {
   }
 
   async function loadCurrent(id: number): Promise<void> {
-    // Just created or extracted here: the held copy is newer than a refetch and keeps its error.
-    if (current.value?.id === id) return
+    if (adoptHeldCopy && current.value?.id === id) {
+      adoptHeldCopy = false
+      return
+    }
+    adoptHeldCopy = false
 
     loadingCurrent?.abort()
     const controller = new AbortController()
@@ -136,6 +142,7 @@ export const useCampaignStore = defineStore('campaign', () => {
   function startNew(): void {
     current.value = null
     composeError.value = null
+    adoptHeldCopy = false
   }
 
   /** Runs the audience extraction for the held campaign. A failure is kept in `composeError`, the campaign stays. */
@@ -164,6 +171,7 @@ export const useCampaignStore = defineStore('campaign', () => {
       composing.value = false
       return null
     }
+    adoptHeldCopy = true
     await extractAudience()
     return current.value?.id ?? null
   }

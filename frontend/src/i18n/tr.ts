@@ -119,6 +119,7 @@ export const tr: typeof en = {
     live: 'Canlı',
     connecting: 'Bağlanıyor…',
     reconnecting: 'Yeniden bağlanıyor…',
+    lost: 'Bağlantı koptu. Tekrar denemek için sayfayı yenileyin.',
     waiting: 'İlk güncelleme bekleniyor…',
     sendRate: 'Gönderim hızı',
     perSecond: '/ sn',

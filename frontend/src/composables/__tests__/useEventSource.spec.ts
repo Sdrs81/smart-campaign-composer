@@ -5,6 +5,7 @@ import { useEventSource } from '../useEventSource'
 
 class FakeEventSource {
   static readonly OPEN = 1
+  static readonly CLOSED = 2
   static instances: FakeEventSource[] = []
   readyState = 0
   closed = false
@@ -37,6 +38,25 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('useEventSource', () => {
+  it('stays "not lost" while the browser reconnects and turns lost when it gives up', () => {
+    const { connected, lost } = useEventSource('/api/stream', { handlers: {} })
+    const source = FakeEventSource.instances[0]!
+    source.onopen?.()
+
+    source.readyState = 0 // CONNECTING: the browser retries by itself
+    source.onerror?.()
+    expect(connected.value).toBe(false)
+    expect(lost.value).toBe(false)
+
+    source.readyState = FakeEventSource.CLOSED // e.g. the server answered 404
+    source.onerror?.()
+    expect(lost.value).toBe(true)
+
+    source.readyState = FakeEventSource.OPEN
+    source.onopen?.()
+    expect(lost.value).toBe(false)
+  })
+
   it('passes named events to their handlers', () => {
     const received: string[] = []
     useEventSource('/api/stream', { handlers: { stats: (data) => received.push(data) } })

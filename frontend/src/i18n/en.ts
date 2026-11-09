@@ -120,6 +120,7 @@ export const en = {
     live: 'Live',
     connecting: 'Connecting…',
     reconnecting: 'Reconnecting…',
+    lost: 'Connection lost. Reload the page to try again.',
     waiting: 'Waiting for the first update…',
     sendRate: 'Send rate',
     perSecond: '/ s',

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { ApiError, api } from '../client'
+import { ApiError, api, parseStats } from '../client'
 
 function respond(status: number, payload: unknown): Response {
   return new Response(JSON.stringify(payload), {
@@ -75,5 +75,41 @@ describe('api client', () => {
       { type: 'delta', text: '{"sms"' },
       { type: 'final', sms: { body: 'a' }, email: { subject: 's', body: 'b' }, repaired: true },
     ])
+  })
+})
+
+describe('parseStats', () => {
+  const counters = { pending: 0, sending: 0, sent: 1, failed: 0, skipped: 0, total: 1 }
+  const snapshot = {
+    campaign_id: 7,
+    status: 'sending',
+    channels: { sms: counters, email: counters },
+    send_rate_per_second: 1.5,
+    total_retries: 0,
+    recent_errors: [],
+  }
+
+  it('accepts a complete snapshot', () => {
+    expect(parseStats(JSON.stringify(snapshot))).toEqual(snapshot)
+  })
+
+  it.each([
+    ['text that is not JSON', '<html>502</html>'],
+    ['a cut-off frame', '{"campaign_id": 7, "stat'],
+    ['JSON that is not an object', '[1, 2]'],
+    ['an object without channels', JSON.stringify({ status: 'sending' })],
+    [
+      'channels without their counters',
+      JSON.stringify({ ...snapshot, channels: { sms: {}, email: {} } }),
+    ],
+    [
+      'a counter that is not a number',
+      JSON.stringify({
+        ...snapshot,
+        channels: { sms: { ...counters, sent: '1' }, email: counters },
+      }),
+    ],
+  ])('rejects %s', (_label, payload) => {
+    expect(parseStats(payload)).toBeNull()
   })
 })

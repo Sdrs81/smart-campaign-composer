@@ -3,6 +3,9 @@ import { nextTick } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
+import { createPinia } from 'pinia'
+
+import App from '../../App.vue'
 import type { CampaignStats, CampaignStatus } from '../../api/types'
 import ChannelProgress from '../../components/ChannelProgress.vue'
 import { setLocale } from '../../i18n'
@@ -12,6 +15,7 @@ import CampaignDashboard from '../CampaignDashboard.vue'
 class FakeEventSource {
   static readonly CONNECTING = 0
   static readonly OPEN = 1
+  static readonly CLOSED = 2
   static instances: FakeEventSource[] = []
   readyState = FakeEventSource.CONNECTING
   closed = false
@@ -34,6 +38,11 @@ class FakeEventSource {
   open(): void {
     this.readyState = FakeEventSource.OPEN
     this.onopen?.()
+  }
+
+  refuse(): void {
+    this.readyState = FakeEventSource.CLOSED
+    this.onerror?.()
   }
 
   drop(): void {
@@ -227,6 +236,49 @@ describe('CampaignDashboard', () => {
     expect(cells).toContain('provider 503')
     expect(cells).toContain('Başarısız')
     expect(text).not.toContain('Recent errors')
+  })
+
+  it('skips a frame that is not a snapshot and keeps the last good one', async () => {
+    const { wrapper, source } = await mountDashboard()
+    source.open()
+    source.emit('stats', JSON.stringify(snapshot('sending', { sent: 20, pending: 80 })))
+    await nextTick()
+
+    source.emit('stats', '{"campaign_id": 7, "stat') // cut off
+    source.emit('stats', '<html>502 Bad Gateway</html>')
+    source.emit('stats', JSON.stringify({ status: 'sending' })) // valid JSON, not a snapshot
+    await nextTick()
+
+    const sms = wrapper.findAllComponents(ChannelProgress)[0]!
+    expect(sms.findAll('dd').map((value) => value.text())).toEqual(['20', '0', '0', '80'])
+    expect(source.closed).toBe(false)
+  })
+
+  it('says so when the browser has given up on the stream', async () => {
+    const { wrapper, source } = await mountDashboard()
+
+    source.refuse()
+    await nextTick()
+
+    expect(wrapper.text()).toContain('Connection lost')
+    expect(wrapper.text()).not.toContain('Reconnecting')
+  })
+
+  it('opens the stream of the other campaign when the address changes to another id', async () => {
+    // Regression: the page was reused for the new id and kept the first campaign's stream and numbers.
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/campaigns/1/dashboard')
+    await router.isReady()
+    const wrapper = mount(App, { global: { plugins: [createPinia(), router] } })
+    await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(1))
+    expect(FakeEventSource.instances[0]!.url).toBe('/api/campaigns/1/stats/stream')
+
+    await router.push('/campaigns/2/dashboard')
+    await vi.waitFor(() => expect(FakeEventSource.instances).toHaveLength(2))
+
+    expect(FakeEventSource.instances[0]!.closed).toBe(true)
+    expect(FakeEventSource.instances[1]!.url).toBe('/api/campaigns/2/stats/stream')
+    wrapper.unmount()
   })
 
   it('closes the stream when the page is left', async () => {

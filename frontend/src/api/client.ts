@@ -83,6 +83,43 @@ export const api = {
     ),
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+const COUNTER_KEYS = ['pending', 'sending', 'sent', 'failed', 'skipped', 'total']
+
+// Every counter must be a number: the progress bar divides by them, so a missing one would draw NaN.
+function isChannelCounts(value: unknown): boolean {
+  return isRecord(value) && COUNTER_KEYS.every((key) => typeof value[key] === 'number')
+}
+
+/**
+ * The text of one `stats` event as a snapshot, or null when it is not one. The stream is a network
+ * boundary: a cut-off frame or a proxy's error page must not reach the dashboard as if it were numbers.
+ */
+export function parseStats(payload: string): CampaignStats | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(payload)
+  } catch {
+    // Nothing usable arrived; the next snapshot (at most a second away) replaces it.
+    return null
+  }
+
+  if (!isRecord(parsed) || !isRecord(parsed.channels)) return null
+  const { channels } = parsed
+  const complete =
+    typeof parsed.status === 'string' &&
+    typeof parsed.send_rate_per_second === 'number' &&
+    typeof parsed.total_retries === 'number' &&
+    Array.isArray(parsed.recent_errors) &&
+    isChannelCounts(channels.sms) &&
+    isChannelCounts(channels.email)
+
+  return complete ? (parsed as unknown as CampaignStats) : null
+}
+
 function parseContentEvent(event: string, data: string): ContentStreamEvent | null {
   let payload: Record<string, unknown>
   try {

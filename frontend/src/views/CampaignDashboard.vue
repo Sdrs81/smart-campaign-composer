@@ -3,7 +3,7 @@ import { computed, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 
-import { api } from '../api/client'
+import { api, parseStats } from '../api/client'
 import type { Channel, CampaignStats } from '../api/types'
 import ChannelProgress from '../components/ChannelProgress.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -20,10 +20,11 @@ const TERMINAL_STATUSES = ['completed', 'failed']
 const stats = shallowRef<CampaignStats | null>(null)
 
 // The server sends `end` once the campaign is final; the browser would otherwise reconnect for good.
-const { connected } = useEventSource(api.statsStreamUrl(props.id), {
+const { connected, lost } = useEventSource(api.statsStreamUrl(props.id), {
   handlers: {
     stats: (payload) => {
-      stats.value = JSON.parse(payload) as CampaignStats
+      // A frame that is not a snapshot is skipped; the last good one stays on screen.
+      stats.value = parseStats(payload) ?? stats.value
     },
   },
   closeOn: ['end'],
@@ -34,6 +35,7 @@ const finished = computed(
 )
 const connection = computed(() => {
   if (finished.value) return t('dashboard.finished')
+  if (lost.value) return t('dashboard.lost')
   if (connected.value) return t('dashboard.live')
   return stats.value === null ? t('dashboard.connecting') : t('dashboard.reconnecting')
 })
