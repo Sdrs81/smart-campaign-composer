@@ -86,6 +86,17 @@ export const useCampaignStore = defineStore('campaign', () => {
     }
   }
 
+  /** Refetches the held campaign, e.g. after content generation moved it to `content_ready`. */
+  async function reloadCurrent(): Promise<void> {
+    const id = current.value?.id
+    if (id === undefined) return
+    try {
+      current.value = await api.getCampaign(id)
+    } catch (failure) {
+      composeError.value = toApiError(failure)
+    }
+  }
+
   function leaveCurrent(): void {
     loadingCurrent?.abort()
     loadingCurrent = null
@@ -141,6 +152,7 @@ export const useCampaignStore = defineStore('campaign', () => {
     composeError,
     loadRules,
     loadCurrent,
+    reloadCurrent,
     leaveCurrent,
     startNew,
     extractAudience,

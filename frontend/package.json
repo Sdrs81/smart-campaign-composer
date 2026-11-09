@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.4",
+    "partial-json": "^0.1.7",
     "pinia": "^4.0.3",
     "tailwindcss": "^4.3.4",
     "vue": "^3.5.42",

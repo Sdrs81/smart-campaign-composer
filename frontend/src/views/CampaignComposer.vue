@@ -5,6 +5,7 @@ import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import type { CampaignStatus } from '../api/types'
 import AudienceCard from '../components/AudienceCard.vue'
 import BriefStep from '../components/BriefStep.vue'
+import ContentStream from '../components/ContentStream.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { useCampaignStore } from '../stores/campaign'
 
@@ -111,6 +112,15 @@ onBeforeRouteLeave(() => store.leaveCurrent())
       v-if="campaign?.segment_rule && store.rules"
       :campaign="campaign"
       :segment="store.rules.segment"
+    />
+
+    <ContentStream
+      v-if="
+        campaign && (campaign.status === 'audience_ready' || campaign.status === 'content_ready')
+      "
+      :key="campaign.id"
+      :campaign="campaign"
+      @completed="store.reloadCurrent()"
     />
   </section>
 </template>
