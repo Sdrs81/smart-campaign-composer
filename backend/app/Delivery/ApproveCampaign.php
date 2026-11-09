@@ -6,6 +6,7 @@ namespace App\Delivery;
 
 use App\Content\ContentValidator;
 use App\Content\MessageContent;
+use App\Enums\CampaignStatus;
 use App\Enums\Channel;
 use App\Exceptions\CampaignApprovalRefused;
 use App\Models\Campaign;
@@ -15,8 +16,9 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 
 /**
- * A person's approval (K15). The campaign lock makes two clicks at once into one approval, and a repeat
- * after approval returns the current state without starting a second send.
+ * A person's approval (K15). The campaign lock makes two clicks at once into one approval. A repeat once
+ * sending has started returns the current state; a repeat while the campaign is still "approved" pushes the
+ * start job again, so a lost push is recovered by approving once more.
  */
 final class ApproveCampaign
 {
@@ -39,6 +41,12 @@ final class ApproveCampaign
         $campaign = Campaign::query()->with('messages')->findOrFail($campaignId);
 
         if ($campaign->status->isApprovedOrLater()) {
+            // Still "approved" means the job never started (for example the queue was down when the first
+            // request tried to push it). Pushing again is safe: StartCampaignJob is idempotent (K16).
+            if ($campaign->status === CampaignStatus::Approved) {
+                StartCampaignJob::dispatch($campaign->id);
+            }
+
             return $campaign;
         }
 

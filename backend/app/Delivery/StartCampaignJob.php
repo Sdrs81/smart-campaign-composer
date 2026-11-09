@@ -8,18 +8,23 @@ use App\Enums\CampaignStatus;
 use App\Enums\DeliveryStatus;
 use App\Models\Campaign;
 use App\Models\Delivery;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
 /**
  * Freezes the audience and hands one SendDeliveryJob per delivery to the channel's queue (K16).
  * Safe to run again: the snapshot ignores existing rows, and a repeated send job exits on a final row.
+ * Unique per campaign while it waits or runs, so a repeated approval cannot fan the audience out twice.
  */
-class StartCampaignJob implements ShouldQueue
+class StartCampaignJob implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
     private const DISPATCH_CHUNK_SIZE = 1000;
+
+    // If the first push was lost, the lock outlives it for this long; a repeated approval after that pushes again.
+    public int $uniqueFor = 30;
 
     // Without these a worker drops the job after one exception and the campaign stays approved for good.
     public int $tries = 3;
@@ -27,6 +32,11 @@ class StartCampaignJob implements ShouldQueue
     public int $backoff = 5;
 
     public function __construct(public readonly int $campaignId) {}
+
+    public function uniqueId(): string
+    {
+        return (string) $this->campaignId;
+    }
 
     public function handle(AudienceSnapshotter $snapshotter): void
     {

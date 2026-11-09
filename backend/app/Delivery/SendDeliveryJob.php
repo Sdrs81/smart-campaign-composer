@@ -30,6 +30,8 @@ class SendDeliveryJob implements ShouldQueue
 
     private const SATURATED_CHANNEL_RETRY_SECONDS = 1;
 
+    private const MINIMUM_NOT_DUE_RELEASE_SECONDS = 1;
+
     /** 0 means unlimited; the retry policy decides when to stop. */
     public int $tries = 0;
 
@@ -40,21 +42,24 @@ class SendDeliveryJob implements ShouldQueue
 
     /**
      * After an unexpected exception the row is still "sending", and claim() only takes it once the claim is
-     * stale. Retrying sooner would find it held and drop the job, leaving the delivery stuck.
+     * stale. Retrying sooner would find it held and drop the job, leaving the delivery stuck. Only the final
+     * give-up (failed()) acts on a fresh claim, because no retry is left to wait for it.
      */
     public function backoff(): int
     {
         return (int) config('delivery.claim_timeout_seconds') + 1;
     }
 
-    /** Runs when the job gives up after repeated exceptions, so the delivery ends as failed instead of stuck. */
+    /**
+     * Runs when the job gives up after repeated exceptions, so the delivery ends as failed instead of stuck.
+     * The claim is fresh here on purpose: the last attempt took it just before it threw, and no job is left
+     * to retry, so waiting for it to go stale would leave the delivery (and the campaign) in "sending" for good.
+     */
     public function failed(Throwable $exception): void
     {
         $delivery = Delivery::query()->find($this->deliveryId);
-        $claimIsStale = $delivery?->claimed_at?->lt(now()->subSeconds((int) config('delivery.claim_timeout_seconds'))) === true;
 
-        // A fresh claim belongs to another worker that is still sending.
-        if ($delivery === null || $delivery->status !== DeliveryStatus::Sending || ! $claimIsStale) {
+        if ($delivery === null || $delivery->status !== DeliveryStatus::Sending) {
             return;
         }
 
@@ -79,6 +84,8 @@ class SendDeliveryJob implements ShouldQueue
         if (! $delivery->status->isTerminal()) {
             // K19 layer two: only one worker wins the row.
             if (! $this->claim($delivery)) {
+                $this->releaseUntilDue($delivery);
+
                 return;
             }
             $delivery->refresh();
@@ -146,13 +153,30 @@ class SendDeliveryJob implements ShouldQueue
         $this->recordResult($delivery, $result, $retryPolicy);
     }
 
+    /**
+     * A job that runs a little before its retry is due (rounding, clock differences) must not be dropped:
+     * nothing else would queue the delivery again, and the campaign would never finish.
+     */
+    private function releaseUntilDue(Delivery $delivery): void
+    {
+        $delivery->refresh();
+        if ($delivery->status !== DeliveryStatus::Pending || $delivery->next_attempt_at === null || ! $delivery->next_attempt_at->isFuture()) {
+            return;
+        }
+
+        $this->release(max(self::MINIMUM_NOT_DUE_RELEASE_SECONDS, (int) ceil(now()->diffInSeconds($delivery->next_attempt_at))));
+    }
+
     /** One conditional UPDATE decides the winner: a pending row, or a "sending" row whose worker died. */
     private function claim(Delivery $delivery): bool
     {
         $claimed = Delivery::query()
             ->whereKey($delivery->getKey())
             ->where(fn ($query) => $query
-                ->where('status', DeliveryStatus::Pending->value)
+                // A duplicate job (a re-run of StartCampaignJob) must not resend before the scheduled retry time.
+                ->where(fn ($pending) => $pending
+                    ->where('status', DeliveryStatus::Pending->value)
+                    ->where(fn ($due) => $due->whereNull('next_attempt_at')->orWhereRaw('next_attempt_at <= now()')))
                 ->orWhere(fn ($stale) => $stale
                     ->where('status', DeliveryStatus::Sending->value)
                     ->whereRaw("claimed_at < now() - ?::int * interval '1 second'", [config('delivery.claim_timeout_seconds')])))

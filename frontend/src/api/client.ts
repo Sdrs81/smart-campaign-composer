@@ -121,13 +121,16 @@ export function parseStats(payload: string): CampaignStats | null {
 }
 
 function parseContentEvent(event: string, data: string): ContentStreamEvent | null {
-  let payload: Record<string, unknown>
+  let parsed: unknown
   try {
-    payload = JSON.parse(data) as Record<string, unknown>
+    parsed = JSON.parse(data)
   } catch {
     // The server always sends JSON; a broken frame carries nothing the UI could show.
     return null
   }
+  // Valid JSON that is not an object (for example `null`) is as unusable as a broken frame.
+  if (!isRecord(parsed)) return null
+  const payload = parsed
 
   if (event === 'delta') return { type: 'delta', text: String(payload.text ?? '') }
   if (event === 'final') return { type: 'final', ...(payload as object) } as ContentStreamEvent

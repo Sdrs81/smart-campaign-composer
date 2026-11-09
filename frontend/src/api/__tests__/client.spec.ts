@@ -76,6 +76,16 @@ describe('api client', () => {
       { type: 'final', sms: { body: 'a' }, email: { subject: 's', body: 'b' }, repaired: true },
     ])
   })
+
+  it('skips a content frame whose JSON is not an object', async () => {
+    const text = 'event: delta\ndata: null\n\nevent: delta\ndata: {"text":"ok"}\n\n'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(text)))
+    const seen: unknown[] = []
+
+    await api.streamContent(1, 'warm', (event) => seen.push(event))
+
+    expect(seen).toEqual([{ type: 'delta', text: 'ok' }])
+  })
 })
 
 describe('parseStats', () => {

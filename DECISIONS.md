@@ -60,9 +60,15 @@ Each decision is written when the first task that needs it lands. Use this templ
 
 ## K9: LLM driver chosen from the API key
 
-- **Decision:** `LLM_DRIVER=auto` resolves to `claude` when `ANTHROPIC_API_KEY` is set, otherwise to `fake` with a logged warning. The model comes from `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`).
-- **Rationale:** Tests and `docker compose up` must work without a key; the warning stops a missing key from passing as a working setup.
+- **Decision:** Callers depend on the `LlmClient` interface. `ClaudeLlmClient` talks to the Messages API over Laravel's HTTP client; `FakeLlmClient` answers offline. `LLM_DRIVER=auto` resolves to `claude` when `ANTHROPIC_API_KEY` is set, otherwise to `fake` with a logged warning. The model comes from `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`; Haiku 5.5 is the cheaper option).
+- **Rationale:** Tests and `docker compose up` must work without a key; the warning stops a missing key from passing as a working setup. `Http::fake` makes the Claude client easy to test, and moving to an SDK later changes one class (DIP).
 - **Alternatives:** The official PHP SDK.
+
+## K10: Structured output from a registry-built JSON schema
+
+- **Decision:** `ClaudeLlmClient` asks the API for structured output (`output_config.format` of type `json_schema`), with the schema built from `FieldRegistry` and the content limits. The backend validates every answer anyway (K11).
+- **Rationale:** The case requires JSON output. The schema makes a shape mismatch rare in the model, so fewer repair rounds are needed; business rules (value limits, operators per type, character limits) do not fit a schema and stay in the validators.
+- **Alternatives:** Prompt-only JSON; forced tool use as a fallback (not built: the API supports structured output, so it would be unused code).
 
 ## K11: Reliability chain and the LLM call log
 
@@ -91,14 +97,14 @@ Each decision is written when the first task that needs it lands. Use this templ
 
 ## K15: Human approval as a campaign state machine
 
-- **Decision:** `Campaign` is a rich model: `defineAudience()`, `setContent()`, `approve()`, `startSending()`, `complete()` and `fail()` are the only way to change `status`, which is not mass assignable. Flow: `draft → audience_ready → content_ready → approved → sending → completed | failed`. Audience and content can be redone until approval (`audience_ready` and `content_ready` accept themselves, and `content_ready` can return to `audience_ready`), because the rule is read-only and the brief is what changes. `approved → approved` is allowed, so approving twice is a no-op. Any other move throws `InvalidCampaignTransition` (HTTP 409 with `from`, `to` and `allowed`). The methods change the model in memory only; the caller saves it.
+- **Decision:** `Campaign` is a rich model: `defineAudience()`, `setContent()`, `approve()`, `startSending()`, `complete()` and `fail()` are the only way to change `status`, which is not mass assignable. Flow: `draft → audience_ready → content_ready → approved → sending → completed | failed`. Audience and content can be redone until approval (`audience_ready` and `content_ready` accept themselves, and `content_ready` can return to `audience_ready`), because the rule is read-only and the brief is what changes. A person can edit only the generated SMS and email text, and only before approval. `approved → approved` is allowed, so approving twice is a no-op. Any other move throws `InvalidCampaignTransition` (HTTP 409 with `from`, `to` and `allowed`). The methods change the model in memory only; the caller saves it.
 - **Rationale:** An invalid transition fails early, next to the data it protects. Idempotent approval makes a double click harmless.
 - **Alternatives:** A rule editor (YAGNI); status set from services or controllers.
 - **One exception (task 8.6):** `Campaign::completeIfFinished()` writes `sending → completed` with a single conditional `UPDATE … WHERE NOT EXISTS (pending/sending deliveries)` instead of `complete()`. The check and the change must be one statement, or two workers finishing together could complete the campaign early or twice. It stays inside the model and only makes the transition `CampaignStatus` already allows.
 
 ## K16: Freeze the audience in SQL at approval, dispatch from a job
 
-- **Decision:** `POST /api/campaigns/{id}/approve` takes a `Cache::lock` on the campaign, re-reads it under the lock, and only moves a `content_ready` campaign to `approved` (any other pre-approval state is a 409). It refuses an audience of 0 with 422 `audience_empty`, and re-validates both messages with the same `ContentValidator` against the stored longest values. It then queues one `StartCampaignJob` and returns; a repeat after approval returns 200 with the current state and queues nothing. `StartCampaignJob` runs `AudienceSnapshotter` (one `INSERT … SELECT … ON CONFLICT DO NOTHING` per channel, with the consent condition applied again and the idempotency key `sha256("campaign:customer:channel")` computed in SQL), moves the campaign to `sending`, and streams the pending delivery ids with `lazyById(1000)`, queuing one `SendDeliveryJob` each on the `sms` or `email` queue. A second run adds no rows and re-queues only deliveries still pending, so a crash during dispatch is recovered by running the job again. A held lock gives 409 `approval_in_progress` after `approval_lock_wait_seconds`.
+- **Decision:** `POST /api/campaigns/{id}/approve` takes a `Cache::lock` on the campaign, re-reads it under the lock, and only moves a `content_ready` campaign to `approved` (any other pre-approval state is a 409). It refuses an audience of 0 with 422 `audience_empty`, and re-validates both messages with the same `ContentValidator` against the stored longest values. It then queues one `StartCampaignJob` and returns; a repeat after sending has started returns 200 with the current state and queues nothing. A repeat while the campaign is still `approved` tries to queue `StartCampaignJob` again, because the first push may have been lost (the request saved the status, then the queue failed). The job is `ShouldBeUnique` per campaign (30 s), so a double click while the first job waits queues nothing, and a push that was really lost is retried once that lock has expired. A late retry job is not dropped: `SendDeliveryJob` hands itself back to the queue when its delivery's `next_attempt_at` is still in the future. `StartCampaignJob` runs `AudienceSnapshotter` (one `INSERT … SELECT … ON CONFLICT DO NOTHING` per channel, with the consent condition applied again and the idempotency key `sha256("campaign:customer:channel")` computed in SQL), moves the campaign to `sending`, and streams the pending delivery ids with `lazyById(1000)`, queuing one `SendDeliveryJob` each on the `sms` or `email` queue. A second run adds no rows and re-queues only deliveries still pending, so a crash during dispatch is recovered by running the job again. A held lock gives 409 `approval_in_progress` after `approval_lock_wait_seconds`.
 - **Rationale:** The freeze is one statement inside Postgres, so no customer row reaches PHP and memory stays flat. Doing it in a job keeps the request fast and lets a failed start be repeated safely. The lock plus the status re-read turns two clicks into one approval.
 - **Alternatives:** Looping over customers in PHP; one batch job for the whole campaign; a `DB::transaction` with `lockForUpdate` instead of a cache lock (the lock must also cover the dispatch).
 
@@ -129,8 +135,15 @@ Each decision is written when the first task that needs it lands. Use this templ
 ## K21: Live status from one grouped query, computed on request
 
 - **Decision:** `GET /api/campaigns/{id}/stats` (`CampaignStats`, 9.1) reads progress with a single `GROUP BY channel, status` over `deliveries` (served by the `campaign_id, channel, status` index) that also sums `attempts`. Every channel and status is returned, zero when absent. Retries are `SUM(attempts)` minus one per `sent` or `failed` delivery, because the last attempt of those is not a retry (a `pending` delivery with attempts has that many scheduled retries). The send rate is the `sent` rows with `sent_at` in the last 5 seconds divided by 5. Recent errors are the 10 newest deliveries with a `last_error`, by `updated_at`, without any customer column. The SSE stream (9.2), `/api/metrics` (9.3) and health (9.4) follow the same rule: computed at request time, no extra counter state, no extra container.
-- **Rationale:** One indexed query keeps the cost constant per poll, and derived counters could drift from the rows. Leaving customer data out keeps phone numbers and emails out of the API and logs.
-- **Alternatives:** Redis counters; several count queries; Reverb/WebSockets.
+- **Stream, metrics, health:** `GET /api/campaigns/{id}/stats/stream` polls the same query every second and sends a `stats` frame only when the snapshot changed, a comment heartbeat every 15 s otherwise, and an `end` event once the campaign is final or the stream is 10 minutes old; the browser's `EventSource` reconnects after 3 s. `/api/metrics` is Prometheus text computed from the tables and Redis on each scrape. `/api/health` treats the database and Redis as critical (503 when either is down); a down provider only makes the status `degraded`, because the app still works and sends retry. The provider state is cached for 15 s so a stalled DNS lookup cannot slow every poll.
+- **Rationale:** One indexed query keeps the cost constant per poll, and derived counters could drift from the rows. `EventSource` reconnects by itself and no extra container is needed (KISS). Leaving customer data out keeps phone numbers and emails out of the API and logs.
+- **Alternatives:** Polling from the browser; Redis counters; several count queries; Reverb/WebSockets.
+
+## K22: No authentication
+
+- **Decision:** The app has no login, users or tokens. It is a single-marketer local demo, and the README says so.
+- **Rationale:** The case does not ask for it (YAGNI), and auth would add routes, state and tests that prove nothing about the campaign flow.
+- **Alternatives:** Sanctum token authentication.
 
 ## K23: Interface language is chosen in the browser with vue-i18n
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Llm;
 
 use App\Llm\Exceptions\SegmentExtractionFailed;
+use App\Llm\Prompts\PromptTags;
 use App\Llm\Prompts\SegmentPrompt;
 use App\Segment\SegmentRuleParser;
 use App\Segment\ValidationErrors;
@@ -24,9 +25,6 @@ final class SegmentExtractor
     private const UNSUPPORTED_MAX_LENGTH = 200;
 
     private const EXPLANATION_MAX_LENGTH = 600;
-
-    // A brief must not close the <brief> wrapper early and write instructions outside it.
-    private const BRIEF_TAG_PATTERN = '/<\/?brief\b/i';
 
     public function __construct(
         private readonly LlmClient $client,
@@ -82,7 +80,7 @@ final class SegmentExtractor
         $length = mb_strlen($brief);
         $problem = match (true) {
             $length < $this->briefMinLength || $length > $this->briefMaxLength => "must be {$this->briefMinLength} to {$this->briefMaxLength} characters, got {$length}.",
-            preg_match(self::BRIEF_TAG_PATTERN, $brief) === 1 => 'must not contain <brief> tags.',
+            PromptTags::appearIn($brief) => 'must not contain '.PromptTags::DESCRIPTION.'.',
             default => null,
         };
 
@@ -149,6 +147,13 @@ final class SegmentExtractor
 
         $phrases = array_map(fn (string $phrase): string => mb_strimwidth(trim($phrase), 0, self::UNSUPPORTED_MAX_LENGTH, '…'), $value);
 
+        // These phrases reach the content prompt later, which refuses the same tags (see PromptTags).
+        if (array_filter($phrases, PromptTags::appearIn(...)) !== []) {
+            $errors[] = 'unsupported_criteria: must not contain '.PromptTags::DESCRIPTION.'.';
+
+            return [];
+        }
+
         return array_values(array_filter($phrases, fn (string $phrase): bool => $phrase !== ''));
     }
 
@@ -157,6 +162,12 @@ final class SegmentExtractor
     {
         if (! is_string($value) || trim($value) === '') {
             $errors[] = 'explanation: must be a non-empty string.';
+
+            return '';
+        }
+
+        if (PromptTags::appearIn($value)) {
+            $errors[] = 'explanation: must not contain '.PromptTags::DESCRIPTION.'.';
 
             return '';
         }

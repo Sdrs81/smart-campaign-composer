@@ -122,6 +122,8 @@ it('retries a transient failure and then succeeds with the same key', function (
         ->and($afterFirst->last_error)->toContain('500');
     $first->assertReleased(delay: 1);
 
+    // The queue runs the released job after its delay, by which time the retry is due.
+    DB::table('deliveries')->where('id', $delivery->id)->update(['next_attempt_at' => DB::raw("now() - interval '1 second'")]);
     runJob($delivery);
 
     $stored = $delivery->fresh();
@@ -295,11 +297,26 @@ it('fails the delivery and finishes the campaign when the job gives up on a stal
         ->and(Campaign::find($delivery->campaign_id)->status->value)->toBe('completed');
 });
 
-it('leaves a fresh claim alone when the job gives up', function (): void {
+it('fails the delivery when the job gives up right after its last attempt took the claim', function (): void {
     $delivery = pendingDelivery();
+    Campaign::query()->whereKey($delivery->campaign_id)->update(['status' => 'sending']);
     DB::table('deliveries')->where('id', $delivery->id)->update(['status' => 'sending', 'claimed_at' => DB::raw('now()')]);
 
     (new SendDeliveryJob($delivery->id))->failed(new RuntimeException('connection reset'));
 
-    expect($delivery->fresh()->status)->toBe(DeliveryStatus::Sending);
+    expect($delivery->fresh()->status)->toBe(DeliveryStatus::Failed)
+        ->and(Campaign::find($delivery->campaign_id)->status->value)->toBe('completed');
+});
+
+it('hands a job that runs before its retry is due back to the queue instead of dropping it', function (): void {
+    $provider = useProvider([SendResult::sent('msg-1')]);
+    $delivery = pendingDelivery();
+    DB::table('deliveries')->where('id', $delivery->id)->update(['next_attempt_at' => DB::raw("now() + interval '1 minute'")]);
+
+    $job = runJob($delivery);
+
+    expect($provider->calls)->toHaveCount(0)
+        ->and($delivery->fresh()->status)->toBe(DeliveryStatus::Pending);
+    // Released, not dropped. The exact delay depends on the clocks of the app and the database, so it is not pinned.
+    $job->assertReleased();
 });

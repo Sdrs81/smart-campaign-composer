@@ -9,6 +9,7 @@ use App\Content\MessageContent;
 use App\Enums\Channel;
 use App\Llm\Exceptions\LlmException;
 use App\Llm\Prompts\ContentPrompt;
+use App\Llm\Prompts\PromptTags;
 use App\Segment\AudienceSummary;
 use Generator;
 use JsonException;
@@ -27,9 +28,6 @@ final class ContentGenerator
 {
     private const PURPOSE = 'content';
 
-    // The user message wraps these in tags, so text carrying the same tags could end the wrapper early.
-    private const PROMPT_TAG_PATTERN = '/<\/?(brief|tone|audience)\b/i';
-
     public function __construct(
         private readonly LlmClient $client,
         private readonly ContentPrompt $prompt,
@@ -41,8 +39,8 @@ final class ContentGenerator
     /** @return Generator<int, ContentEvent> */
     public function generate(string $brief, string $tone, AudienceSummary $audience, string $ruleExplanation): Generator
     {
-        if (preg_match(self::PROMPT_TAG_PATTERN, "{$brief}\n{$tone}\n{$ruleExplanation}") === 1) {
-            yield ContentEvent::failed('content_input_invalid', 'The brief, tone and audience description must not contain <brief>, <tone> or <audience> tags.');
+        if (PromptTags::appearIn("{$brief}\n{$tone}\n{$ruleExplanation}")) {
+            yield ContentEvent::failed('content_input_invalid', 'The brief, tone and audience description must not contain '.PromptTags::DESCRIPTION.'.');
 
             return;
         }
