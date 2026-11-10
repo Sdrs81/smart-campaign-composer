@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /*
@@ -16,6 +17,8 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
  // ->use(RefreshDatabase::class)
+    // Any HTTP call a test did not fake fails, so nothing can reach a real API (K28).
+    ->beforeEach(fn () => Http::preventStrayRequests())
     ->in('Feature');
 
 /*

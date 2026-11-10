@@ -175,6 +175,12 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** The case requires `docker compose up` to work on a clean clone. Compose reads `.env` for interpolation by itself, so no extra tool is needed, and no secret enters the repository.
 - **Alternatives:** Committing a `.env` (secrets risk); a `cp` step in the README (breaks the one-command requirement); copying in the entrypoint (the container cannot write to the host).
 
+## K28: Tests pin the fake LLM and refuse stray HTTP calls
+
+- **Decision:** `phpunit.xml` forces `LLM_DRIVER=fake` and an empty `ANTHROPIC_API_KEY` as `<server ... force="true"/>` entries, the same way it pins the database (K4). `tests/Pest.php` calls `Http::preventStrayRequests()` before every Feature test, so a test that does not `Http::fake` its calls fails instead of reaching a real host. A Feature test asserts the fake driver and the stray-request guard. `LlmConfigTest` is unchanged: it sets `$_ENV` and `$_SERVER` itself before loading `config/llm.php`.
+- **Rationale:** With a key in the container's environment (K27 makes that easy), `LLM_DRIVER=auto` resolved to Claude and a test run could spend money and give non-deterministic results. Pinning the driver removes the key from the test run, and the stray-request guard makes any remaining leak loud.
+- **Alternatives:** Relying on developers not to set a key (fails silently); unsetting the variable in `TestCase::setUp` (config is already built by then); `Http::fake()` globally (hides unexpected calls instead of failing).
+
 ## Setup notes (Phase 2)
 
 - **API only:** no web routes, views or Vite in the backend; errors share one `{error:{code,message,details}}` body.
