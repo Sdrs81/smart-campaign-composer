@@ -93,12 +93,25 @@ final class DevScenarios
         }
         $category = implode(' ve ', array_slice($facts['categories'], 0, self::MAX_CATEGORIES_NAMED)) ?: self::NO_CATEGORY_NAMED;
 
-        $fill = fn (string $text): string => strtr($text, ['%OFFER%' => $offer, '%CATEGORY%' => $category]);
+        $fill = fn (string $text): string => $this->capitalizeSentences(strtr($text, ['%OFFER%' => $offer, '%CATEGORY%' => $category]));
 
         return [
             'sms' => ['body' => $fill($chosen['sms']['body'])],
             'email' => ['subject' => $fill($chosen['email']['subject']), 'body' => $fill($chosen['email']['body'])],
         ];
+    }
+
+    /**
+     * A filled slot ("özel fırsat", "elektronik") is lower case, so it must be capitalised when it lands at
+     * the start of the text, of a line or of a sentence. mb_strtoupper turns i into I, not the Turkish İ.
+     */
+    private function capitalizeSentences(string $text): string
+    {
+        return (string) preg_replace_callback(
+            '/(^|[.!?]\s+|\n)(\p{Ll})/u',
+            fn (array $match): string => $match[1].($match[2] === 'i' ? 'İ' : mb_strtoupper($match[2])),
+            $text,
+        );
     }
 
     /**

@@ -91,6 +91,17 @@ describe('ContentStream', () => {
     stream.finish()
   })
 
+  it('starts when autostart turns true after the component was already shown', async () => {
+    drive()
+    const wrapper = mount(ContentStream, { props: { campaign: CAMPAIGN, autostart: false } })
+    expect(api.streamContent).not.toHaveBeenCalled()
+
+    await wrapper.setProps({ autostart: true })
+
+    expect(api.streamContent).toHaveBeenCalledOnce()
+    expect(wrapper.emitted('started')).toHaveLength(1)
+  })
+
   it('waits for a click without autostart', () => {
     drive()
     mount(ContentStream, { props: { campaign: CAMPAIGN } })

@@ -138,8 +138,29 @@ it('puts the same discount, city and category in the SMS and the email of every 
     }
 
     $category = $scenarios->contentVariant('elektronik ve kozmetik kategorisi için %20 indirim', 1);
-    expect($category['sms']['body'])->toContain('elektronik ve kozmetik')
-        ->and($category['email']['body'])->toContain('elektronik ve kozmetik');
+    // The names may head a sentence, where they are capitalised.
+    expect(mb_stripos($category['sms']['body'], 'elektronik ve kozmetik'))->not->toBeFalse()
+        ->and(mb_stripos($category['email']['body'], 'elektronik ve kozmetik'))->not->toBeFalse();
+});
+
+it('starts every sentence with a capital letter, also where a lower-case slot lands', function (): void {
+    $scenarios = new DevScenarios(new BriefReader(devRegistry()));
+
+    foreach (DEV_SCENARIO_BRIEFS as $name => $keywords) {
+        foreach (range(0, $scenarios->variantCount($keywords) - 1) as $variant) {
+            $content = $scenarios->contentVariant($keywords, $variant);
+
+            foreach ([$content['sms']['body'], $content['email']['subject'], $content['email']['body']] as $text) {
+                // A sentence start is the text start, a line start, or what follows . ! ? and a space.
+                expect(preg_match('/(^|[.!?]\s+|\n)\p{Ll}/u', $text))->toBe(0, "{$name} #{$variant}: {$text}");
+            }
+        }
+    }
+
+    // Turkish dotted İ, not a plain I, and the category at the head of a subject.
+    expect($scenarios->contentVariant('elektronik kategorisi', 0)['email']['subject'])->toStartWith('Elektronik')
+        ->and($scenarios->contentVariant('indirim', 1)['sms']['body'])->toContain('Alışverişe');
+    expect((new ReflectionMethod(DevScenarios::class, 'capitalizeSentences'))->invoke($scenarios, 'iyi günler. ılık hava'))->toBe('İyi günler. Ilık hava');
 });
 
 it('writes no fixed city name and no other city than the brief names', function (): void {

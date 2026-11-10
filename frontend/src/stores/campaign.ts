@@ -156,17 +156,21 @@ export const useCampaignStore = defineStore('campaign', () => {
     autoGenerateFor.value = null
   }
 
-  /** Runs the audience extraction for the held campaign. A failure is kept in `composeError`, the campaign stays. */
-  async function extractAudience(): Promise<void> {
+  /**
+   * Runs the audience extraction for the held campaign, from `brief` when it was edited. A failure is kept in
+   * `composeError`, the campaign stays.
+   */
+  async function extractAudience(brief?: string): Promise<void> {
     const campaign = current.value
     if (!campaign) return
     composing.value = true
     composeError.value = null
     autoGenerateFor.value = null
     try {
-      const extracted = await api.defineAudience(campaign.id)
+      const extracted = await api.defineAudience(campaign.id, brief)
       current.value = extracted
-      // Existing text is never replaced without a click on "Generate again".
+      // Running the extraction is the click that asks for new text: the server has dropped the old text with
+      // the old audience, so the content is written again (K26). A campaign that still has text is left alone.
       if (extracted.status === 'audience_ready' && (extracted.messages?.length ?? 0) === 0) {
         autoGenerateFor.value = extracted.id
       }

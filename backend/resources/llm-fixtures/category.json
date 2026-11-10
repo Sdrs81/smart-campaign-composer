@@ -42,7 +42,7 @@
             }
         },
         {
-            "offer": "seçili ürünlerde avantajlar",
+            "offer": "avantajlı fiyatlar",
             "sms": {
                 "body": "Merhaba {{first_name}}, %CATEGORY% kategorisinde %OFFER% ile alışveriş yapmanın tam zamanı!"
             },

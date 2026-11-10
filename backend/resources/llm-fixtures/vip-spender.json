@@ -13,7 +13,7 @@
     },
     "content": [
         {
-            "offer": "özel ayrıcalıklar",
+            "offer": "ayrıcalıklar",
             "sms": {
                 "body": "Merhaba {{first_name}}, en sevdiğimiz müşterilerimizdensin! Sana özel %OFFER% var."
             },
@@ -23,7 +23,7 @@
             }
         },
         {
-            "offer": "özel ayrıcalıklar",
+            "offer": "ayrıcalıklar",
             "sms": {
                 "body": "{{first_name}}, bizi tercih ettiğin için teşekkürler. Seçkin müşterilerimize özel %OFFER% seni bekliyor."
             },
@@ -33,13 +33,13 @@
             }
         },
         {
-            "offer": "özel ayrıcalıklar",
+            "offer": "ayrıcalıklar",
             "sms": {
-                "body": "Merhaba {{first_name}}, sadakatine teşekkür ederiz. Bu ay senin için %OFFER% hazırladık."
+                "body": "Merhaba {{first_name}}, sadakatine teşekkür ederiz. Bu ay sana %OFFER% hazırladık."
             },
             "email": {
                 "subject": "Sadakatine teşekkür ederiz",
-                "body": "Merhaba {{first_name}},\n\nSadakatine teşekkür ederiz. Bu ay senin için %OFFER% hazırladık.\n\nİyi alışverişler dileriz."
+                "body": "Merhaba {{first_name}},\n\nSadakatine teşekkür ederiz. Bu ay sana %OFFER% hazırladık.\n\nİyi alışverişler dileriz."
             }
         }
     ]

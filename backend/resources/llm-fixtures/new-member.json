@@ -19,11 +19,11 @@
         {
             "offer": "hoş geldin fırsatı",
             "sms": {
-                "body": "Aramıza hoş geldin {{first_name}}! İlk alışverişin için %OFFER% var."
+                "body": "Aramıza hoş geldin {{first_name}}! İlk alışverişinde %OFFER% var."
             },
             "email": {
                 "subject": "Aramıza hoş geldin",
-                "body": "Merhaba {{first_name}},\n\nAramıza katıldığın için çok mutluyuz. İlk alışverişin için %OFFER% var.\n\nKeyifli alışverişler dileriz."
+                "body": "Merhaba {{first_name}},\n\nAramıza katıldığın için çok mutluyuz. İlk alışverişinde %OFFER% var.\n\nKeyifli alışverişler dileriz."
             }
         },
         {

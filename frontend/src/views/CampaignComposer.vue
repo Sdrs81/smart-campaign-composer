@@ -29,12 +29,15 @@ const campaign = computed(() => store.current)
 const canExtract = computed(
   () => isNew.value || (campaign.value !== null && EDITABLE.includes(campaign.value.status)),
 )
-const briefText = computed({
-  get: () => (isNew.value ? draftBrief.value : (campaign.value?.brief ?? '')),
-  set: (value: string) => {
-    draftBrief.value = value
+// The text box holds the brief being written. A saved campaign puts its brief there, and the brief stays
+// editable until approval: the rule is read from it again by "Re-run extraction".
+watch(
+  () => campaign.value?.brief,
+  (saved) => {
+    if (saved !== undefined) draftBrief.value = saved
   },
-})
+  { immediate: true },
+)
 const submitLabel = computed(() => {
   if (isNew.value) return t('brief.extract')
   return campaign.value?.segment_rule ? t('brief.rerun') : t('brief.extract')
@@ -42,8 +45,10 @@ const submitLabel = computed(() => {
 
 async function open(): Promise<void> {
   await store.loadRules()
-  if (props.id === undefined) store.startNew()
-  else await store.loadCurrent(props.id)
+  if (props.id === undefined) {
+    store.startNew()
+    draftBrief.value = ''
+  } else await store.loadCurrent(props.id)
 }
 
 async function submit(): Promise<void> {
@@ -53,7 +58,7 @@ async function submit(): Promise<void> {
     if (createdId !== null) await router.replace({ name: 'campaign', params: { id: createdId } })
     return
   }
-  await store.extractAudience()
+  await store.extractAudience(draftBrief.value)
 }
 
 // Reported by the editor: the text fits, is saved and the server has no complaint.
@@ -94,10 +99,10 @@ onBeforeRouteLeave(() => store.leaveCurrent())
 
     <template v-if="store.rules && (isNew || campaign)">
       <BriefStep
-        v-model="briefText"
+        v-model="draftBrief"
         :limits="store.rules.brief"
         :busy="store.composing"
-        :readonly="!isNew"
+        :readonly="!canExtract"
         :can-submit="canExtract"
         :submit-label="submitLabel"
         @submit="submit"

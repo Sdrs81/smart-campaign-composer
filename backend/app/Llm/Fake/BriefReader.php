@@ -123,10 +123,12 @@ final class BriefReader
     public function describe(array $conditions): string
     {
         $parts = array_map(function (array $condition): string {
+            $field = $this->registry->find($condition['field']);
             $value = $condition['value'];
-            $text = is_array($value) ? implode($condition['operator'] === 'between' ? '–' : ', ', $value) : (string) $value;
+            $values = array_map(fn (mixed $item): string => $field?->labelOf((string) $item) ?? (string) $item, (array) $value);
+            $text = implode($condition['operator'] === 'between' ? '–' : ', ', $values);
 
-            return $this->registry->find($condition['field'])?->label.': '
+            return $field?->label.': '
                 .str_replace('{value}', $text, Operator::from($condition['operator'])->template());
         }, $conditions);
 

@@ -138,6 +138,21 @@ describe('campaign store', () => {
       expect(store.autoGenerateFor).toBeNull()
     })
 
+    it('sends an edited brief with the extraction and marks the campaign again', async () => {
+      vi.spyOn(api, 'getCampaign').mockResolvedValue(campaign(6))
+      const define = vi
+        .spyOn(api, 'defineAudience')
+        .mockResolvedValue({ ...campaign(6), status: 'audience_ready', brief: 'Yeni özet' })
+      const store = useCampaignStore()
+      await store.loadCurrent(6)
+
+      await store.extractAudience('Yeni özet')
+
+      expect(define).toHaveBeenCalledExactlyOnceWith(6, 'Yeni özet')
+      expect(store.current?.brief).toBe('Yeni özet')
+      expect(store.autoGenerateFor).toBe(6)
+    })
+
     it('does not mark a failed extraction', async () => {
       vi.spyOn(api, 'createCampaign').mockResolvedValue(campaign(7))
       vi.spyOn(api, 'defineAudience').mockRejectedValue(new ApiError(422, 'invalid', 'No.'))

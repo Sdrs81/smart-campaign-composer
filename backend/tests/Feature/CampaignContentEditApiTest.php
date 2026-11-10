@@ -138,3 +138,12 @@ it('serves the brief limits and the segment labels for the rule chips', function
     $operators = collect($response->json('data.segment.operators'))->pluck('name')->all();
     expect($operators)->toBe(array_map(fn (Operator $operator): string => $operator->value, Operator::cases()));
 });
+
+it('serves Turkish names for the stored values of gender, language and loyalty tier', function (): void {
+    $fields = collect($this->getJson('/api/content/rules')->assertOk()->json('data.segment.fields'))->keyBy('name');
+
+    expect($fields['gender']['value_labels'])->toBe(['female' => 'Kadın', 'male' => 'Erkek'])
+        ->and($fields['language']['value_labels'])->toBe(['tr' => 'Türkçe', 'en' => 'İngilizce'])
+        ->and($fields['loyalty_tier']['value_labels']['platinum'])->toBe('Platin')
+        ->and($fields['age']['value_labels'])->toBe([]);
+});

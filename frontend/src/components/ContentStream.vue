@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { Campaign } from '../api/types'
@@ -7,7 +7,7 @@ import { useContentStream } from '../composables/useContentStream'
 import EmailPreview from './EmailPreview.vue'
 import SmsPreview from './SmsPreview.vue'
 
-// With `autostart` the first content begins without a click (K26); `started` lets the page spend that request.
+// When `autostart` turns true the content is written without a click (K26); `started` lets the page spend that request.
 const props = defineProps<{ campaign: Campaign; autostart?: boolean }>()
 const emit = defineEmits<{ completed: []; started: [] }>()
 const { t } = useI18n()
@@ -17,11 +17,16 @@ const { status, draft, repaired, error, start, cancel } = useContentStream(
   () => emit('completed'),
 )
 
-onMounted(() => {
-  if (!props.autostart) return
-  emit('started')
-  void start()
-})
+// Watched, not read on mount: "Re-run extraction" asks for new text while this component is already shown.
+watch(
+  () => props.autostart,
+  (autostart) => {
+    if (!autostart) return
+    emit('started')
+    void start()
+  },
+  { immediate: true },
+)
 
 const streaming = computed(() => status.value === 'streaming')
 // The cards show the text arriving; once it is checked and saved, the editor below takes over the same text.

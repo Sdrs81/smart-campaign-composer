@@ -28,7 +28,7 @@ export const en = {
     failed: 'Failed',
     skipped: 'Skipped',
   },
-  total: 'Total',
+  total: 'Total people',
   errors: {
     network: 'Could not reach the server: {reason}',
   },

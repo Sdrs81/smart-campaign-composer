@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import type { ContentRules } from '../../api/types'
 import { describeCondition } from '../describeCondition'
 
 const SEGMENT = {
@@ -27,6 +28,29 @@ describe('describeCondition', () => {
   it('needs no value for a template without one', () => {
     expect(describeCondition({ field: 'age', operator: 'is_null', value: null }, SEGMENT)).toBe(
       'Yaş: boş',
+    )
+  })
+
+  it('shows the Turkish name of a stored value, and the stored value when it has none', () => {
+    const segment: ContentRules['segment'] = {
+      fields: [
+        { name: 'gender', label: 'Cinsiyet', value_labels: { female: 'Kadın', male: 'Erkek' } },
+        { name: 'platform', label: 'Platform', value_labels: {} },
+      ],
+      operators: [
+        { name: 'eq', template: '{value}' },
+        { name: 'in', template: '{value}' },
+      ],
+    }
+
+    expect(describeCondition({ field: 'gender', operator: 'eq', value: 'female' }, segment)).toBe(
+      'Cinsiyet: Kadın',
+    )
+    expect(
+      describeCondition({ field: 'gender', operator: 'in', value: ['female', 'male'] }, segment),
+    ).toBe('Cinsiyet: Kadın, Erkek')
+    expect(describeCondition({ field: 'platform', operator: 'eq', value: 'ios' }, segment)).toBe(
+      'Platform: ios',
     )
   })
 

@@ -25,21 +25,21 @@
         {
             "offer": "özel fırsat",
             "sms": {
-                "body": "Merhaba {{first_name}}, uzun zamandır sipariş vermedin. Dönmen için %OFFER% hazırladık!"
+                "body": "Merhaba {{first_name}}, uzun zamandır sipariş vermedin. Sana %OFFER% hazırladık!"
             },
             "email": {
                 "subject": "Seni yeniden görmek isteriz",
-                "body": "Merhaba {{first_name}},\n\nSon zamanlarda sipariş vermediğini fark ettik. Dönmen için %OFFER% hazırladık.\n\nSeni tekrar görmek isteriz."
+                "body": "Merhaba {{first_name}},\n\nSon zamanlarda sipariş vermediğini fark ettik. Sana %OFFER% hazırladık.\n\nSeni tekrar görmek isteriz."
             }
         },
         {
             "offer": "özel fırsat",
             "sms": {
-                "body": "{{first_name}}, seni özledik! Yeni siparişin için %OFFER% seni bekliyor."
+                "body": "{{first_name}}, seni özledik! Yeni siparişinde %OFFER% seni bekliyor."
             },
             "email": {
                 "subject": "Seni özledik",
-                "body": "Merhaba {{first_name}},\n\nSeni özledik! Yeni siparişin için %OFFER% seni bekliyor.\n\nSevgiler."
+                "body": "Merhaba {{first_name}},\n\nSeni özledik! Yeni siparişinde %OFFER% seni bekliyor.\n\nSevgiler."
             }
         },
         {

@@ -83,6 +83,11 @@ it('reads the facts a message should repeat', function (string $brief, ?int $dis
     'a discount over 99' => ['%150 indirim', null, null, []],
 ]);
 
+it('describes stored values by their Turkish names', function (): void {
+    expect((new BriefReader(briefRegistry()))->describe([condition('gender', 'eq', 'female'), condition('loyalty_tier', 'in', ['gold', 'platinum'])]))
+        ->toBe('Briefte belirtilen koşullara göre müşteriler seçildi: Cinsiyet: Kadın; Sadakat seviyesi: Altın, Platin.');
+});
+
 it('describes the conditions in the chips\' wording', function (): void {
     $reader = new BriefReader(briefRegistry());
 

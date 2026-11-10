@@ -17,6 +17,7 @@ final readonly class FieldDefinition
     /**
      * @param  (Closure(): list<string>)|null  $enumValues  lazy, so the city list is read from the DB only when needed
      * @param  bool  $derivedFromBirthDate  age is not stored; the compiler turns it into a birth_date comparison
+     * @param  array<string, string>  $valueLabels  how a stored value reads in Turkish ("female" → "Kadın"); a value without a label is shown as stored
      */
     public function __construct(
         public string $name,
@@ -27,7 +28,13 @@ final readonly class FieldDefinition
         public ?int $min = null,
         public ?int $max = null,
         public bool $derivedFromBirthDate = false,
+        public array $valueLabels = [],
     ) {}
+
+    public function labelOf(string $value): string
+    {
+        return $this->valueLabels[$value] ?? $value;
+    }
 
     /** @return list<string> */
     public function allowedValues(): array

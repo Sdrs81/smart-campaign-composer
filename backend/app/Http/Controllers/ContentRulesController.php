@@ -25,7 +25,7 @@ class ContentRulesController extends Controller
             ),
             'segment' => [
                 'fields' => array_values(array_map(
-                    fn (FieldDefinition $field): array => ['name' => $field->name, 'label' => $field->label],
+                    fn (FieldDefinition $field): array => ['name' => $field->name, 'label' => $field->label, 'value_labels' => $field->valueLabels],
                     $registry->all(),
                 )),
                 'operators' => array_map(

@@ -133,13 +133,18 @@ class CustomerSeeder extends Seeder
 
         $loginDaysAgoMax = min($registeredDaysAgo - 1, $purchase['last_days_ago'] ?? PHP_INT_MAX, $cart['days_ago'] ?? PHP_INT_MAX);
 
+        // The name follows the gender, so a "female" customer is never greeted with a man's name in previews.
+        $gender = $this->chance(self::FEMALE_SHARE) ? 'female' : 'male';
+
         return [
-            'first_name' => $this->chance(self::MISSING_FIRST_NAME_SHARE) ? null : $this->faker->firstName(),
+            'first_name' => $this->chance(self::MISSING_FIRST_NAME_SHARE)
+                ? null
+                : ($gender === 'female' ? $this->faker->firstNameFemale() : $this->faker->firstNameMale()),
             'last_name' => $this->faker->lastName(),
             'email' => sprintf('musteri%d@example.com', $number),
             'phone' => sprintf('+90500%07d', $number), // reserved-looking range, never routable
             'city' => $this->weighted(self::CITY_WEIGHTS),
-            'gender' => $this->chance(self::FEMALE_SHARE) ? 'female' : 'male',
+            'gender' => $gender,
             'birth_date' => $this->now->subYears($this->between(...self::AGE_YEARS_RANGE))
                 ->subDays($this->between(0, self::BIRTHDAY_EXTRA_DAYS_MAX))->toDateString(),
             'language' => $this->chance(self::ENGLISH_SHARE) ? 'en' : 'tr',
