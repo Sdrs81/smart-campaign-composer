@@ -12,7 +12,7 @@ import LocaleSwitcher from './components/LocaleSwitcher.vue'
       <h1 class="text-xl font-semibold">
         <RouterLink
           :to="{ name: 'campaigns' }"
-          class="focus:outline-2 focus:outline-offset-2 focus:outline-indigo-600"
+          class="hover:text-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
         >
           Smart Campaign Composer
         </RouterLink>

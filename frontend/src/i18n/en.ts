@@ -141,15 +141,16 @@ export const en = {
     consent_withdrawn:
       'The customer withdrew consent for this channel after the audience was fixed, so nothing was sent.',
     provider_temporary:
-      'The delivery service had a temporary problem. Failed attempts are retried automatically.',
-    retries_exhausted: 'The delivery service kept failing, so the message was not sent.',
+      'The delivery service was busy or briefly unavailable when this message was sent. The system tries again automatically.',
+    retries_exhausted:
+      'The delivery service stayed unavailable after several attempts, so this message was not sent.',
     provider_rejected:
       'The delivery service refused this message, for example because of an invalid number or address.',
     content_invalid:
       'The message could not be sent because its text is missing or too long for the channel.',
     internal:
-      'An unexpected error stopped this message. Please pass the technical detail to the software team.',
-    unknown: 'The message could not be delivered. The technical detail shows the cause.',
+      'An unexpected error in our system stopped this message, so it was not sent. The software team needs to look into it.',
+    unknown: 'This message could not be delivered.',
   },
   progress: {
     sent: 'Sent',

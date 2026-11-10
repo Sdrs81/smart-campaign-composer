@@ -181,7 +181,7 @@ describe('CampaignDashboard', () => {
 
     const cells = wrapper.findAll('tbody tr td').map((cell) => cell.text())
     expect(cells).toContain('3')
-    expect(cells.at(-1)).toContain('The delivery service had a temporary problem')
+    expect(cells.at(-1)).toContain(en.deliveryError.provider_temporary)
   })
 
   it('keeps the raw error behind a collapsed "Technical detail" and explains it in plain words', async () => {
@@ -205,6 +205,13 @@ describe('CampaignDashboard', () => {
       expect(en.deliveryError[code], `${code} in English`).toBeTruthy()
       expect(tr.deliveryError[code], `${code} in Turkish`).toBeTruthy()
     }
+    // Each sentence must stand on its own: the marketer is not sent to the technical detail for the cause.
+    const sentences = [...Object.values(en.deliveryError), ...Object.values(tr.deliveryError)]
+    for (const sentence of sentences)
+      expect(sentence).not.toMatch(/technical detail|teknik ayrıntı/i)
+    expect(new Set(Object.values(en.deliveryError)).size).toBe(
+      Object.values(en.deliveryError).length,
+    )
 
     setLocale('tr')
     const { wrapper, source } = await mountDashboard()

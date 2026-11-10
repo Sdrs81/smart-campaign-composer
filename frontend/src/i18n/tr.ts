@@ -140,14 +140,15 @@ export const tr: typeof en = {
     consent_withdrawn:
       'Müşteri, kitle belirlendikten sonra bu kanal için iznini geri çekti; bu yüzden mesaj gönderilmedi.',
     provider_temporary:
-      'Gönderim servisinde geçici bir sorun oldu. Başarısız denemeler otomatik olarak tekrarlanır.',
-    retries_exhausted: 'Gönderim servisi sürekli hata verdi, bu yüzden mesaj gönderilemedi.',
+      'Mesaj gönderilirken gönderim servisi yoğundu ya da kısa süreliğine ulaşılamıyordu. Sistem otomatik olarak yeniden dener.',
+    retries_exhausted:
+      'Gönderim servisine birkaç denemeden sonra da ulaşılamadı, bu yüzden mesaj gönderilemedi.',
     provider_rejected:
       'Gönderim servisi bu mesajı kabul etmedi; örneğin numara veya adres geçersiz olabilir.',
     content_invalid: 'Mesaj gönderilemedi: metni eksik ya da bu kanal için fazla uzun.',
     internal:
-      'Beklenmeyen bir hata bu mesajı durdurdu. Lütfen teknik ayrıntıyı yazılım ekibine iletin.',
-    unknown: 'Mesaj teslim edilemedi. Nedeni teknik ayrıntıda görebilirsiniz.',
+      'Sistemimizde beklenmeyen bir hata oluştu ve mesaj gönderilemedi. Yazılım ekibinin incelemesi gerekiyor.',
+    unknown: 'Bu mesaj teslim edilemedi.',
   },
   progress: {
     sent: 'Gönderildi',
