@@ -59,12 +59,12 @@ Yalnızca `DECISIONS.md`'ye girecek kararlar: case'te doğrudan geçenler, mimar
 
 ### İçerik ve onay
 
-| #   | Karar                                                                                                                                                                                                                                                                                                                                                           | Gerekçe (ilke)                                                                                                                                                 | Alternatifler                                                                             | Görevler                             |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------ |
-| K13 | Limitler kullanıcının gördüğü karakterle (grapheme: backend `grapheme_strlen`, frontend `Intl.Segmenter`): SMS ≤160, konu ≤80, email gövdesi düz metin ≤2.000. Kişiye giden metin üzerinden, kitlenin her değişken için en uzun değeriyle en kötü durum. LLM ve insan aynı doğrulayıcıdan geçer; limitler tek config'te, frontend `/api/content/rules`'tan alır | Case şartı. Limit alıcıda garanti edilir, gönderimde tekrar kontrol (Defensive); tek kaynak (DRY). Operatördeki GSM-7/UCS-2 segment farkı bilinen sadeleştirme | Şablon uzunluğu, sabit bütçe, GSM segment sayımı                                          | 2.4, 4.4, 5.7, 5.8, 6.4, 10.5        |
-| K14 | Kişiselleştirme: izinli değişken listesi (`{{first_name}}`, `{{last_name}}`, `{{city}}`), her biri fallback'li; tek geçişte render; bilinmeyen değişken reddedilir                                                                                                                                                                                              | Case şartı. Şablon enjeksiyonu yok; render O(n)                                                                                                                | Twig/Blade gibi şablon motoru                                                             | 5.7, 5.8                             |
-| K15 | İnsan onayı: kampanya durum makinesi (zengin model). Yalnızca üretilen SMS ve email metni, yalnızca onaydan önce düzenlenir; kural salt-okur (brief değiştirilip yeniden üretilir); onay kilitli ve idempotent                                                                                                                                                  | Case akışı; geçersiz geçiş erken hata verir (Rich Domain Model, Defensive); kural editörü gereksiz (YAGNI)                                                     | Kural editörü                                                                             | 3.3, 6.2, 6.4, 8.5, 10.5, 10.6, 14.4 |
-| K26 | Kitle ilk kez başarıyla çıkarıldığında frontend içerik stream'ini kendiliğinden başlatır (yalnızca kampanyada henüz mesaj yoksa); "Tekrar oluştur" butonu ve backend akışı (K12) değişmez                                                                                                                                                                       | Gereksiz bir tıklama kalkar; stream zaten POST + SSE olduğu için ek job veya durum gerekmez (KISS); var olan içerik habersiz ezilmez (Defensive)               | Kitle endpoint'inden sonra backend job'ı ile üretim; her kitle çıkarımında yeniden üretim | 13.1                                 |
+| #   | Karar                                                                                                                                                                                                                                                                                                                                                           | Gerekçe (ilke)                                                                                                                                                 | Alternatifler                                                                             | Görevler                       |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------ |
+| K13 | Limitler kullanıcının gördüğü karakterle (grapheme: backend `grapheme_strlen`, frontend `Intl.Segmenter`): SMS ≤160, konu ≤80, email gövdesi düz metin ≤2.000. Kişiye giden metin üzerinden, kitlenin her değişken için en uzun değeriyle en kötü durum. LLM ve insan aynı doğrulayıcıdan geçer; limitler tek config'te, frontend `/api/content/rules`'tan alır | Case şartı. Limit alıcıda garanti edilir, gönderimde tekrar kontrol (Defensive); tek kaynak (DRY). Operatördeki GSM-7/UCS-2 segment farkı bilinen sadeleştirme | Şablon uzunluğu, sabit bütçe, GSM segment sayımı                                          | 2.4, 4.4, 5.7, 5.8, 6.4, 10.5  |
+| K14 | Kişiselleştirme: izinli değişken listesi (`{{first_name}}`, `{{last_name}}`, `{{city}}`), her biri fallback'li; tek geçişte render; bilinmeyen değişken reddedilir                                                                                                                                                                                              | Case şartı. Şablon enjeksiyonu yok; render O(n)                                                                                                                | Twig/Blade gibi şablon motoru                                                             | 5.7, 5.8                       |
+| K15 | İnsan onayı: kampanya durum makinesi (zengin model). Yalnızca üretilen SMS ve email metni, yalnızca onaydan önce düzenlenir; kural salt-okur (brief değiştirilip yeniden üretilir); onay kilitli ve idempotent                                                                                                                                                  | Case akışı; geçersiz geçiş erken hata verir (Rich Domain Model, Defensive); kural editörü gereksiz (YAGNI)                                                     | Kural editörü                                                                             | 3.3, 6.2, 6.4, 8.5, 10.5, 10.6 |
+| K26 | Kitle ilk kez başarıyla çıkarıldığında frontend içerik stream'ini kendiliğinden başlatır (yalnızca kampanyada henüz mesaj yoksa); "Tekrar oluştur" butonu ve backend akışı (K12) değişmez                                                                                                                                                                       | Gereksiz bir tıklama kalkar; stream zaten POST + SSE olduğu için ek job veya durum gerekmez (KISS); var olan içerik habersiz ezilmez (Defensive)               | Kitle endpoint'inden sonra backend job'ı ile üretim; her kitle çıkarımında yeniden üretim | 13.1                           |
 
 ### Gönderim
 
@@ -96,15 +96,15 @@ Yalnızca `DECISIONS.md`'ye girecek kararlar: case'te doğrudan geçenler, mimar
 - **Dil:** Projenin tüm dosyaları ve içerikleri İngilizce yazılır: kod, yorumlar, config dosyaları (`.gitignore` yorumları dahil), `README.md`, `DECISIONS.md`, `CLAUDE.md`, rules/skills/agents, hook ve script mesajları, commit mesajları, PR başlığı ve açıklaması. Türkçe kalanlar: bu plan (`docs/plan.md`, çalışma belgesi), Claude'un sohbetteki raporları ve dosya bazlı özetler. Ürün içeriği (LLM'in ürettiği kampanya metni) ürün gereği Türkçe kalır (5.9, 11.1). Arayüz metinleri ise Türkçe/İngilizce seçilebilir (K23); çeviri dosyaları (`frontend/src/i18n/tr.ts`) de bu "proje dosyaları İngilizce" kuralının bilinçli istisnasıdır.
 - **Takvim (çekirdek akış 5 günde):**
 
-  | Gün | Fazlar                                                                | Gün sonu ölçütü                                                                                                                         |
-  | --- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-  | G1  | Faz 1, Faz 2                                                          | `docker compose up` sağlıklı, `make test` yeşil, Claude araçları çalışıyor                                                              |
-  | G2  | Faz 3, Faz 4, Faz 5.1–5.4                                             | Seed ve segment derleyicisi çalışıyor, LLM istemcisi testli                                                                             |
-  | G3  | Faz 5.5–5.11, Faz 6, Faz 7                                            | Brief → kural → sayılar → stream içerik API'den çalışıyor; mock provider ayakta                                                         |
-  | G4  | Faz 8, Faz 9                                                          | `make smoke` yeşil, stats/health/metrics hazır                                                                                          |
-  | G5  | Faz 10                                                                | Çekirdek akış tarayıcıda uçtan uca, `make e2e` yeşil                                                                                    |
-  | G6  | Faz 11                                                                | Teslim paketi                                                                                                                           |
-  | G7  | Faz 12, Faz 13, Faz 14, Tampon, İsteğe Bağlı Kısımlar (CI önce, 14.6) | Arayüz ve fake LLM iyileştirmeleri tarayıcıda; temiz klonda yalnızca `docker compose up`; `make test`, `make smoke` ve `make e2e` yeşil |
+  | Gün | Fazlar                                                          | Gün sonu ölçütü                                                                                                                         |
+  | --- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+  | G1  | Faz 1, Faz 2                                                    | `docker compose up` sağlıklı, `make test` yeşil, Claude araçları çalışıyor                                                              |
+  | G2  | Faz 3, Faz 4, Faz 5.1–5.4                                       | Seed ve segment derleyicisi çalışıyor, LLM istemcisi testli                                                                             |
+  | G3  | Faz 5.5–5.11, Faz 6, Faz 7                                      | Brief → kural → sayılar → stream içerik API'den çalışıyor; mock provider ayakta                                                         |
+  | G4  | Faz 8, Faz 9                                                    | `make smoke` yeşil, stats/health/metrics hazır                                                                                          |
+  | G5  | Faz 10                                                          | Çekirdek akış tarayıcıda uçtan uca, `make e2e` yeşil                                                                                    |
+  | G6  | Faz 11                                                          | Teslim paketi                                                                                                                           |
+  | G7  | Faz 12, Faz 13, Faz 14, Tampon, İsteğe Bağlı Kısımlar (CI önce) | Arayüz ve fake LLM iyileştirmeleri tarayıcıda; temiz klonda yalnızca `docker compose up`; `make test`, `make smoke` ve `make e2e` yeşil |
 
 - **Gerideysek önce kesilecekler** (çekirdek akışı bozmayanlar, README'de "yapılmadı" olarak yazılır): 5.12 `llm:eval` (altın brief testleri fake ile unit testte kalır), 9.5 JSON log, 2.1'de Larastan, 10.8 Playwright (yerine `make smoke` + elle tarayıcı kontrolü), 1.13 deneme koşusu (Faz 2'nin ilk görevinde yapılır).
 
@@ -840,19 +840,15 @@ Sıra bağımlılığa göre: 13.3 ve 13.4, 13.2'deki brief okuyucusunu kullanı
 
 ## Faz 14: Case denetimi düzeltmeleri · G7
 
-Plan dışı faz: Faz 13 sonrası kodun case dosyasına karşı denetiminden gelen bulgular; dal `phase-14/audit-fixes`. Çekirdek akış değişmez; düzeltmeler kurulum, test yalıtımı, hız limiti kanıtı ve iki kenar durum. Yeni kütüphane ve migration yok.
+Plan dışı faz: Faz 13 sonrası kodun case dosyasına karşı denetiminden gelen bulgular; dal `phase-14/audit-fixes`. Çekirdek akış değişmez; düzeltmeler kurulum, test yalıtımı ve hız limiti kanıtı; sonda README kapanışı. Yeni kütüphane ve migration yok. Sıra önceliğe göre.
 
-| Bulgu                                                            | Önem   | Görev      |
-| ---------------------------------------------------------------- | ------ | ---------- |
-| H1. Temiz klonda `docker compose up`, `.env` olmadığı için düşer | Kritik | 14.1       |
-| H2. `.env`'de key varken testler fake LLM'den çıkar              | Orta   | 14.2       |
-| H3. Smoke'un ≤100/sn kontrolü yapısı gereği hep geçer            | Orta   | 14.3       |
-| H4. `failed` kampanya durumu hiç oluşmaz                         | Düşük  | 14.4       |
-| İçerik stream'inde süre sınırı doğrulanamadı                     | Düşük  | 14.5       |
-| E1. Bonuslar yok ve README'de belirtilmemiş (CI önce)            | Düşük  | 14.6, 14.7 |
-| E2. Gerçek modelle `llm:eval` sonucu yok                         | Düşük  | 14.7       |
-
-Sıra önceliğe göre. 14.6 (CI), 14.1 ve 14.2'den sonra gelir: CI temiz ortamda `.env`'siz ve key'siz koşar.
+| Bulgu                                                            | Önem   | Görev |
+| ---------------------------------------------------------------- | ------ | ----- |
+| H1. Temiz klonda `docker compose up`, `.env` olmadığı için düşer | Kritik | 14.1  |
+| H2. `.env`'de key varken testler fake LLM'den çıkar              | Orta   | 14.2  |
+| H3. Smoke'un ≤100/sn kontrolü yapısı gereği hep geçer            | Orta   | 14.3  |
+| E1. Bonuslar yok ve README'de belirtilmemiş                      | Düşük  | 14.4  |
+| E2. Gerçek modelle `llm:eval` sonucu yok                         | Düşük  | 14.4  |
 
 ### 14.1 Tek komutla kurulum · K27
 
@@ -878,32 +874,11 @@ Sıra önceliğe göre. 14.6 (CI), 14.1 ve 14.2'den sonra gelir: CI temiz ortamd
 - **Bağımlı:** 8.4, 8.8, 9.3
 - **Kabul:** Integration (gerçek Redis): 250 alım sonrası tepe sayacı saniye kovalarıyla birebir; `/api/metrics` satırı Prometheus biçiminde. `make smoke` 3 ardışık koşuda yeşil; tabloda gönderen tepe/sn ≤100 ve `rate_limited` sütunu var; çıktı rapora eklenir.
 
-### 14.4 Başarısız kampanya durumu · K15
+### 14.4 README kapanışı ve gerçek model ölçümü
 
-- **İş:** `StartCampaignJob::failed(Throwable)`: kampanya hâlâ `approved` ise `fail()`, kaydet ve nedeniyle log. `CampaignStatus`'a `Approved → Failed` geçişi eklenir; hiçbir kodun kullanmadığı `Sending → Failed` kaldırılır (gönderimi başlamış kampanya, başarısız mesajlarla birlikte `completed` olur, K18). README akış diyagramı buna uyar (`approved --> failed`). Dashboard `failed`'da stream'i zaten kapatır; değişiklik gerekmez, testle doğrulanır.
-- **Dosyalar:** `app/Delivery/StartCampaignJob.php`, `app/Enums/CampaignStatus.php`, `README.md`, Pest (`CampaignStatusTransitionTest`, yeni `StartCampaignJob` testi)
-- **Bağımlı:** 8.5, 9.2
-- **Kabul:** Pest: snapshot her denemede exception atınca son denemeden sonra kampanya `failed`; stats stream tek snapshot ve `end` gönderir; `failed` kampanyada onay 409; geçiş tablosu testi güncel.
-
-### 14.5 İçerik stream'inde süre sınırı
-
-- **İş:** Docs first: FrankenPHP (klasik mod) altında `max_execution_time`'ın duvar süresini mi CPU süresini mi saydığı resmi dokümanla doğrulanır. Duvar süresiyse `CampaignContentStreamController`'daki stream closure'ına `set_time_limit(0)` eklenir (stats stream'deki gibi) ve kitle endpoint'inin en kötü süresi (3 deneme × Claude zaman aşımı) aynı gözle değerlendirilir. CPU süresiyse kod değişmez; neden rapora ve kısa bir "neden" yorumuna yazılır.
-- **Dosyalar:** `app/Http/Controllers/CampaignContentStreamController.php` (gerekirse)
-- **Bağımlı:** 6.3
-- **Kabul:** Doküman kanıtı raporda; değişiklik varsa `make test` yeşil.
-
-### 14.6 CI pipeline · İsteğe Bağlı 1
-
-- **İş:** `.github/workflows/ci.yml`: `push` ve `pull_request`'te ubuntu runner'da `make lint` ve `make test`. Runner'da Docker ve Compose hazır; 14.1 sonrası `.env` gerekmez, key yok → fake LLM (14.2). Ek cache yok (YAGNI). README "Tests" bölümüne CI satırı.
-- **Dosyalar:** `.github/workflows/ci.yml`, `README.md`
-- **Bağımlı:** 14.1, 14.2
-- **Kabul:** Dalın push'unda (onayla) Actions koşusu yeşil ve PR sayfasında görünür.
-
-### 14.7 README kapanışı ve gerçek model ölçümü
-
-- **İş:** README "Not done" listesine bonusların durumu: zamanlanmış gönderim, A/B varyantları ve kullanıcının diline göre içerik yapılmadı (`customers.language` var, içerik yalnızca Türkçe); CI 14.6 ile yapıldı. Kurulum bloğu ve akış diyagramının 14.1 ve 14.4 ile uyumu kontrol edilir. İsteğe bağlı: sen `.env`'e gerçek key koyup `docker compose exec app php artisan llm:eval` çalıştırırsın; Claude çıktıyı README'nin "LLM evaluation" bölümüne ekler (Claude `.env`'e erişmez).
+- **İş:** README "Not done" listesine bonusların durumu: zamanlanmış gönderim, A/B varyantları, kullanıcının diline göre içerik (`customers.language` var, içerik yalnızca Türkçe) ve CI pipeline yapılmadı. Kurulum bloğunun 14.1 ile uyumu kontrol edilir. İsteğe bağlı: sen `.env`'e gerçek key koyup `docker compose exec app php artisan llm:eval` çalıştırırsın; Claude çıktıyı README'nin "LLM evaluation" bölümüne ekler (Claude `.env`'e erişmez).
 - **Dosyalar:** `README.md`
-- **Bağımlı:** 14.1–14.6
+- **Bağımlı:** 14.1–14.3
 - **Kabul:** Okuyarak onay; `node scripts/scrub-sessions.mjs --check` 0.
 
 ---
@@ -921,7 +896,7 @@ Sıra önceliğe göre. 14.6 (CI), 14.1 ve 14.2'den sonra gelir: CI temiz ortamd
 
 Çekirdek bittikten sonra, bu sırayla:
 
-1. **CI pipeline:** GitHub Actions'ta `make lint` + `make test` (servis container'larıyla). En ucuz ve en görünür bonus; Faz 2'den sonra zaman olursa öne alınabilir. Faz 14.6'da yapılır.
+1. **CI pipeline:** GitHub Actions'ta `make lint` + `make test` (servis container'larıyla). En ucuz ve en görünür bonus; Faz 2'den sonra zaman olursa öne alınabilir.
 2. **Zamanlanmış gönderim:** `campaigns.scheduled_at`; scheduler her dakika vadesi gelenleri `StartCampaignJob`'a verir.
 3. **A/B varyantları:** kanal başına 2 içerik; atama `hash(customer_id) mod 100` ile deterministik, O(1); dashboard'da varyant kırılımı.
 4. **Kullanıcının diline göre içerik:** `customers.language`; prompt dil başına içerik üretir; render'da dil seçilir.
