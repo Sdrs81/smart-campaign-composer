@@ -202,10 +202,13 @@ function check(audience, counts, provider, senderPeak) {
       c.sent + c.failed + c.skipped === total(c),
       `${c.sent + c.failed + c.skipped} of ${total(c)}`,
     ]);
+    // A failed row may still have been accepted: the provider can answer 500 after keeping the message, and
+    // every retry can fail too. So the provider total lies between sent and sent + failed; above it means a
+    // duplicate, below it a lost message.
     checks.push([
-      `${channel}: sent = provider total (no duplicates, none lost)`,
-      c.sent === p.total,
-      `sent ${c.sent}, provider ${p.total}`,
+      `${channel}: sent <= provider total <= sent + failed (no duplicates, none lost)`,
+      c.sent <= p.total && p.total <= c.sent + c.failed,
+      `sent ${c.sent}, failed ${c.failed}, provider ${p.total}`,
     ]);
     checks.push([
       `${channel}: sender peak per second <= ${RATE_LIMIT_PER_SECOND}`,
