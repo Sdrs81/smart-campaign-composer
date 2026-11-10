@@ -51,11 +51,17 @@ const PREVIEW: Preview = {
   ],
 }
 
+// Every editor is closed after its test: one left open keeps its real 600 ms save timer running and
+// would call the next test's updateContent spy, which only shows when the machine is slow.
+const mounted: ReturnType<typeof mount>[] = []
+
 function mountEditor(source: Campaign = campaign()) {
-  return mount(ContentEditor, {
+  const wrapper = mount(ContentEditor, {
     props: { campaign: source, rules: RULES },
     attachTo: document.body,
   })
+  mounted.push(wrapper)
+  return wrapper
 }
 
 async function typeSms(wrapper: ReturnType<typeof mountEditor>, text: string) {
@@ -64,8 +70,11 @@ async function typeSms(wrapper: ReturnType<typeof mountEditor>, text: string) {
 
 beforeEach(() => {
   vi.spyOn(api, 'previewCampaign').mockResolvedValue(PREVIEW)
+  // Closing an editor with an unsent edit saves it; that must never reach the real API.
+  vi.spyOn(api, 'updateContent').mockResolvedValue(campaign())
 })
 afterEach(() => {
+  for (const wrapper of mounted.splice(0)) wrapper.unmount()
   vi.useRealTimers()
   vi.restoreAllMocks()
   document.body.innerHTML = ''

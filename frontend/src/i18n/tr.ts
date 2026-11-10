@@ -4,6 +4,9 @@ export const tr: typeof en = {
   language: {
     switchTo: 'Dili şuna çevir: {language}',
   },
+  nav: {
+    back: 'Kampanyalara dön',
+  },
   status: {
     draft: 'Taslak',
     audience_ready: 'Kitle hazır',
@@ -131,7 +134,25 @@ export const tr: typeof en = {
     status: 'Durum',
     attempts: 'Deneme',
     error: 'Hata',
-    back: 'Kampanyalara dön',
+    technicalDetail: 'Teknik ayrıntı',
+  },
+  deliveryError: {
+    consent_withdrawn:
+      'Müşteri, kitle belirlendikten sonra bu kanal için iznini geri çekti; bu yüzden mesaj gönderilmedi.',
+    provider_unreachable:
+      'Gönderim servisine ulaşılamadı ya da servis zamanında yanıt vermedi. Başarısız denemeler otomatik olarak tekrarlanır.',
+    provider_busy:
+      'Gönderim servisi çok fazla mesajla ilgileniyordu ve yavaşlamamızı istedi. Başarısız denemeler kısa bir bekleyişten sonra otomatik olarak tekrarlanır.',
+    provider_error:
+      'Gönderim servisi bu mesajı alırken kendi içinde bir hata verdi. Başarısız denemeler otomatik olarak tekrarlanır.',
+    retries_exhausted:
+      'Gönderim servisine birkaç denemeden sonra da ulaşılamadı, bu yüzden mesaj gönderilemedi.',
+    provider_rejected:
+      'Gönderim servisi bu mesajı kabul etmedi; örneğin numara veya adres geçersiz olabilir.',
+    content_invalid: 'Mesaj gönderilemedi: metni eksik ya da bu kanal için fazla uzun.',
+    internal:
+      'Sistemimizde beklenmeyen bir hata oluştu ve mesaj gönderilemedi. Yazılım ekibinin incelemesi gerekiyor.',
+    unknown: 'Bu mesaj gönderilirken bir sorun oluştu.',
   },
   progress: {
     sent: 'Gönderildi',

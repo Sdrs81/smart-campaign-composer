@@ -151,6 +151,12 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** The switch is a display choice of one marketer, so it needs no server state or login, and it must not change what is sent to customers (that language is set by the brief and the model). Keeping the rule labels and API messages on the server keeps one source of truth for them (K7, K13) instead of a second copy in the frontend.
 - **Alternatives:** Translating API errors by `code` in the frontend (a second copy of every message); the backend choosing the language from an `Accept-Language` header (the content limits and rule labels would then depend on the request); a per-language route prefix (`/tr/campaigns`), which adds routes for no gain in a single-marketer demo.
 
+## K24: Delivery errors carry a fixed code that the dashboard explains in plain language
+
+- **Decision:** Every retry, failure and skip stores a code from a small fixed set in `deliveries.last_error_code` (`App\Delivery\DeliveryErrorCode`: `consent_withdrawn`, `provider_unreachable`, `provider_busy`, `provider_error`, `retries_exhausted`, `provider_rejected`, `content_invalid`, `internal`) next to the raw text in `last_error`. The stats API sends both (`recent_errors[].code` and `.error`). The frontend turns the code into a short sentence in the chosen language and keeps the raw text behind a collapsed "Technical detail" section for engineers. A row without a code (written before the column existed) gets a generic sentence. This narrows K23 for delivery errors only: other API messages are still shown as received.
+- **Rationale:** The user is a marketer, and a provider response such as `Provider answered 500: ...` means nothing to them, while the raw text is exactly what a developer needs. A code set by the code that knows the cause is more robust than guessing the cause from English text, and the set is closed, so the frontend can translate every value and a test can check it.
+- **Alternatives:** Classifying the raw text with regular expressions in the frontend (breaks when a message is reworded); translating on the backend from an `Accept-Language` header (K23 rejected this; the dashboard stream would depend on the request); explaining errors from the delivery status alone (cannot tell a rejected number from an exhausted retry).
+
 ## Setup notes (Phase 2)
 
 - **API only:** no web routes, views or Vite in the backend; errors share one `{error:{code,message,details}}` body.

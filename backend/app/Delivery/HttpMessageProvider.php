@@ -38,7 +38,7 @@ final readonly class HttpMessageProvider implements MessageProvider
                 ->withHeaders([self::IDEMPOTENCY_HEADER => $idempotencyKey])
                 ->post($channel->value, $payload);
         } catch (ConnectionException $exception) {
-            return SendResult::transient("Could not reach the provider: {$exception->getMessage()}");
+            return SendResult::transient("Could not reach the provider: {$exception->getMessage()}", DeliveryErrorCode::ProviderUnreachable);
         }
 
         return $this->classify($response);

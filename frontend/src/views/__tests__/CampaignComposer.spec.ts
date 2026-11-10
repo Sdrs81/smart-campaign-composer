@@ -90,6 +90,15 @@ describe('CampaignComposer', () => {
     expect(wrapper.find('button[type="submit"]').attributes('disabled')).toBeDefined()
   })
 
+  it('has a back button to the list beside the title', async () => {
+    const { wrapper } = await mountComposer('/campaigns/new')
+
+    const back = wrapper.find('a[aria-label="Back to campaigns"]')
+
+    expect(back.attributes('href')).toBe('/campaigns')
+    expect(back.element.nextElementSibling?.tagName).toBe('H2')
+  })
+
   it('counts an emoji family as one character', async () => {
     const { wrapper } = await mountComposer('/campaigns/new')
 

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Delivery\DeliveryErrorCode;
 use App\Delivery\RetryPolicy;
 use App\Delivery\SendResult;
 
@@ -72,6 +73,7 @@ it('gives up after the fifth failed attempt', function (string $kind): void {
     expect($fourth->shouldRetry())->toBeTrue()
         ->and($fifth->shouldRetry())->toBeFalse()
         ->and($fifth->delayMilliseconds)->toBeNull()
+        ->and($fifth->errorCode)->toBe(DeliveryErrorCode::RetriesExhausted)
         ->and($fifth->reason)->toContain('5 attempts');
 })->with(['transient' => ['transient'], 'rate limited' => ['rate']]);
 
@@ -79,6 +81,7 @@ it('never retries a permanent failure', function (): void {
     $decision = retryPolicyPicking()->decide(SendResult::permanent('Provider answered 400: bad recipient'), 1);
 
     expect($decision->shouldRetry())->toBeFalse()
+        ->and($decision->errorCode)->toBe(DeliveryErrorCode::ProviderRejected)
         ->and($decision->reason)->toContain('bad recipient');
 });
 

@@ -42,7 +42,7 @@ final readonly class RetryPolicy
     {
         return match ($result->outcome) {
             SendOutcome::Sent => throw new InvalidArgumentException('A sent message needs no retry decision; decide() takes a failed result.'),
-            SendOutcome::Permanent => RetryDecision::giveUp('The provider refused the message for good: '.$result->reason),
+            SendOutcome::Permanent => RetryDecision::giveUp(DeliveryErrorCode::ProviderRejected, 'The provider refused the message for good: '.$result->reason),
             SendOutcome::RateLimited, SendOutcome::Transient => $this->retryOrGiveUp($result, $finishedAttempts),
         };
     }
@@ -50,7 +50,7 @@ final readonly class RetryPolicy
     private function retryOrGiveUp(SendResult $result, int $finishedAttempts): RetryDecision
     {
         if ($finishedAttempts >= $this->maxAttempts) {
-            return RetryDecision::giveUp("Gave up after {$finishedAttempts} attempts: {$result->reason}");
+            return RetryDecision::giveUp(DeliveryErrorCode::RetriesExhausted, "Gave up after {$finishedAttempts} attempts: {$result->reason}");
         }
 
         $backoff = $this->backoffMilliseconds($finishedAttempts);

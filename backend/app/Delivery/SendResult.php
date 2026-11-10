@@ -11,6 +11,7 @@ final readonly class SendResult
         public ?int $retryAfterSeconds = null,
         public ?string $reason = null,
         public ?string $providerMessageId = null,
+        public ?DeliveryErrorCode $errorCode = null,
     ) {}
 
     public static function sent(string $providerMessageId): self
@@ -23,16 +24,17 @@ final readonly class SendResult
      */
     public static function rateLimited(?int $retryAfterSeconds, string $reason): self
     {
-        return new self(SendOutcome::RateLimited, $retryAfterSeconds, $reason);
+        return new self(SendOutcome::RateLimited, $retryAfterSeconds, $reason, errorCode: DeliveryErrorCode::ProviderBusy);
     }
 
-    public static function transient(string $reason): self
+    /** @param  DeliveryErrorCode  $errorCode  what the dashboard tells the marketer; a server error unless the provider was not reached */
+    public static function transient(string $reason, DeliveryErrorCode $errorCode = DeliveryErrorCode::ProviderError): self
     {
-        return new self(SendOutcome::Transient, reason: $reason);
+        return new self(SendOutcome::Transient, reason: $reason, errorCode: $errorCode);
     }
 
     public static function permanent(string $reason): self
     {
-        return new self(SendOutcome::Permanent, reason: $reason);
+        return new self(SendOutcome::Permanent, reason: $reason, errorCode: DeliveryErrorCode::ProviderRejected);
     }
 }

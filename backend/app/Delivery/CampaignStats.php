@@ -109,12 +109,13 @@ class CampaignStats
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
             ->limit(self::RECENT_ERROR_LIMIT)
-            ->get(['id', 'channel', 'status', 'attempts', 'last_error', 'updated_at'])
+            ->get(['id', 'channel', 'status', 'attempts', 'last_error', 'last_error_code', 'updated_at'])
             ->map(fn (Delivery $delivery): array => [
                 'delivery_id' => $delivery->id,
                 'channel' => $delivery->channel->value,
                 'status' => $delivery->status->value,
                 'attempts' => $delivery->attempts,
+                'code' => $delivery->last_error_code?->value,
                 // Provider error bodies can echo the rejected recipient; the API must not hand it out.
                 'error' => SensitiveText::mask((string) $delivery->last_error),
                 'at' => $delivery->updated_at,

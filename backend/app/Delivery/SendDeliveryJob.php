@@ -63,7 +63,7 @@ class SendDeliveryJob implements ShouldQueue
             return;
         }
 
-        $delivery->markFailed("The send job failed after repeated errors: {$exception->getMessage()}");
+        $delivery->markFailed(DeliveryErrorCode::Internal, "The send job failed after repeated errors: {$exception->getMessage()}");
         $this->saveAndLog($delivery);
         Campaign::completeIfFinished($delivery->campaign_id);
     }
@@ -111,7 +111,7 @@ class SendDeliveryJob implements ShouldQueue
 
         // Opt-in is checked again here because consent may have been withdrawn since the audience was frozen.
         if (! $customer->canReceive($delivery->channel)) {
-            $delivery->skip("The customer can no longer receive {$delivery->channel->value} messages (consent withdrawn or no address).");
+            $delivery->skip(DeliveryErrorCode::ConsentWithdrawn, "The customer can no longer receive {$delivery->channel->value} messages (consent withdrawn or no address).");
             $this->saveAndLog($delivery);
 
             return;
@@ -122,7 +122,7 @@ class SendDeliveryJob implements ShouldQueue
             ->where('channel', $delivery->channel->value)
             ->first();
         if ($message === null) {
-            $delivery->markFailed("The campaign has no {$delivery->channel->value} message to send.");
+            $delivery->markFailed(DeliveryErrorCode::ContentInvalid, "The campaign has no {$delivery->channel->value} message to send.");
             $this->saveAndLog($delivery);
 
             return;
@@ -131,7 +131,7 @@ class SendDeliveryJob implements ShouldQueue
         $payload = $this->renderPayload($message, $customer, $renderer);
         $lengthProblem = $this->lengthProblem($delivery->channel, $payload, $renderer);
         if ($lengthProblem !== null) {
-            $delivery->markFailed($lengthProblem);
+            $delivery->markFailed(DeliveryErrorCode::ContentInvalid, $lengthProblem);
             $this->saveAndLog($delivery);
 
             return;
@@ -271,14 +271,14 @@ class SendDeliveryJob implements ShouldQueue
         $decision = $retryPolicy->decide($result, $delivery->attempts + 1);
 
         if (! $decision->shouldRetry()) {
-            $delivery->markFailed((string) $decision->reason);
+            $delivery->markFailed($decision->errorCode ?? DeliveryErrorCode::Internal, (string) $decision->reason);
             $this->saveAndLog($delivery);
 
             return;
         }
 
         $delay = (int) $decision->delayMilliseconds;
-        $delivery->scheduleRetry(now()->addMilliseconds($delay), (string) $result->reason);
+        $delivery->scheduleRetry(now()->addMilliseconds($delay), $result->errorCode ?? DeliveryErrorCode::Internal, (string) $result->reason);
         $this->saveAndLog($delivery);
 
         $this->release((int) ceil($delay / self::MILLISECONDS_PER_SECOND));

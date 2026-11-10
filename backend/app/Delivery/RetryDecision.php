@@ -8,17 +8,18 @@ final readonly class RetryDecision
 {
     private function __construct(
         public ?int $delayMilliseconds,
+        public ?DeliveryErrorCode $errorCode,
         public ?string $reason,
     ) {}
 
     public static function retryIn(int $delayMilliseconds): self
     {
-        return new self($delayMilliseconds, null);
+        return new self($delayMilliseconds, null, null);
     }
 
-    public static function giveUp(string $reason): self
+    public static function giveUp(DeliveryErrorCode $errorCode, string $reason): self
     {
-        return new self(null, $reason);
+        return new self(null, $errorCode, $reason);
     }
 
     public function shouldRetry(): bool

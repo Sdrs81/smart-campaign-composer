@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Delivery\ChannelRateLimiter;
+use App\Delivery\DeliveryErrorCode;
 use App\Delivery\MessageProvider;
 use App\Delivery\RetryPolicy;
 use App\Delivery\SendDeliveryJob;
@@ -119,7 +120,8 @@ it('retries a transient failure and then succeeds with the same key', function (
         ->and($afterFirst->attempts)->toBe(1)
         ->and($afterFirst->claimed_at)->toBeNull()
         ->and($afterFirst->next_attempt_at)->not->toBeNull()
-        ->and($afterFirst->last_error)->toContain('500');
+        ->and($afterFirst->last_error)->toContain('500')
+        ->and($afterFirst->last_error_code)->toBe(DeliveryErrorCode::ProviderError);
     $first->assertReleased(delay: 1);
 
     // The queue runs the released job after its delay, by which time the retry is due.
@@ -142,7 +144,8 @@ it('marks a permanent failure as failed without a retry', function (): void {
     $stored = $delivery->fresh();
     expect($stored->status)->toBe(DeliveryStatus::Failed)
         ->and($stored->attempts)->toBe(1)
-        ->and($stored->last_error)->toContain('bad recipient');
+        ->and($stored->last_error)->toContain('bad recipient')
+        ->and($stored->last_error_code)->toBe(DeliveryErrorCode::ProviderRejected);
     $job->assertNotReleased();
 });
 
@@ -154,6 +157,7 @@ it('waits at least Retry-After after a 429', function (): void {
 
     $stored = $delivery->fresh();
     expect($stored->status)->toBe(DeliveryStatus::Pending)
+        ->and($stored->last_error_code)->toBe(DeliveryErrorCode::ProviderBusy)
         ->and($stored->next_attempt_at->getTimestamp() - now()->getTimestamp())->toBeGreaterThanOrEqual(2);
     $job->assertReleased(delay: 3);
 });
@@ -168,7 +172,8 @@ it('fails the delivery once the retry policy gives up', function (): void {
     $stored = $delivery->fresh();
     expect($stored->status)->toBe(DeliveryStatus::Failed)
         ->and($stored->attempts)->toBe(5)
-        ->and($stored->last_error)->toContain('5 attempts');
+        ->and($stored->last_error)->toContain('5 attempts')
+        ->and($stored->last_error_code)->toBe(DeliveryErrorCode::RetriesExhausted);
     $job->assertNotReleased();
 });
 
@@ -227,7 +232,8 @@ it('skips a delivery whose consent was withdrawn after the audience was frozen',
     expect($provider->calls)->toBeEmpty()
         ->and($stored->status)->toBe(DeliveryStatus::Skipped)
         ->and($stored->attempts)->toBe(0)
-        ->and($stored->last_error)->toContain('no longer receive');
+        ->and($stored->last_error)->toContain('no longer receive')
+        ->and($stored->last_error_code)->toBe(DeliveryErrorCode::ConsentWithdrawn);
 });
 
 it('fails without calling the provider when the rendered text is too long', function (): void {
@@ -239,7 +245,21 @@ it('fails without calling the provider when the rendered text is too long', func
     $stored = $delivery->fresh();
     expect($provider->calls)->toBeEmpty()
         ->and($stored->status)->toBe(DeliveryStatus::Failed)
-        ->and($stored->last_error)->toContain('limit is 160');
+        ->and($stored->last_error)->toContain('limit is 160')
+        ->and($stored->last_error_code)->toBe(DeliveryErrorCode::ContentInvalid);
+});
+
+it('fails without calling the provider when the campaign has no message for the channel', function (): void {
+    $provider = useProvider([SendResult::sent('msg-1')]);
+    $delivery = pendingDelivery();
+    CampaignMessage::query()->where('campaign_id', $delivery->campaign_id)->delete();
+
+    runJob($delivery);
+
+    $stored = $delivery->fresh();
+    expect($provider->calls)->toBeEmpty()
+        ->and($stored->status)->toBe(DeliveryStatus::Failed)
+        ->and($stored->last_error_code)->toBe(DeliveryErrorCode::ContentInvalid);
 });
 
 it('gives the claim back and tries again later when the channel stays saturated', function (): void {
@@ -294,6 +314,7 @@ it('fails the delivery and finishes the campaign when the job gives up on a stal
     $stored = $delivery->fresh();
     expect($stored->status)->toBe(DeliveryStatus::Failed)
         ->and($stored->last_error)->toContain('connection reset')
+        ->and($stored->last_error_code)->toBe(DeliveryErrorCode::Internal)
         ->and(Campaign::find($delivery->campaign_id)->status->value)->toBe('completed');
 });
 

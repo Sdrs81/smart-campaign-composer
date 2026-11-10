@@ -5,6 +5,9 @@ export const en = {
   language: {
     switchTo: 'Switch language to {language}',
   },
+  nav: {
+    back: 'Back to campaigns',
+  },
   status: {
     draft: 'Draft',
     audience_ready: 'Audience ready',
@@ -132,7 +135,26 @@ export const en = {
     status: 'Status',
     attempts: 'Attempts',
     error: 'Error',
-    back: 'Back to campaigns',
+    technicalDetail: 'Technical detail',
+  },
+  deliveryError: {
+    consent_withdrawn:
+      'The customer withdrew consent for this channel after the audience was fixed, so nothing was sent.',
+    provider_unreachable:
+      'The delivery service could not be reached or did not respond in time. Failed attempts are retried automatically.',
+    provider_busy:
+      'The delivery service was handling too many messages and asked us to slow down. Failed attempts are retried automatically after a short wait.',
+    provider_error:
+      'The delivery service had an internal error while receiving this message. Failed attempts are retried automatically.',
+    retries_exhausted:
+      'The delivery service stayed unavailable after several attempts, so this message was not sent.',
+    provider_rejected:
+      'The delivery service refused this message, for example because of an invalid number or address.',
+    content_invalid:
+      'The message could not be sent because its text is missing or too long for the channel.',
+    internal:
+      'An unexpected error in our system stopped this message, so it was not sent. The software team needs to look into it.',
+    unknown: 'There was a problem while sending this message.',
   },
   progress: {
     sent: 'Sent',
