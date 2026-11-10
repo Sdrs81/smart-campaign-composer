@@ -8,6 +8,7 @@ use App\Llm\LlmRequest;
 use App\Llm\LlmResponse;
 use App\Llm\LlmUsage;
 use App\Segment\SegmentRule;
+use Closure;
 use LogicException;
 
 /**
@@ -40,8 +41,11 @@ final class DevScenarios
     /** @var list<Scenario>|null */
     private ?array $scenarios = null;
 
-    /** @param  BriefReader|null  $reader  adds the filters the brief states itself (city, age, ...); without it the scenario's own rule is used */
-    public function __construct(private readonly ?BriefReader $reader = null) {}
+    /**
+     * @param  BriefReader|null  $reader  adds the filters the brief states itself (city, age, ...); without it the scenario's own rule is used
+     * @param  Closure(string): int|null  $contentRun  counts content requests per brief key (1 for the first); without it every request gets the first variant
+     */
+    public function __construct(private readonly ?BriefReader $reader = null, private readonly ?Closure $contentRun = null) {}
 
     public function respond(LlmRequest $request): LlmResponse
     {
@@ -49,7 +53,9 @@ final class DevScenarios
         $scenario = $this->scenarioFor($brief);
         $answer = match ($request->purpose) {
             'segment' => $this->segmentFor($scenario, $brief),
-            'content' => $this->contentVariant($brief),
+            // "Generate again" sends the same brief, so the run number steps through the variants; the audience
+            // and the %OFFER% facts come from the brief alone and stay the same.
+            'content' => $this->contentVariant($brief, $this->contentRun === null ? 0 : ($this->contentRun)(sha1($brief)) - 1),
             default => throw new LogicException("DevScenarios has no answer for purpose '{$request->purpose}'; supported: segment, content."),
         };
         $text = json_encode($answer, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

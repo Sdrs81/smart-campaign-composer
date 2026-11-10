@@ -214,6 +214,63 @@ it('lays the filters the brief states over the scenario rule', function (): void
         ->and($segment('Yaz duyurusu hazırla')['rule']['conditions'][0]['field'])->toBe('registered_at');
 });
 
+/** A run counter like the cache one in the app, but in memory. */
+function devRunCounter(): Closure
+{
+    $runs = [];
+
+    return function (string $key) use (&$runs): int {
+        $runs[$key] = ($runs[$key] ?? 0) + 1;
+
+        return $runs[$key];
+    };
+}
+
+it('steps through the variants on every request for the same brief and wraps around', function (): void {
+    $scenarios = new DevScenarios(new BriefReader(devRegistry()), devRunCounter());
+    $brief = "İstanbul'daki müşterilere sepet hatırlatması";
+    $variants = array_map(fn (int $number): array => (new DevScenarios(new BriefReader(devRegistry())))->contentVariant($brief, $number), [0, 1, 2]);
+    $ask = fn (): array => json_decode($scenarios->respond(devRequest('content', $brief))->text, true, flags: JSON_THROW_ON_ERROR);
+
+    $answers = [$ask(), $ask(), $ask(), $ask()];
+
+    expect($answers[0])->toBe($variants[0])
+        ->and($answers[1])->toBe($variants[1])
+        ->and($answers[2])->toBe($variants[2])
+        ->and($answers[3])->toBe($variants[0])
+        ->and($answers[0]['sms']['body'])->not->toBe($answers[1]['sms']['body'])
+        ->and($answers[1]['sms']['body'])->not->toBe($answers[2]['sms']['body']);
+});
+
+it('keeps the audience and the facts the same while the text changes', function (): void {
+    $registry = new FieldRegistry(fn (): array => ['Ankara', 'İstanbul', 'İzmir', 'Bursa']);
+    $scenarios = new DevScenarios(new BriefReader($registry), devRunCounter());
+    $brief = "İstanbul'daki 25 yaş altı erkeklere %20 indirim kampanyası";
+    $rule = fn (): array => json_decode($scenarios->respond(devRequest('segment', $brief))->text, true, flags: JSON_THROW_ON_ERROR)['rule'];
+    $firstRule = $rule();
+
+    foreach (range(1, 6) as $run) {
+        $content = json_decode($scenarios->respond(devRequest('content', $brief))->text, true, flags: JSON_THROW_ON_ERROR);
+        $text = $content['sms']['body'].$content['email']['subject'].$content['email']['body'];
+
+        expect($text)->toContain('İstanbul')->toContain('%20')
+            ->and($text)->not->toContain('Ankara')->not->toContain('İzmir')->not->toContain('Bursa')
+            ->and($rule())->toBe($firstRule);
+    }
+});
+
+it('counts runs per brief, so a different brief starts again from the first variant', function (): void {
+    $scenarios = new DevScenarios(new BriefReader(devRegistry()), devRunCounter());
+    $text = fn (string $brief): string => $scenarios->respond(devRequest('content', $brief))->text;
+
+    $text('Sepeti terk edenler');
+    $second = $text('Sepeti terk edenler');
+    $otherFirst = $text('Sepeti terk eden başka müşteriler');
+
+    expect($otherFirst)->not->toBe($second)
+        ->and($otherFirst)->toBe((new DevScenarios(new BriefReader(devRegistry())))->respond(devRequest('content', 'Sepeti terk eden başka müşteriler'))->text);
+});
+
 it('answers a content request with sms and email text', function (): void {
     $answer = json_decode((new DevScenarios)->respond(devRequest('content', DEV_CART_BRIEF))->text, true, flags: JSON_THROW_ON_ERROR);
 

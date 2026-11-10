@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 use App\Enums\CampaignStatus;
+use App\Enums\Channel;
 use App\Enums\MessageSource;
 use App\Llm\Exceptions\LlmUnavailable;
 use App\Llm\FakeLlmClient;
 use App\Llm\LlmClient;
 use App\Models\Campaign;
+use App\Models\CampaignMessage;
 use App\Segment\AudienceSummary;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Sleep;
 use Illuminate\Testing\TestResponse;
 
 uses(RefreshDatabase::class);
@@ -56,6 +59,20 @@ function sseEvents(TestResponse $response): array
 
     return $events;
 }
+
+it('writes a different text when the content is generated again, with the dev scenarios on', function (): void {
+    config(['llm.fake.dev_scenarios' => true]);
+    Sleep::fake();
+    $campaign = audienceReadyCampaign();
+    $smsBody = fn (): ?string => CampaignMessage::query()->where('campaign_id', $campaign->id)->where('channel', Channel::Sms)->value('body');
+
+    $this->postJson("/api/campaigns/{$campaign->id}/content/stream")->assertOk()->streamedContent();
+    $first = $smsBody();
+    $this->postJson("/api/campaigns/{$campaign->id}/content/stream")->assertOk()->streamedContent();
+    $second = $smsBody();
+
+    expect($first)->not->toBeNull()->and($second)->not->toBeNull()->and($second)->not->toBe($first);
+});
 
 it('streams deltas then a final event and stores the two generated messages', function (): void {
     contentFake()->enqueue(contentAnswer());
