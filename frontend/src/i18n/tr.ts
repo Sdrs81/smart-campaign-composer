@@ -140,11 +140,11 @@ export const tr: typeof en = {
     consent_withdrawn:
       'Müşteri, kitle belirlendikten sonra bu kanal için iznini geri çekti; bu yüzden mesaj gönderilmedi.',
     provider_unreachable:
-      'Gönderim servisi zamanında yanıt vermedi, bu yüzden ulaşılamadı. Sistem mesajı otomatik olarak yeniden dener.',
+      'Gönderim servisine ulaşılamadı ya da servis zamanında yanıt vermedi. Başarısız denemeler otomatik olarak tekrarlanır.',
     provider_busy:
-      'Gönderim servisi çok fazla mesajla ilgileniyordu ve yavaşlamamızı istedi. Sistem kısa bir süre bekleyip yeniden dener.',
+      'Gönderim servisi çok fazla mesajla ilgileniyordu ve yavaşlamamızı istedi. Başarısız denemeler kısa bir bekleyişten sonra otomatik olarak tekrarlanır.',
     provider_error:
-      'Gönderim servisi bu mesajı alırken kendi içinde bir hata verdi. Sistem otomatik olarak yeniden dener.',
+      'Gönderim servisi bu mesajı alırken kendi içinde bir hata verdi. Başarısız denemeler otomatik olarak tekrarlanır.',
     retries_exhausted:
       'Gönderim servisine birkaç denemeden sonra da ulaşılamadı, bu yüzden mesaj gönderilemedi.',
     provider_rejected:
@@ -152,7 +152,7 @@ export const tr: typeof en = {
     content_invalid: 'Mesaj gönderilemedi: metni eksik ya da bu kanal için fazla uzun.',
     internal:
       'Sistemimizde beklenmeyen bir hata oluştu ve mesaj gönderilemedi. Yazılım ekibinin incelemesi gerekiyor.',
-    unknown: 'Bu mesaj teslim edilemedi.',
+    unknown: 'Bu mesaj gönderilirken bir sorun oluştu.',
   },
   progress: {
     sent: 'Gönderildi',

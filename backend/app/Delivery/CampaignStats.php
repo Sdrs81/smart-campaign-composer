@@ -115,8 +115,8 @@ class CampaignStats
                 'channel' => $delivery->channel->value,
                 'status' => $delivery->status->value,
                 'attempts' => $delivery->attempts,
-                // Provider error bodies can echo the rejected recipient; the API must not hand it out.
                 'code' => $delivery->last_error_code?->value,
+                // Provider error bodies can echo the rejected recipient; the API must not hand it out.
                 'error' => SensitiveText::mask((string) $delivery->last_error),
                 'at' => $delivery->updated_at,
             ])
