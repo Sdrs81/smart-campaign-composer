@@ -50,6 +50,35 @@ async function providerRequest(method, path) {
   return JSON.parse(await compose("exec", "-T", "app", "php", "-r", code));
 }
 
+// The sender's own peak is what proves the limit (K17): the provider's peak is capped by its own limit, so it
+// would look fine even if we sent too fast. It lives in Redis across runs, so it is cleared with the provider stats.
+async function resetSenderPeak() {
+  await compose(
+    "exec",
+    "-T",
+    "redis",
+    "sh",
+    "-c",
+    "redis-cli --scan --pattern '*send:peak:*' | xargs -r redis-cli del",
+  );
+}
+
+// NaN when the metric is missing, which fails the check instead of passing silently.
+async function senderPeaks() {
+  const text = await (await fetch(`${BASE_URL}/api/metrics`)).text();
+  return Object.fromEntries(
+    CHANNELS.map((channel) => [
+      channel,
+      Number(
+        new RegExp(
+          `^send_peak_per_second\\{channel="${channel}"\\} (\\d+)$`,
+          "m",
+        ).exec(text)?.[1],
+      ),
+    ]),
+  );
+}
+
 async function query(sql) {
   const stdout = await compose(
     "exec",
@@ -153,7 +182,7 @@ async function waitForCompletion(campaignId, startedAt) {
 }
 
 // Every check returns [name, passed, detail]; the report prints them all before the exit code decides.
-function check(audience, counts, provider) {
+function check(audience, counts, provider, senderPeak) {
   const checks = [];
   for (const channel of CHANNELS) {
     const c = counts[channel];
@@ -179,9 +208,9 @@ function check(audience, counts, provider) {
       `sent ${c.sent}, provider ${p.total}`,
     ]);
     checks.push([
-      `${channel}: peak per second <= ${RATE_LIMIT_PER_SECOND}`,
-      p.peak_per_second <= RATE_LIMIT_PER_SECOND,
-      `peak ${p.peak_per_second}`,
+      `${channel}: sender peak per second <= ${RATE_LIMIT_PER_SECOND}`,
+      senderPeak[channel] <= RATE_LIMIT_PER_SECOND,
+      `sender peak ${senderPeak[channel]}, provider peak ${p.peak_per_second} (info only)`,
     ]);
   }
   const retries = CHANNELS.reduce(
@@ -201,16 +230,17 @@ function check(audience, counts, provider) {
   return checks;
 }
 
-function printReport(audience, counts, provider, seconds, checks) {
+function printReport(audience, counts, provider, senderPeak, seconds, checks) {
   console.log(`\nCompleted in ${seconds}s\n`);
   console.log(
-    "channel  audience  sent  failed  skipped  attempts  provider total  duplicates prevented  peak/s",
+    "channel  audience  sent  failed  skipped  attempts  provider total  duplicates prevented  sender peak/s  provider peak/s  rate_limited (limit/injected)",
   );
   for (const channel of CHANNELS) {
     const c = counts[channel];
     const p = provider[channel];
+    const limited = `${p.rate_limited.limit}/${p.rate_limited.injected}`;
     console.log(
-      `${channel.padEnd(7)}  ${String(audience[channel]).padStart(8)}  ${String(c.sent).padStart(4)}  ${String(c.failed).padStart(6)}  ${String(c.skipped).padStart(7)}  ${String(c.attempts).padStart(8)}  ${String(p.total).padStart(14)}  ${String(p.duplicates_prevented).padStart(20)}  ${String(p.peak_per_second).padStart(6)}`,
+      `${channel.padEnd(7)}  ${String(audience[channel]).padStart(8)}  ${String(c.sent).padStart(4)}  ${String(c.failed).padStart(6)}  ${String(c.skipped).padStart(7)}  ${String(c.attempts).padStart(8)}  ${String(p.total).padStart(14)}  ${String(p.duplicates_prevented).padStart(20)}  ${String(senderPeak[channel]).padStart(13)}  ${String(p.peak_per_second).padStart(15)}  ${limited.padStart(29)}`,
     );
   }
   console.log("");
@@ -229,6 +259,7 @@ async function main() {
 
   // Start from zero so the provider's totals belong to this run only.
   await providerRequest("DELETE", "/stats");
+  await resetSenderPeak();
 
   const startedAt = Date.now();
   const campaign = await api("POST", "/campaigns", { brief: BRIEF });
@@ -249,11 +280,13 @@ async function main() {
 
   const counts = await deliveryCounts(campaign.id);
   const provider = await providerRequest("GET", "/stats");
-  const checks = check(audience, counts, provider);
+  const senderPeak = await senderPeaks();
+  const checks = check(audience, counts, provider, senderPeak);
   printReport(
     audience,
     counts,
     provider,
+    senderPeak,
     Math.round((Date.now() - startedAt) / 1000),
     checks,
   );

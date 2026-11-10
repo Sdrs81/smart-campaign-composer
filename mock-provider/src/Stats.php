@@ -47,8 +47,14 @@ final class Stats
         $this->redis->incr(self::PREFIX.$channel->value.':duplicates');
     }
 
+    /** A 429 is either the provider's own limit (the sender's limiter failed) or an injected fault (expected noise). */
+    public function recordRateLimited(Channel $channel, RateLimitCause $cause): void
+    {
+        $this->redis->incr(self::PREFIX.$channel->value.':rate_limited:'.$cause->value);
+    }
+
     /**
-     * @return array<string, array{total: int, duplicates_prevented: int, peak_per_second: int}>
+     * @return array<string, array{total: int, duplicates_prevented: int, peak_per_second: int, rate_limited: array{limit: int, injected: int}}>
      */
     public function snapshot(): array
     {
@@ -58,6 +64,10 @@ final class Stats
                 'total' => $this->counter($channel, 'total'),
                 'duplicates_prevented' => $this->counter($channel, 'duplicates'),
                 'peak_per_second' => $this->counter($channel, 'peak'),
+                'rate_limited' => [
+                    'limit' => $this->counter($channel, 'rate_limited:'.RateLimitCause::Limit->value),
+                    'injected' => $this->counter($channel, 'rate_limited:'.RateLimitCause::Injected->value),
+                ],
             ];
         }
 
