@@ -58,6 +58,10 @@ export const useCampaignStore = defineStore('campaign', () => {
   // True only between creating a campaign here and the page that opens it: that copy is newer than a
   // refetch and carries the extraction error. Every later visit must fetch, or it shows a stale copy.
   let adoptHeldCopy = false
+  // The campaign whose first content should start by itself (K26): set when an extraction succeeds on a
+  // campaign without messages, spent by ContentStream when it starts. Kept in the store, not the
+  // component, because a new campaign changes page between the extraction and the stream.
+  const autoGenerateFor = ref<number | null>(null)
 
   async function loadRules(): Promise<void> {
     if (rules.value) return
@@ -74,6 +78,8 @@ export const useCampaignStore = defineStore('campaign', () => {
       return
     }
     adoptHeldCopy = false
+    // A reload or another campaign never starts generation on its own.
+    autoGenerateFor.value = null
 
     loadingCurrent?.abort()
     const controller = new AbortController()
@@ -143,6 +149,11 @@ export const useCampaignStore = defineStore('campaign', () => {
     current.value = null
     composeError.value = null
     adoptHeldCopy = false
+    autoGenerateFor.value = null
+  }
+
+  function clearAutoGenerate(): void {
+    autoGenerateFor.value = null
   }
 
   /** Runs the audience extraction for the held campaign. A failure is kept in `composeError`, the campaign stays. */
@@ -151,8 +162,14 @@ export const useCampaignStore = defineStore('campaign', () => {
     if (!campaign) return
     composing.value = true
     composeError.value = null
+    autoGenerateFor.value = null
     try {
-      current.value = await api.defineAudience(campaign.id)
+      const extracted = await api.defineAudience(campaign.id)
+      current.value = extracted
+      // Existing text is never replaced without a click on "Generate again".
+      if (extracted.status === 'audience_ready' && (extracted.messages?.length ?? 0) === 0) {
+        autoGenerateFor.value = extracted.id
+      }
     } catch (failure) {
       composeError.value = toApiError(failure)
     } finally {
@@ -196,6 +213,8 @@ export const useCampaignStore = defineStore('campaign', () => {
     approveCurrent,
     clearApprovalError,
     leaveCurrent,
+    autoGenerateFor,
+    clearAutoGenerate,
     startNew,
     extractAudience,
     createAndExtract,

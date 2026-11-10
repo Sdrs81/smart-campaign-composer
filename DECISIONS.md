@@ -157,6 +157,12 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** The user is a marketer, and a provider response such as `Provider answered 500: ...` means nothing to them, while the raw text is exactly what a developer needs. A code set by the code that knows the cause is more robust than guessing the cause from English text, and the set is closed, so the frontend can translate every value and a test can check it.
 - **Alternatives:** Classifying the raw text with regular expressions in the frontend (breaks when a message is reworded); translating on the backend from an `Accept-Language` header (K23 rejected this; the dashboard stream would depend on the request); explaining errors from the delivery status alone (cannot tell a rejected number from an exhausted retry).
 
+## K26: The first content starts by itself after the first audience
+
+- **Decision:** When an audience extraction succeeds on a campaign that has no messages yet, the content stream starts without a click. The campaign store keeps a one-shot marker (`autoGenerateFor`); `ContentStream` spends it on mount and begins the same POST stream as the button (K12). A page reload, opening another campaign, a failed extraction (422/503) and a campaign that already has text never start generation; "Generate again" is unchanged. The backend does not change.
+- **Rationale:** One click less in the main flow. The marker lives in the store because a new campaign changes page between the extraction and the stream. Existing text is never overwritten silently.
+- **Alternatives:** A backend job started by the audience endpoint (needs a new state and a way to show its progress); generating after every extraction (replaces edited text); a component-local flag (lost on the page change).
+
 ## Setup notes (Phase 2)
 
 - **API only:** no web routes, views or Vite in the backend; errors share one `{error:{code,message,details}}` body.

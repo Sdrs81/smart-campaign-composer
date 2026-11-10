@@ -110,12 +110,15 @@ describe('CampaignComposer', () => {
   it('creates the campaign, extracts the audience and shows chips and counts', async () => {
     const create = vi.spyOn(api, 'createCampaign').mockResolvedValue(campaign())
     const extract = vi.spyOn(api, 'defineAudience').mockResolvedValue(EXTRACTED)
+    const stream = vi.spyOn(api, 'streamContent').mockReturnValue(new Promise(() => undefined))
     const { wrapper, router } = await mountComposer('/campaigns/new')
 
     await submitBrief(wrapper)
 
     expect(create).toHaveBeenCalledWith(BRIEF)
     expect(extract).toHaveBeenCalledWith(5)
+    // The "new" page is replaced right after this, so the stream must start on the campaign page (K26).
+    expect(stream).not.toHaveBeenCalled()
     expect(router.currentRoute.value.name).toBe('campaign')
     const chips = wrapper.findAll('ul[aria-label="Rule"] li').map((chip) => chip.text())
     expect(chips).toEqual([
@@ -143,6 +146,8 @@ describe('CampaignComposer', () => {
         ),
       )
       .mockResolvedValueOnce(EXTRACTED)
+    // Still streaming: ending without a final event would show the "stream ended" alert.
+    const stream = vi.spyOn(api, 'streamContent').mockReturnValue(new Promise(() => undefined))
     const { wrapper } = await mountComposer('/campaigns/new')
 
     await submitBrief(wrapper)
@@ -151,6 +156,8 @@ describe('CampaignComposer', () => {
     expect(alert.text()).toContain('could not be turned into a rule')
     expect(alert.text()).toContain('conditions[1].value: must be a number')
     expect(alert.text()).toContain('iPhone kullananlar')
+    // A failed extraction starts no generation.
+    expect(stream).not.toHaveBeenCalled()
 
     await wrapper.find('form').trigger('submit')
     await flushPromises()
@@ -173,6 +180,19 @@ describe('CampaignComposer', () => {
     expect(alert.text()).toContain('language model is unreachable')
     expect(alert.text()).toContain('try again')
     expect(wrapper.find('button[type="submit"]').text()).toBe('Extract audience')
+  })
+
+  it('starts the first content by itself after extracting on the campaign page, but not on a reload', async () => {
+    vi.spyOn(api, 'getCampaign').mockResolvedValue(campaign())
+    vi.spyOn(api, 'defineAudience').mockResolvedValue(EXTRACTED)
+    const stream = vi.spyOn(api, 'streamContent').mockReturnValue(new Promise(() => undefined))
+    const { wrapper } = await mountComposer('/campaigns/5')
+    expect(stream).not.toHaveBeenCalled()
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(stream).toHaveBeenCalledOnce()
   })
 
   it('shows a saved campaign read-only and hides the button once approved', async () => {

@@ -145,12 +145,18 @@ onBeforeRouteLeave(() => store.leaveCurrent())
       :segment="store.rules.segment"
     />
 
+    <!-- Not on the "new" page: it is replaced by the campaign page right after the extraction, which
+         would cancel a stream started here (K26). -->
     <ContentStream
       v-if="
-        campaign && (campaign.status === 'audience_ready' || campaign.status === 'content_ready')
+        campaign &&
+        !isNew &&
+        (campaign.status === 'audience_ready' || campaign.status === 'content_ready')
       "
       :key="campaign.id"
       :campaign="campaign"
+      :autostart="store.autoGenerateFor === campaign.id"
+      @started="store.clearAutoGenerate()"
       @completed="onContentGenerated"
     />
 

@@ -104,4 +104,63 @@ describe('campaign store', () => {
     expect(store.page).toBe(2)
     expect(store.error).toBeNull()
   })
+
+  describe('automatic first content (K26)', () => {
+    const MESSAGE = { channel: 'sms', subject: null, body: 'Kayıtlı SMS', source: 'llm' } as const
+
+    it('marks the campaign after its first successful extraction', async () => {
+      vi.spyOn(api, 'createCampaign').mockResolvedValue(campaign(5))
+      vi.spyOn(api, 'defineAudience').mockResolvedValue({
+        ...campaign(5),
+        status: 'audience_ready',
+      })
+      const store = useCampaignStore()
+
+      await store.createAndExtract('Sepeti terk edenlere indirim')
+
+      expect(store.autoGenerateFor).toBe(5)
+      store.clearAutoGenerate()
+      expect(store.autoGenerateFor).toBeNull()
+    })
+
+    it('does not mark a campaign that already has text', async () => {
+      vi.spyOn(api, 'getCampaign').mockResolvedValue(campaign(6))
+      vi.spyOn(api, 'defineAudience').mockResolvedValue({
+        ...campaign(6),
+        status: 'content_ready',
+        messages: [MESSAGE],
+      })
+      const store = useCampaignStore()
+      await store.loadCurrent(6)
+
+      await store.extractAudience()
+
+      expect(store.autoGenerateFor).toBeNull()
+    })
+
+    it('does not mark a failed extraction', async () => {
+      vi.spyOn(api, 'createCampaign').mockResolvedValue(campaign(7))
+      vi.spyOn(api, 'defineAudience').mockRejectedValue(new ApiError(422, 'invalid', 'No.'))
+      const store = useCampaignStore()
+
+      await store.createAndExtract('Sepeti terk edenlere indirim')
+
+      expect(store.autoGenerateFor).toBeNull()
+    })
+
+    it('forgets the mark when another campaign is opened', async () => {
+      vi.spyOn(api, 'createCampaign').mockResolvedValue(campaign(5))
+      vi.spyOn(api, 'defineAudience').mockResolvedValue({
+        ...campaign(5),
+        status: 'audience_ready',
+      })
+      vi.spyOn(api, 'getCampaign').mockResolvedValue(campaign(9))
+      const store = useCampaignStore()
+      await store.createAndExtract('Sepeti terk edenlere indirim')
+
+      await store.loadCurrent(9)
+
+      expect(store.autoGenerateFor).toBeNull()
+    })
+  })
 })

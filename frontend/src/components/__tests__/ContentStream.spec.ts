@@ -80,6 +80,24 @@ describe('ContentStream', () => {
     expect(wrapper.emitted('completed')).toHaveLength(1)
   })
 
+  it('starts by itself on autostart, once, and tells the page', async () => {
+    const stream = drive()
+    const wrapper = mount(ContentStream, { props: { campaign: CAMPAIGN, autostart: true } })
+    await flushPromises()
+
+    expect(api.streamContent).toHaveBeenCalledOnce()
+    expect(wrapper.emitted('started')).toHaveLength(1)
+    expect(wrapper.find('button').text()).toBe('Cancel')
+    stream.finish()
+  })
+
+  it('waits for a click without autostart', () => {
+    drive()
+    mount(ContentStream, { props: { campaign: CAMPAIGN } })
+
+    expect(api.streamContent).not.toHaveBeenCalled()
+  })
+
   it('cancels the stream and says nothing was saved', async () => {
     const stream = drive()
     const wrapper = mount(ContentStream, { props: { campaign: CAMPAIGN } })
