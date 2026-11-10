@@ -27,7 +27,7 @@ export const tr: typeof en = {
     failed: 'Başarısız',
     skipped: 'Atlandı',
   },
-  total: 'Toplam',
+  total: 'Toplam Kişi Sayısı',
   errors: {
     network: 'Sunucuya ulaşılamadı: {reason}',
   },

@@ -110,12 +110,16 @@ describe('CampaignComposer', () => {
   it('creates the campaign, extracts the audience and shows chips and counts', async () => {
     const create = vi.spyOn(api, 'createCampaign').mockResolvedValue(campaign())
     const extract = vi.spyOn(api, 'defineAudience').mockResolvedValue(EXTRACTED)
+    const stream = vi.spyOn(api, 'streamContent').mockReturnValue(new Promise(() => undefined))
     const { wrapper, router } = await mountComposer('/campaigns/new')
 
     await submitBrief(wrapper)
 
     expect(create).toHaveBeenCalledWith(BRIEF)
-    expect(extract).toHaveBeenCalledWith(5)
+    // A first extraction sends no brief: the campaign was just created from it.
+    expect(extract).toHaveBeenCalledWith(5, undefined)
+    // The "new" page is replaced right after this, so the stream must start on the campaign page (K26).
+    expect(stream).not.toHaveBeenCalled()
     expect(router.currentRoute.value.name).toBe('campaign')
     const chips = wrapper.findAll('ul[aria-label="Rule"] li').map((chip) => chip.text())
     expect(chips).toEqual([
@@ -143,6 +147,8 @@ describe('CampaignComposer', () => {
         ),
       )
       .mockResolvedValueOnce(EXTRACTED)
+    // Still streaming: ending without a final event would show the "stream ended" alert.
+    const stream = vi.spyOn(api, 'streamContent').mockReturnValue(new Promise(() => undefined))
     const { wrapper } = await mountComposer('/campaigns/new')
 
     await submitBrief(wrapper)
@@ -151,6 +157,8 @@ describe('CampaignComposer', () => {
     expect(alert.text()).toContain('could not be turned into a rule')
     expect(alert.text()).toContain('conditions[1].value: must be a number')
     expect(alert.text()).toContain('iPhone kullananlar')
+    // A failed extraction starts no generation.
+    expect(stream).not.toHaveBeenCalled()
 
     await wrapper.find('form').trigger('submit')
     await flushPromises()
@@ -173,6 +181,63 @@ describe('CampaignComposer', () => {
     expect(alert.text()).toContain('language model is unreachable')
     expect(alert.text()).toContain('try again')
     expect(wrapper.find('button[type="submit"]').text()).toBe('Extract audience')
+  })
+
+  it('starts the first content by itself after extracting on the campaign page, but not on a reload', async () => {
+    vi.spyOn(api, 'getCampaign').mockResolvedValue(campaign())
+    vi.spyOn(api, 'defineAudience').mockResolvedValue(EXTRACTED)
+    const stream = vi.spyOn(api, 'streamContent').mockReturnValue(new Promise(() => undefined))
+    const { wrapper } = await mountComposer('/campaigns/5')
+    expect(stream).not.toHaveBeenCalled()
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(stream).toHaveBeenCalledOnce()
+  })
+
+  it('lets the saved brief be edited, re-runs the extraction from it and writes the content again each time', async () => {
+    const editedBrief = 'Sepeti terk eden kadın müşterilere indirim gönder'
+    vi.spyOn(api, 'getCampaign').mockResolvedValue(EXTRACTED)
+    const extract = vi
+      .spyOn(api, 'defineAudience')
+      .mockResolvedValue({ ...EXTRACTED, brief: editedBrief })
+    const stream = vi.spyOn(api, 'streamContent').mockReturnValue(new Promise(() => undefined))
+    const { wrapper } = await mountComposer('/campaigns/5')
+    const textarea = () => wrapper.find('textarea')
+    expect(textarea().attributes('readonly')).toBeUndefined()
+    expect(textarea().element.value).toBe(BRIEF)
+
+    await textarea().setValue(editedBrief)
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(extract).toHaveBeenCalledExactlyOnceWith(5, editedBrief)
+    expect(stream).toHaveBeenCalledOnce()
+    expect(textarea().element.value).toBe(editedBrief)
+
+    // The content component is already on screen now; a second run must still write the text again.
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(extract).toHaveBeenCalledTimes(2)
+    expect(stream).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the edited text in the box when the re-run fails, and starts no content', async () => {
+    vi.spyOn(api, 'getCampaign').mockResolvedValue(EXTRACTED)
+    vi.spyOn(api, 'defineAudience').mockRejectedValue(
+      new ApiError(503, 'llm_unavailable', 'Model unreachable.'),
+    )
+    const stream = vi.spyOn(api, 'streamContent').mockReturnValue(new Promise(() => undefined))
+    const { wrapper } = await mountComposer('/campaigns/5')
+
+    await wrapper.find('textarea').setValue('Yeni bir kampanya özeti yazıyorum')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('textarea').element.value).toBe('Yeni bir kampanya özeti yazıyorum')
+    expect(stream).not.toHaveBeenCalled()
   })
 
   it('shows a saved campaign read-only and hides the button once approved', async () => {

@@ -15,13 +15,36 @@
         "unsupported_criteria": [],
         "explanation": "Brief belirli bir kitle belirtmediği için kayıtlı tüm müşteriler seçildi."
     },
-    "content": {
-        "sms": {
-            "body": "Merhaba {{first_name}}, sana özel yeni kampanyamızı kaçırma! Detaylar için bizi ziyaret et."
+    "content": [
+        {
+            "offer": "özel kampanya",
+            "sms": {
+                "body": "Merhaba {{first_name}}, sana özel yeni kampanyamızı kaçırma! %OFFER% seni bekliyor."
+            },
+            "email": {
+                "subject": "Sana özel yeni kampanya",
+                "body": "Merhaba {{first_name}},\n\nSana özel hazırladığımız yeni kampanya yayında: %OFFER% seni bekliyor. Detayları görmek için bizi ziyaret edebilirsin.\n\nKeyifli alışverişler dileriz."
+            }
         },
-        "email": {
-            "subject": "Sana özel yeni kampanya",
-            "body": "Merhaba {{first_name}},\n\nSana özel hazırladığımız yeni kampanya yayında. Detayları görmek için bizi ziyaret edebilirsin.\n\nKeyifli alışverişler dileriz."
+        {
+            "offer": "özel kampanya",
+            "sms": {
+                "body": "{{first_name}}, yeni kampanyamız başladı! %OFFER% için hemen göz at."
+            },
+            "email": {
+                "subject": "Yeni kampanyamız başladı",
+                "body": "Merhaba {{first_name}},\n\nYeni kampanyamız başladı. %OFFER% için sayfamıza göz atabilirsin.\n\nSevgiler."
+            }
+        },
+        {
+            "offer": "özel kampanya",
+            "sms": {
+                "body": "Merhaba {{first_name}}, bu fırsat uzun sürmeyecek: %OFFER% seni bekliyor."
+            },
+            "email": {
+                "subject": "Bu fırsat uzun sürmeyecek",
+                "body": "Merhaba {{first_name}},\n\nBu fırsat sınırlı süre geçerli: %OFFER% seni bekliyor. Detaylar için bizi ziyaret et.\n\nİyi alışverişler dileriz."
+            }
         }
-    }
+    ]
 }

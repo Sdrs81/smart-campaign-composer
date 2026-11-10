@@ -20,18 +20,24 @@ final class DefineCampaignAudience
         private readonly AudienceService $audience,
     ) {}
 
-    public function __invoke(Campaign $campaign): Campaign
+    /**
+     * @param  string|null  $brief  an edited brief to extract from; it is saved with the audience, and only when extraction succeeds, so the stored brief always matches the stored rule
+     */
+    public function __invoke(Campaign $campaign, ?string $brief = null): Campaign
     {
         // Refuse before the paid model call, not after it.
         $campaign->assertAudienceCanBeDefined();
 
-        $extraction = $this->extractor->extract($campaign->brief, Carbon::today());
+        $extraction = $this->extractor->extract($brief ?? $campaign->brief, Carbon::today());
         $summary = $this->audience->summarize($extraction->rule);
 
         // The model call took seconds; re-read under a lock so an approval made meanwhile is not overwritten.
-        return DB::transaction(function () use ($campaign, $extraction, $summary): Campaign {
+        return DB::transaction(function () use ($campaign, $brief, $extraction, $summary): Campaign {
             $locked = Campaign::query()->lockForUpdate()->findOrFail($campaign->id);
             $locked->defineAudience($extraction->rule->toArray(), $extraction->unsupported, $summary->toArray());
+            if ($brief !== null) {
+                $locked->brief = $brief;
+            }
             $locked->save();
             // The text was checked against the old audience's longest values, so it cannot stay as if still valid.
             $locked->messages()->delete();

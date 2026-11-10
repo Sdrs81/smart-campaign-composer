@@ -61,6 +61,40 @@ it('can be run again with a changed brief before approval', function (): void {
     $this->postJson("/api/campaigns/{$campaign->id}/audience")->assertOk();
 });
 
+it('extracts from an edited brief and saves that brief with the new audience', function (): void {
+    fakeLlm()->enqueue(femaleSegmentAnswer());
+    $campaign = draftCampaign();
+
+    $this->postJson("/api/campaigns/{$campaign->id}/audience", ['brief' => 'İstanbul\'daki 25 yaş altı kadınlar için kampanya'])
+        ->assertOk()
+        ->assertJsonPath('data.brief', 'İstanbul\'daki 25 yaş altı kadınlar için kampanya');
+
+    // The model was asked about the edited brief, not the saved one.
+    expect(fakeLlm()->requests()[0]->messages[0]['content'])->toContain('İstanbul\'daki 25 yaş altı kadınlar için kampanya')
+        ->and($campaign->fresh()->brief)->toBe('İstanbul\'daki 25 yaş altı kadınlar için kampanya');
+});
+
+it('keeps the saved brief when the extraction from an edited brief fails', function (): void {
+    fakeLlm()->enqueue('bu bir JSON değil', 'bu da değil', 'yine değil');
+    $campaign = draftCampaign();
+
+    $this->postJson("/api/campaigns/{$campaign->id}/audience", ['brief' => 'Tamamen farklı bir kampanya özeti'])->assertStatus(422);
+
+    expect($campaign->fresh()->brief)->toBe('Kadın müşterilerimize özel bir kampanya');
+});
+
+it('rejects an edited brief that is too short or too long, before any model call', function (): void {
+    $campaign = draftCampaign();
+
+    $this->postJson("/api/campaigns/{$campaign->id}/audience", ['brief' => 'kısa'])
+        ->assertStatus(422)
+        ->assertJsonPath('error.code', 'validation_failed')
+        ->assertJsonStructure(['error' => ['details' => ['errors' => ['brief']]]]);
+    $this->postJson("/api/campaigns/{$campaign->id}/audience", ['brief' => str_repeat('a', config('llm.brief.max_length') + 1)])->assertStatus(422);
+
+    expect(fakeLlm()->requests())->toBe([]);
+});
+
 it('drops the saved messages when the audience is defined again', function (): void {
     fakeLlm()->enqueue(femaleSegmentAnswer());
     $campaign = draftCampaign();

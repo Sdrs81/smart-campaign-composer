@@ -26,10 +26,12 @@ final class FieldRegistry
     {
         $this->register(
             $this->enum('city', 'Şehir', $cities),
-            $this->enum('gender', 'Cinsiyet', fn (): array => ['female', 'male']),
-            $this->enum('language', 'Dil', fn (): array => ['tr', 'en']),
+            $this->enum('gender', 'Cinsiyet', fn (): array => ['female', 'male'], ['female' => 'Kadın', 'male' => 'Erkek']),
+            $this->enum('language', 'Dil', fn (): array => ['tr', 'en'], ['tr' => 'Türkçe', 'en' => 'İngilizce']),
             $this->enum('platform', 'Platform', fn (): array => ['ios', 'android', 'web']),
-            $this->enum('loyalty_tier', 'Sadakat seviyesi', fn (): array => ['bronze', 'silver', 'gold', 'platinum']),
+            $this->enum('loyalty_tier', 'Sadakat seviyesi', fn (): array => ['bronze', 'silver', 'gold', 'platinum'], [
+                'bronze' => 'Bronz', 'silver' => 'Gümüş', 'gold' => 'Altın', 'platinum' => 'Platin',
+            ]),
             $this->enum('favorite_category', 'Favori kategori', fn (): array => ['elektronik', 'moda', 'ev', 'kozmetik', 'spor', 'kitap', 'market']),
             new FieldDefinition('age', FieldType::Number, 'birth_date', 'Yaş', min: 0, max: self::AGE_MAX, derivedFromBirthDate: true),
             $this->number('orders_count', 'Sipariş sayısı', self::COUNT_MAX),
@@ -63,10 +65,13 @@ final class FieldRegistry
         }
     }
 
-    /** @param  Closure(): list<string>  $values */
-    private function enum(string $name, string $label, Closure $values): FieldDefinition
+    /**
+     * @param  Closure(): list<string>  $values
+     * @param  array<string, string>  $valueLabels
+     */
+    private function enum(string $name, string $label, Closure $values, array $valueLabels = []): FieldDefinition
     {
-        return new FieldDefinition($name, FieldType::Enum, $name, $label, enumValues: $values);
+        return new FieldDefinition($name, FieldType::Enum, $name, $label, enumValues: $values, valueLabels: $valueLabels);
     }
 
     private function number(string $name, string $label, int $max): FieldDefinition

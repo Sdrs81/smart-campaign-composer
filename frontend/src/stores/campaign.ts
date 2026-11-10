@@ -58,6 +58,10 @@ export const useCampaignStore = defineStore('campaign', () => {
   // True only between creating a campaign here and the page that opens it: that copy is newer than a
   // refetch and carries the extraction error. Every later visit must fetch, or it shows a stale copy.
   let adoptHeldCopy = false
+  // The campaign whose first content should start by itself (K26): set when an extraction succeeds on a
+  // campaign without messages, spent by ContentStream when it starts. Kept in the store, not the
+  // component, because a new campaign changes page between the extraction and the stream.
+  const autoGenerateFor = ref<number | null>(null)
 
   async function loadRules(): Promise<void> {
     if (rules.value) return
@@ -74,6 +78,8 @@ export const useCampaignStore = defineStore('campaign', () => {
       return
     }
     adoptHeldCopy = false
+    // A reload or another campaign never starts generation on its own.
+    autoGenerateFor.value = null
 
     loadingCurrent?.abort()
     const controller = new AbortController()
@@ -143,16 +149,31 @@ export const useCampaignStore = defineStore('campaign', () => {
     current.value = null
     composeError.value = null
     adoptHeldCopy = false
+    autoGenerateFor.value = null
   }
 
-  /** Runs the audience extraction for the held campaign. A failure is kept in `composeError`, the campaign stays. */
-  async function extractAudience(): Promise<void> {
+  function clearAutoGenerate(): void {
+    autoGenerateFor.value = null
+  }
+
+  /**
+   * Runs the audience extraction for the held campaign, from `brief` when it was edited. A failure is kept in
+   * `composeError`, the campaign stays.
+   */
+  async function extractAudience(brief?: string): Promise<void> {
     const campaign = current.value
     if (!campaign) return
     composing.value = true
     composeError.value = null
+    autoGenerateFor.value = null
     try {
-      current.value = await api.defineAudience(campaign.id)
+      const extracted = await api.defineAudience(campaign.id, brief)
+      current.value = extracted
+      // Running the extraction is the click that asks for new text: the server has dropped the old text with
+      // the old audience, so the content is written again (K26). A campaign that still has text is left alone.
+      if (extracted.status === 'audience_ready' && (extracted.messages?.length ?? 0) === 0) {
+        autoGenerateFor.value = extracted.id
+      }
     } catch (failure) {
       composeError.value = toApiError(failure)
     } finally {
@@ -196,6 +217,8 @@ export const useCampaignStore = defineStore('campaign', () => {
     approveCurrent,
     clearApprovalError,
     leaveCurrent,
+    autoGenerateFor,
+    clearAutoGenerate,
     startNew,
     extractAudience,
     createAndExtract,

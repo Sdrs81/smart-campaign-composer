@@ -13,15 +13,38 @@
             ]
         },
         "unsupported_criteria": [],
-        "explanation": "Son 90 günde giriş yapmamış müşteriler seçildi (hiç giriş yapmamışlar dahil)."
+        "explanation": "Son 90 gündür hesabına giriş yapmamış müşteriler seçildi."
     },
-    "content": {
-        "sms": {
-            "body": "Merhaba {{first_name}}, seni özledik! Hesabına giriş yap, yeni fırsatları kaçırma."
+    "content": [
+        {
+            "offer": "özel fırsat",
+            "sms": {
+                "body": "Merhaba {{first_name}}, seni özledik! Hesabına giriş yap, %OFFER% seni bekliyor."
+            },
+            "email": {
+                "subject": "Seni özledik, geri dön",
+                "body": "Merhaba {{first_name}},\n\nUzun süredir seni göremedik. Hesabına giriş yaparak yeni ürünlere göz atabilirsin; %OFFER% seni bekliyor.\n\nSeni tekrar aramızda görmek isteriz."
+            }
         },
-        "email": {
-            "subject": "Seni özledik, geri dön",
-            "body": "Merhaba {{first_name}},\n\nUzun süredir seni göremedik. Hesabına giriş yaparak yeni ürünlere ve fırsatlara göz atabilirsin.\n\nSeni tekrar aramızda görmek isteriz."
+        {
+            "offer": "özel fırsat",
+            "sms": {
+                "body": "{{first_name}}, bir süredir uğramadın. Geri dön, %OFFER% var!"
+            },
+            "email": {
+                "subject": "Bir süredir uğramadın",
+                "body": "Merhaba {{first_name}},\n\nSon zamanlarda hesabına girmediğini fark ettik. Geri döndüğünde %OFFER% var.\n\nSevgiler."
+            }
+        },
+        {
+            "offer": "özel fırsat",
+            "sms": {
+                "body": "Hesabın seni bekliyor {{first_name}}! Giriş yap ve %OFFER% ile alışverişe başla."
+            },
+            "email": {
+                "subject": "Hesabın seni bekliyor",
+                "body": "Merhaba {{first_name}},\n\nHesabına giriş yaparak %OFFER% ile alışverişe kaldığın yerden devam edebilirsin.\n\nİyi alışverişler dileriz."
+            }
         }
-    }
+    ]
 }

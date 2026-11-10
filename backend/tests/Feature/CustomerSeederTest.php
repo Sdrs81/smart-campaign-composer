@@ -35,8 +35,17 @@ it('seeds the same customers every time', function () {
         ->and(emailFingerprint())->toBe($first);
 });
 
-it('keeps purchase and cart columns consistent', function () {
+it('keeps purchase, cart and name columns consistent', function () {
     $this->seed(CustomerSeeder::class);
+
+    // A first name belongs to one gender only, so a preview never greets a female customer with a man's name.
+    $namesUsedByBothGenders = DB::selectOne(<<<'SQL'
+        SELECT count(*) AS names FROM (
+            SELECT first_name FROM customers WHERE first_name IS NOT NULL
+            GROUP BY first_name HAVING count(DISTINCT gender) > 1
+        ) AS shared
+    SQL)->names;
+    expect($namesUsedByBothGenders)->toBe(0);
 
     $violations = DB::selectOne(<<<'SQL'
         SELECT count(*) FILTER (WHERE first_purchase_at > last_purchase_at) AS dates_swapped,

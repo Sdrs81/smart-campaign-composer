@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Content\ContentValidator;
 use App\Llm\ClaudeLlmClient;
 use App\Llm\ContentGenerator;
+use App\Llm\Fake\BriefReader;
 use App\Llm\Fake\DevScenarios;
 use App\Llm\FakeLlmClient;
 use App\Llm\LlmClient;
@@ -15,7 +16,9 @@ use App\Llm\Prompts\SegmentPrompt;
 use App\Llm\RecordingLlmClient;
 use App\Llm\SegmentExtractor;
 use App\Segment\SegmentRuleParser;
+use Closure;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
@@ -24,6 +27,8 @@ class LlmServiceProvider extends ServiceProvider
 {
     // Recorded as the model of every call made by the offline client.
     private const FAKE_MODEL_NAME = 'fake';
+
+    private const CONTENT_RUN_KEY_PREFIX = 'fake-llm:content-run:';
 
     public function register(): void
     {
@@ -63,12 +68,23 @@ class LlmServiceProvider extends ServiceProvider
         $driver = (string) config('llm.driver');
 
         return match ($driver) {
-            'fake' => new FakeLlmClient(config('llm.fake.dev_scenarios') === true ? new DevScenarios : null),
+            'fake' => new FakeLlmClient(config('llm.fake.dev_scenarios') === true ? new DevScenarios($this->app->make(BriefReader::class), $this->contentRunCounter()) : null),
             'claude' => $this->claudeClient(),
             default => throw new InvalidArgumentException(
                 "Unknown LLM_DRIVER '{$driver}'; allowed: auto, claude, fake."
             ),
         };
+    }
+
+    /**
+     * Counts content requests per brief in the cache (Redis in the running app), because every request is
+     * served by a fresh process and an in-memory count would always read 1 (K25).
+     *
+     * @return Closure(string): int
+     */
+    private function contentRunCounter(): Closure
+    {
+        return fn (string $briefKey): int => (int) Cache::increment(self::CONTENT_RUN_KEY_PREFIX.$briefKey);
     }
 
     private function claudeClient(): LlmClient

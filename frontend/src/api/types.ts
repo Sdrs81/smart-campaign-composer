@@ -68,7 +68,8 @@ export interface ContentRules {
   variables: { name: string; fallback: string }[]
   brief: { min_length: number; max_length: number }
   segment: {
-    fields: { name: string; label: string }[]
+    // `value_labels` maps a stored value to its Turkish name ("female" → "Kadın"); empty for most fields.
+    fields: { name: string; label: string; value_labels?: Record<string, string> }[]
     // `template` holds a `{value}` placeholder, e.g. "son {value} gün içinde".
     operators: { name: string; template: string }[]
   }

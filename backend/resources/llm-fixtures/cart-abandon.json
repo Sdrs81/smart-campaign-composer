@@ -20,13 +20,36 @@
         "unsupported_criteria": [],
         "explanation": "Son 30 günde sepete ürün ekleyip aynı sürede satın alma yapmayan müşteriler seçildi (hiç alışveriş yapmamışlar dahil)."
     },
-    "content": {
-        "sms": {
-            "body": "Merhaba {{first_name}}, sepetindeki ürünler seni bekliyor! Siparişini tamamlamak için hemen göz at."
+    "content": [
+        {
+            "offer": "özel fırsat",
+            "sms": {
+                "body": "Merhaba {{first_name}}, sepetindeki ürünler seni bekliyor! Şimdi %OFFER% var, siparişini hemen tamamla."
+            },
+            "email": {
+                "subject": "Sepetindeki ürünler seni bekliyor",
+                "body": "Merhaba {{first_name}},\n\nSepetine eklediğin ürünleri henüz tamamlamadığını fark ettik. Şimdi %OFFER% var, siparişini birkaç adımda tamamlayabilirsin.\n\nKeyifli alışverişler dileriz."
+            }
         },
-        "email": {
-            "subject": "Sepetindeki ürünler seni bekliyor",
-            "body": "Merhaba {{first_name}},\n\nSepetine eklediğin ürünleri henüz tamamlamadığını fark ettik. Siparişini birkaç adımda tamamlayabilirsin.\n\nKeyifli alışverişler dileriz."
+        {
+            "offer": "özel fırsat",
+            "sms": {
+                "body": "{{first_name}}, sepetini unuttun mu? %OFFER% seni bekliyor, stoklar tükenmeden göz at."
+            },
+            "email": {
+                "subject": "Sepetini unuttun mu?",
+                "body": "Merhaba {{first_name}},\n\nSeçtiğin ürünler stoklar tükenmeden seni bekliyor. %OFFER% seni bekliyor; sepetine dönüp alışverişini tamamlaman yeterli.\n\nSevgiler."
+            }
+        },
+        {
+            "offer": "özel fırsat",
+            "sms": {
+                "body": "Merhaba {{first_name}}, seçtiğin ürünler hâlâ sepetinde. %OFFER% ile alışverişi bugün tamamla!"
+            },
+            "email": {
+                "subject": "Sepetin hazır, alışverişi tamamla",
+                "body": "Merhaba {{first_name}},\n\nSepetindeki ürünler hâlâ hazır. %OFFER% ile alışverişini bugün tamamlayabilirsin.\n\nİyi alışverişler dileriz."
+            }
         }
-    }
+    ]
 }

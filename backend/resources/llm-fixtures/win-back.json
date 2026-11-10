@@ -1,0 +1,56 @@
+{
+    "name": "win-back",
+    "keywords": [
+        "siparis vermemis",
+        "siparis vermeyen",
+        "alisveris yapmamis",
+        "alisveris yapmayan",
+        "geri kazan"
+    ],
+    "segment": {
+        "rule": {
+            "version": 1,
+            "conditions": [
+                {
+                    "field": "last_purchase_at",
+                    "operator": "not_within_last_days",
+                    "value": 60
+                }
+            ]
+        },
+        "unsupported_criteria": [],
+        "explanation": "Son 60 gündür sipariş vermemiş müşteriler seçildi (hiç alışveriş yapmamışlar dahil)."
+    },
+    "content": [
+        {
+            "offer": "özel fırsat",
+            "sms": {
+                "body": "Merhaba {{first_name}}, uzun zamandır sipariş vermedin. Sana %OFFER% hazırladık!"
+            },
+            "email": {
+                "subject": "Seni yeniden görmek isteriz",
+                "body": "Merhaba {{first_name}},\n\nSon zamanlarda sipariş vermediğini fark ettik. Sana %OFFER% hazırladık.\n\nSeni tekrar görmek isteriz."
+            }
+        },
+        {
+            "offer": "özel fırsat",
+            "sms": {
+                "body": "{{first_name}}, seni özledik! Yeni siparişinde %OFFER% seni bekliyor."
+            },
+            "email": {
+                "subject": "Seni özledik",
+                "body": "Merhaba {{first_name}},\n\nSeni özledik! Yeni siparişinde %OFFER% seni bekliyor.\n\nSevgiler."
+            }
+        },
+        {
+            "offer": "özel fırsat",
+            "sms": {
+                "body": "Merhaba {{first_name}}, yeniden alışveriş yapmanın tam zamanı: %OFFER% var."
+            },
+            "email": {
+                "subject": "Yeniden alışveriş yapmanın tam zamanı",
+                "body": "Merhaba {{first_name}},\n\nYeniden alışveriş yapmanın tam zamanı: %OFFER% var. Yeni gelenlere göz atmayı unutma.\n\nİyi alışverişler dileriz."
+            }
+        }
+    ]
+}

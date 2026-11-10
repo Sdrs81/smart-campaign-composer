@@ -49,7 +49,13 @@ export const api = {
   createCampaign: (brief: string) => requestData<Campaign>('POST', '/campaigns', { brief }),
   getCampaign: (id: number, signal?: AbortSignal) =>
     requestData<Campaign>('GET', `/campaigns/${id}`, undefined, signal),
-  defineAudience: (id: number) => requestData<Campaign>('POST', `/campaigns/${id}/audience`),
+  // `brief` is an edited brief to extract from; without it the saved brief is used.
+  defineAudience: (id: number, brief?: string) =>
+    requestData<Campaign>(
+      'POST',
+      `/campaigns/${id}/audience`,
+      brief === undefined ? undefined : { brief },
+    ),
   approveCampaign: (id: number) => requestData<Campaign>('POST', `/campaigns/${id}/approve`),
   updateContent: (id: number, content: EditableContent) =>
     requestData<Campaign>('PUT', `/campaigns/${id}/content`, content),
