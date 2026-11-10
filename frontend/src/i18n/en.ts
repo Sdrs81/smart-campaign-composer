@@ -140,8 +140,12 @@ export const en = {
   deliveryError: {
     consent_withdrawn:
       'The customer withdrew consent for this channel after the audience was fixed, so nothing was sent.',
-    provider_temporary:
-      'The delivery service was busy or briefly unavailable when this message was sent. The system tries again automatically.',
+    provider_unreachable:
+      'The delivery service did not respond in time, so it could not be reached. The system tries this message again automatically.',
+    provider_busy:
+      'The delivery service was handling too many messages and asked us to slow down. The system waits a moment and tries again.',
+    provider_error:
+      'The delivery service had an internal error while receiving this message. The system tries again automatically.',
     retries_exhausted:
       'The delivery service stayed unavailable after several attempts, so this message was not sent.',
     provider_rejected:

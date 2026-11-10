@@ -278,7 +278,7 @@ class SendDeliveryJob implements ShouldQueue
         }
 
         $delay = (int) $decision->delayMilliseconds;
-        $delivery->scheduleRetry(now()->addMilliseconds($delay), DeliveryErrorCode::ProviderTemporary, (string) $result->reason);
+        $delivery->scheduleRetry(now()->addMilliseconds($delay), $result->errorCode ?? DeliveryErrorCode::Internal, (string) $result->reason);
         $this->saveAndLog($delivery);
 
         $this->release((int) ceil($delay / self::MILLISECONDS_PER_SECOND));

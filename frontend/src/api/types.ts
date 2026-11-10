@@ -94,7 +94,9 @@ export interface Preview {
 // Mirrors App\Delivery\DeliveryErrorCode (K24); the dashboard explains each one in plain language.
 export const DELIVERY_ERROR_CODES = [
   'consent_withdrawn',
-  'provider_temporary',
+  'provider_unreachable',
+  'provider_busy',
+  'provider_error',
   'retries_exhausted',
   'provider_rejected',
   'content_invalid',

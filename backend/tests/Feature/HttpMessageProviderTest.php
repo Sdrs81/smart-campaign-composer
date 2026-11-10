@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Delivery\DeliveryErrorCode;
 use App\Delivery\HttpMessageProvider;
 use App\Delivery\SendOutcome;
 use App\Delivery\SendResult;
@@ -41,7 +42,8 @@ it('classifies 429 as rate limited and reads Retry-After', function (): void {
     $result = sendSms();
 
     expect($result->outcome)->toBe(SendOutcome::RateLimited)
-        ->and($result->retryAfterSeconds)->toBe(2);
+        ->and($result->retryAfterSeconds)->toBe(2)
+        ->and($result->errorCode)->toBe(DeliveryErrorCode::ProviderBusy);
 });
 
 it('leaves retry-after empty when a 429 carries no usable header', function (): void {
@@ -53,13 +55,19 @@ it('leaves retry-after empty when a 429 carries no usable header', function (): 
 it('classifies 5xx as transient', function (int $status): void {
     Http::fake(['provider.test/*' => Http::response('boom', $status)]);
 
-    expect(sendSms()->outcome)->toBe(SendOutcome::Transient);
+    $result = sendSms();
+
+    expect($result->outcome)->toBe(SendOutcome::Transient)
+        ->and($result->errorCode)->toBe(DeliveryErrorCode::ProviderError);
 })->with([500, 503, 504]);
 
-it('classifies a connection failure or timeout as transient', function (): void {
+it('classifies a connection failure or timeout as transient and unreachable', function (): void {
     Http::fake(['provider.test/*' => Http::failedConnection()]);
 
-    expect(sendSms()->outcome)->toBe(SendOutcome::Transient);
+    $result = sendSms();
+
+    expect($result->outcome)->toBe(SendOutcome::Transient)
+        ->and($result->errorCode)->toBe(DeliveryErrorCode::ProviderUnreachable);
 });
 
 it('classifies other 4xx as permanent', function (int $status): void {
@@ -68,5 +76,6 @@ it('classifies other 4xx as permanent', function (int $status): void {
     $result = sendSms();
 
     expect($result->outcome)->toBe(SendOutcome::Permanent)
+        ->and($result->errorCode)->toBe(DeliveryErrorCode::ProviderRejected)
         ->and($result->reason)->toContain((string) $status);
 })->with([400, 404, 422]);

@@ -121,7 +121,7 @@ it('retries a transient failure and then succeeds with the same key', function (
         ->and($afterFirst->claimed_at)->toBeNull()
         ->and($afterFirst->next_attempt_at)->not->toBeNull()
         ->and($afterFirst->last_error)->toContain('500')
-        ->and($afterFirst->last_error_code)->toBe(DeliveryErrorCode::ProviderTemporary);
+        ->and($afterFirst->last_error_code)->toBe(DeliveryErrorCode::ProviderError);
     $first->assertReleased(delay: 1);
 
     // The queue runs the released job after its delay, by which time the retry is due.
@@ -157,6 +157,7 @@ it('waits at least Retry-After after a 429', function (): void {
 
     $stored = $delivery->fresh();
     expect($stored->status)->toBe(DeliveryStatus::Pending)
+        ->and($stored->last_error_code)->toBe(DeliveryErrorCode::ProviderBusy)
         ->and($stored->next_attempt_at->getTimestamp() - now()->getTimestamp())->toBeGreaterThanOrEqual(2);
     $job->assertReleased(delay: 3);
 });

@@ -769,10 +769,10 @@ Faz 11 sonrası elle incelemeden gelen üç istek; dal `phase-12/ui-polish`. Yen
 
 ### 12.2 Gönderim hatası kodu (backend) · K24
 
-- **İş:** `DeliveryErrorCode` enum'u: `consent_withdrawn` (atlandı), `provider_temporary` (429/5xx/ulaşılamadı, yeniden denenecek), `retries_exhausted`, `provider_rejected` (kalıcı 4xx), `content_invalid` (uzunluk aşımı veya kanal mesajı yok), `internal` (job tekrar tekrar çöktü). `deliveries.last_error_code` (nullable, yeni migration). `markFailed`, `scheduleRetry` ve `skip` metnin yanında kodu da alır; kodu `SendDeliveryJob` ve `RetryDecision` verir. `CampaignStats` `recent_errors` öğesine `code` ekler (SSE aynı sınıfı kullandığı için ayrıca iş yok). Ham `error` metni ve maskelemesi aynen kalır.
-- **Dosyalar:** `app/Delivery/DeliveryErrorCode.php`, `database/migrations/*_add_last_error_code_to_deliveries_table.php`, `app/Models/Delivery.php`, `app/Delivery/{SendDeliveryJob,RetryPolicy,RetryDecision,CampaignStats}.php`, Pest
+- **İş:** `DeliveryErrorCode` enum'u: `consent_withdrawn` (atlandı), `provider_unreachable` (bağlantı kurulamadı veya zaman aşımı), `provider_busy` (429), `provider_error` (5xx); üçü de yeniden denenecek, `retries_exhausted`, `provider_rejected` (kalıcı 4xx), `content_invalid` (uzunluk aşımı veya kanal mesajı yok), `internal` (job tekrar tekrar çöktü). `deliveries.last_error_code` (nullable, yeni migration). `markFailed`, `scheduleRetry` ve `skip` metnin yanında kodu da alır; kodu `SendDeliveryJob` ve `RetryDecision` verir. `CampaignStats` `recent_errors` öğesine `code` ekler (SSE aynı sınıfı kullandığı için ayrıca iş yok). Ham `error` metni ve maskelemesi aynen kalır.
+- **Dosyalar:** `app/Delivery/DeliveryErrorCode.php`, `database/migrations/*_add_last_error_code_to_deliveries_table.php`, `app/Models/Delivery.php`, `app/Delivery/{SendDeliveryJob,SendResult,HttpMessageProvider,RetryPolicy,RetryDecision,CampaignStats}.php`, Pest
 - **Bağımlı:** 8.3, 9.1
-- **Kabul:** Pest: her hata yolu doğru kodu yazar (izin geri çekildi, 429/5xx, deneme tükendi, 4xx, uzunluk aşımı, job çökmesi); stats yanıtında `code` var; `make smoke` yeşil.
+- **Kabul:** Pest: her hata yolu doğru kodu yazar (izin geri çekildi, zaman aşımı, 429, 5xx, deneme tükendi, 4xx, uzunluk aşımı, job çökmesi); stats yanıtında `code` var; `make smoke` yeşil.
 
 ### 12.3 Anlaşılır gönderim hataları (dashboard) · K24
 

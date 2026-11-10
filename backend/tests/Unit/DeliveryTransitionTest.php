@@ -28,7 +28,7 @@ function callDeliveryMethod(Delivery $delivery, string $method): void
     match ($method) {
         'markSent' => $delivery->markSent('msg-1'),
         'markFailed' => $delivery->markFailed(DeliveryErrorCode::Internal, 'boom'),
-        'scheduleRetry' => $delivery->scheduleRetry(CarbonImmutable::now()->addSecond(), DeliveryErrorCode::ProviderTemporary, 'timeout'),
+        'scheduleRetry' => $delivery->scheduleRetry(CarbonImmutable::now()->addSecond(), DeliveryErrorCode::ProviderUnreachable, 'timeout'),
         'skip' => $delivery->skip(DeliveryErrorCode::ConsentWithdrawn, 'opted out'),
     };
 }

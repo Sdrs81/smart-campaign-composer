@@ -139,8 +139,12 @@ export const tr: typeof en = {
   deliveryError: {
     consent_withdrawn:
       'Müşteri, kitle belirlendikten sonra bu kanal için iznini geri çekti; bu yüzden mesaj gönderilmedi.',
-    provider_temporary:
-      'Mesaj gönderilirken gönderim servisi yoğundu ya da kısa süreliğine ulaşılamıyordu. Sistem otomatik olarak yeniden dener.',
+    provider_unreachable:
+      'Gönderim servisi zamanında yanıt vermedi, bu yüzden ulaşılamadı. Sistem mesajı otomatik olarak yeniden dener.',
+    provider_busy:
+      'Gönderim servisi çok fazla mesajla ilgileniyordu ve yavaşlamamızı istedi. Sistem kısa bir süre bekleyip yeniden dener.',
+    provider_error:
+      'Gönderim servisi bu mesajı alırken kendi içinde bir hata verdi. Sistem otomatik olarak yeniden dener.',
     retries_exhausted:
       'Gönderim servisine birkaç denemeden sonra da ulaşılamadı, bu yüzden mesaj gönderilemedi.',
     provider_rejected:

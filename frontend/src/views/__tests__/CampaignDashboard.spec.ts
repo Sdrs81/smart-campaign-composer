@@ -168,7 +168,7 @@ describe('CampaignDashboard', () => {
                 channel: 'sms',
                 status: 'failed',
                 attempts: 3,
-                code: 'provider_temporary',
+                code: 'provider_error',
                 error: 'provider 503',
                 at: '2026-01-01T10:00:00Z',
               },
@@ -181,7 +181,7 @@ describe('CampaignDashboard', () => {
 
     const cells = wrapper.findAll('tbody tr td').map((cell) => cell.text())
     expect(cells).toContain('3')
-    expect(cells.at(-1)).toContain(en.deliveryError.provider_temporary)
+    expect(cells.at(-1)).toContain(en.deliveryError.provider_error)
   })
 
   it('keeps the raw error behind a collapsed "Technical detail" and explains it in plain words', async () => {
