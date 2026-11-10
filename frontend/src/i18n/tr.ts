@@ -4,6 +4,9 @@ export const tr: typeof en = {
   language: {
     switchTo: 'Dili şuna çevir: {language}',
   },
+  nav: {
+    back: 'Kampanyalara dön',
+  },
   status: {
     draft: 'Taslak',
     audience_ready: 'Kitle hazır',
@@ -131,7 +134,6 @@ export const tr: typeof en = {
     status: 'Durum',
     attempts: 'Deneme',
     error: 'Hata',
-    back: 'Kampanyalara dön',
   },
   progress: {
     sent: 'Gönderildi',

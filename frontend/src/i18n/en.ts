@@ -5,6 +5,9 @@ export const en = {
   language: {
     switchTo: 'Switch language to {language}',
   },
+  nav: {
+    back: 'Back to campaigns',
+  },
   status: {
     draft: 'Draft',
     audience_ready: 'Audience ready',
@@ -132,7 +135,6 @@ export const en = {
     status: 'Status',
     attempts: 'Attempts',
     error: 'Error',
-    back: 'Back to campaigns',
   },
   progress: {
     sent: 'Sent',

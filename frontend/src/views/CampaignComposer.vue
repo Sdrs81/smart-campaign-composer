@@ -6,6 +6,7 @@ import { onBeforeRouteLeave, RouterLink, useRouter } from 'vue-router'
 import type { Campaign, CampaignStatus } from '../api/types'
 import ApproveDialog from '../components/ApproveDialog.vue'
 import AudienceCard from '../components/AudienceCard.vue'
+import BackLink from '../components/BackLink.vue'
 import BriefStep from '../components/BriefStep.vue'
 import ContentEditor from '../components/ContentEditor.vue'
 import ContentStream from '../components/ContentStream.vue'
@@ -78,9 +79,12 @@ onBeforeRouteLeave(() => store.leaveCurrent())
 <template>
   <section class="mx-auto max-w-3xl space-y-6">
     <div class="flex items-center justify-between">
-      <h2 class="text-lg font-semibold">
-        {{ isNew ? t('composer.newTitle') : t('composer.title', { id }) }}
-      </h2>
+      <div class="flex items-center gap-3">
+        <BackLink />
+        <h2 class="text-lg font-semibold">
+          {{ isNew ? t('composer.newTitle') : t('composer.title', { id }) }}
+        </h2>
+      </div>
       <StatusBadge v-if="campaign" :status="campaign.status" />
     </div>
 

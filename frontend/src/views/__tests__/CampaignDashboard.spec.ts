@@ -281,6 +281,21 @@ describe('CampaignDashboard', () => {
     wrapper.unmount()
   })
 
+  it('has one round back button to the list, named in both languages, and no link at the bottom', async () => {
+    const { wrapper } = await mountDashboard()
+    const links = wrapper.findAll('a')
+
+    expect(links).toHaveLength(1)
+    expect(links[0]!.attributes('href')).toBe('/campaigns')
+    expect(links[0]!.attributes('aria-label')).toBe('Back to campaigns')
+    expect(wrapper.find('section > div a').exists()).toBe(true)
+
+    setLocale('tr')
+    await nextTick()
+    expect(wrapper.find('a').attributes('aria-label')).toBe('Kampanyalara dön')
+    setLocale('en')
+  })
+
   it('closes the stream when the page is left', async () => {
     const { wrapper, source } = await mountDashboard()
 

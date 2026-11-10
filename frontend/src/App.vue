@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
+import { RouterLink, RouterView } from 'vue-router'
 
 import LocaleSwitcher from './components/LocaleSwitcher.vue'
 </script>
@@ -9,7 +9,14 @@ import LocaleSwitcher from './components/LocaleSwitcher.vue'
     <header
       class="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-6 py-4"
     >
-      <h1 class="text-xl font-semibold">Smart Campaign Composer</h1>
+      <h1 class="text-xl font-semibold">
+        <RouterLink
+          :to="{ name: 'campaigns' }"
+          class="focus:outline-2 focus:outline-offset-2 focus:outline-indigo-600"
+        >
+          Smart Campaign Composer
+        </RouterLink>
+      </h1>
       <LocaleSwitcher />
     </header>
     <main class="px-6 py-8">

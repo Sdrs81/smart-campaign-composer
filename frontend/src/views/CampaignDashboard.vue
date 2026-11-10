@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RouterLink } from 'vue-router'
 
 import { api, parseStats } from '../api/client'
 import type { Channel, CampaignStats } from '../api/types'
+import BackLink from '../components/BackLink.vue'
 import ChannelProgress from '../components/ChannelProgress.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { useEventSource } from '../composables/useEventSource'
@@ -45,9 +45,12 @@ const formatTime = (iso: string): string => new Date(iso).toLocaleTimeString(loc
 <template>
   <section class="mx-auto max-w-3xl space-y-6" aria-labelledby="dashboard-heading">
     <div class="flex items-center justify-between gap-4">
-      <h2 id="dashboard-heading" class="text-lg font-semibold">
-        {{ t('dashboard.title', { id }) }}
-      </h2>
+      <div class="flex items-center gap-3">
+        <BackLink />
+        <h2 id="dashboard-heading" class="text-lg font-semibold">
+          {{ t('dashboard.title', { id }) }}
+        </h2>
+      </div>
       <div class="flex items-center gap-3">
         <span aria-live="polite" class="text-sm text-slate-600">{{ connection }}</span>
         <StatusBadge v-if="stats" :status="stats.status" />
@@ -111,12 +114,5 @@ const formatTime = (iso: string): string => new Date(iso).toLocaleTimeString(loc
         </div>
       </section>
     </template>
-
-    <RouterLink
-      :to="{ name: 'campaigns' }"
-      class="inline-block text-sm text-indigo-700 underline focus:outline-2 focus:outline-indigo-600"
-    >
-      {{ t('dashboard.back') }}
-    </RouterLink>
   </section>
 </template>
