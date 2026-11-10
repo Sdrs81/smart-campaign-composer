@@ -1,6 +1,6 @@
 # Smart Campaign Composer: Uygulama Planı
 
-Tarih: 2026-11-04, güncelleme 2026-11-09 · Durum: onaylandı · Tasarım seçenekleri ve yanıtlanan sorular Bölüm 2'de (K1–K23)
+Tarih: 2026-11-04, güncelleme 2026-11-10 · Durum: onaylandı · Tasarım seçenekleri ve yanıtlanan sorular Bölüm 2'de (K1–K24)
 
 ## 0. Bağlam
 
@@ -74,11 +74,12 @@ Yalnızca `DECISIONS.md`'ye girecek kararlar: case'te doğrudan geçenler, mimar
 
 ### Takip ve kapsam
 
-| #   | Karar                                                                                                                                                                                                          | Gerekçe (ilke)                                                                                                                                           | Alternatifler                                                                                   | Görevler      |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------- |
-| K21 | Canlı durum SSE ile (1 sn, yalnızca değişince, tek `GROUP BY` sorgusu); `/api/metrics` Prometheus text, sorgu anında hesaplanır; `/api/health`: DB/Redis kritik, provider `degraded`                           | Case şartı. Ek container ve sayaç durumu yok (KISS); `EventSource` kendiliğinden yeniden bağlanır                                                        | Polling; Reverb; sayaç tabanlı metrik                                                           | 9.1–9.4, 10.7 |
-| K22 | Kimlik doğrulama yok: tek pazarlamacı, yerel demo                                                                                                                                                              | Case'te istenmiyor (YAGNI); README'de açıkça yazılır                                                                                                     | Sanctum token                                                                                   | 11.1          |
-| K23 | Arayüz dili tarayıcıda seçilir (vue-i18n, Türkçe/İngilizce, başlıkta tek buton, seçim `localStorage`'da); yalnızca frontend'in kendi metinleri çevrilir, API mesajları ve model içeriği olduğu gibi gösterilir | Dil bir görüntüleme tercihidir: sunucu durumu gerekmez, müşteriye giden içerik değişmez; kural etiketleri ve hata mesajları tek kaynakta (backend) kalır | `Accept-Language` ile backend çevirisi; hata kodlarını frontend'de çevirmek; dil önekli rotalar | 10.9          |
+| #   | Karar                                                                                                                                                                                                                                                                                                 | Gerekçe (ilke)                                                                                                                                           | Alternatifler                                                                                                | Görevler      |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------- |
+| K21 | Canlı durum SSE ile (1 sn, yalnızca değişince, tek `GROUP BY` sorgusu); `/api/metrics` Prometheus text, sorgu anında hesaplanır; `/api/health`: DB/Redis kritik, provider `degraded`                                                                                                                  | Case şartı. Ek container ve sayaç durumu yok (KISS); `EventSource` kendiliğinden yeniden bağlanır                                                        | Polling; Reverb; sayaç tabanlı metrik                                                                        | 9.1–9.4, 10.7 |
+| K22 | Kimlik doğrulama yok: tek pazarlamacı, yerel demo                                                                                                                                                                                                                                                     | Case'te istenmiyor (YAGNI); README'de açıkça yazılır                                                                                                     | Sanctum token                                                                                                | 11.1          |
+| K23 | Arayüz dili tarayıcıda seçilir (vue-i18n, Türkçe/İngilizce, başlıkta tek buton, seçim `localStorage`'da); yalnızca frontend'in kendi metinleri çevrilir, API mesajları ve model içeriği olduğu gibi gösterilir                                                                                        | Dil bir görüntüleme tercihidir: sunucu durumu gerekmez, müşteriye giden içerik değişmez; kural etiketleri ve hata mesajları tek kaynakta (backend) kalır | `Accept-Language` ile backend çevirisi; hata kodlarını frontend'de çevirmek; dil önekli rotalar              | 10.9          |
+| K24 | Gönderim hataları dashboard'da sade bir açıklamayla gösterilir: backend her hataya küçük, sabit bir kod (`deliveries.last_error_code`) yazar, frontend kodu Türkçe/İngilizce açıklamaya çevirir; ham hata metni kapalı "Teknik ayrıntı" altında kalır. K23'ü yalnızca gönderim hataları için daraltır | Kullanıcı pazarlamacı, ham provider metni ona anlamsız; ham metin yazılım ekibine iletmek için korunur. Sabit kod kümesi metin eşleştirmeden sağlam      | Ham metinden regex ile sınıflama; `Accept-Language` ile backend çevirisi; yalnızca durum sütunundan açıklama | 12.2, 12.3    |
 
 ## 3. Çalışma akışı
 
@@ -91,15 +92,15 @@ Yalnızca `DECISIONS.md`'ye girecek kararlar: case'te doğrudan geçenler, mimar
 - **Dil:** Projenin tüm dosyaları ve içerikleri İngilizce yazılır: kod, yorumlar, config dosyaları (`.gitignore` yorumları dahil), `README.md`, `DECISIONS.md`, `CLAUDE.md`, rules/skills/agents, hook ve script mesajları, commit mesajları, PR başlığı ve açıklaması. Türkçe kalanlar: bu plan (`docs/plan.md`, çalışma belgesi), Claude'un sohbetteki raporları ve dosya bazlı özetler. Ürün içeriği (LLM'in ürettiği kampanya metni) ürün gereği Türkçe kalır (5.9, 11.1). Arayüz metinleri ise Türkçe/İngilizce seçilebilir (K23); çeviri dosyaları (`frontend/src/i18n/tr.ts`) de bu "proje dosyaları İngilizce" kuralının bilinçli istisnasıdır.
 - **Takvim (çekirdek akış 5 günde):**
 
-  | Gün | Fazlar                                  | Gün sonu ölçütü                                                                 |
-  | --- | --------------------------------------- | ------------------------------------------------------------------------------- |
-  | G1  | Faz 1, Faz 2                            | `docker compose up` sağlıklı, `make test` yeşil, Claude araçları çalışıyor      |
-  | G2  | Faz 3, Faz 4, Faz 5.1–5.4               | Seed ve segment derleyicisi çalışıyor, LLM istemcisi testli                     |
-  | G3  | Faz 5.5–5.11, Faz 6, Faz 7              | Brief → kural → sayılar → stream içerik API'den çalışıyor; mock provider ayakta |
-  | G4  | Faz 8, Faz 9                            | `make smoke` yeşil, stats/health/metrics hazır                                  |
-  | G5  | Faz 10                                  | Çekirdek akış tarayıcıda uçtan uca, `make e2e` yeşil                            |
-  | G6  | Faz 11                                  | Teslim paketi                                                                   |
-  | G7  | Tampon, İsteğe Bağlı Kısımlar (CI önce) |                                                                                 |
+  | Gün | Fazlar                                          | Gün sonu ölçütü                                                                 |
+  | --- | ----------------------------------------------- | ------------------------------------------------------------------------------- |
+  | G1  | Faz 1, Faz 2                                    | `docker compose up` sağlıklı, `make test` yeşil, Claude araçları çalışıyor      |
+  | G2  | Faz 3, Faz 4, Faz 5.1–5.4                       | Seed ve segment derleyicisi çalışıyor, LLM istemcisi testli                     |
+  | G3  | Faz 5.5–5.11, Faz 6, Faz 7                      | Brief → kural → sayılar → stream içerik API'den çalışıyor; mock provider ayakta |
+  | G4  | Faz 8, Faz 9                                    | `make smoke` yeşil, stats/health/metrics hazır                                  |
+  | G5  | Faz 10                                          | Çekirdek akış tarayıcıda uçtan uca, `make e2e` yeşil                            |
+  | G6  | Faz 11                                          | Teslim paketi                                                                   |
+  | G7  | Faz 12, Tampon, İsteğe Bağlı Kısımlar (CI önce) | Arayüz iyileştirmeleri tarayıcıda, `make test` ve `make e2e` yeşil              |
 
 - **Gerideysek önce kesilecekler** (çekirdek akışı bozmayanlar, README'de "yapılmadı" olarak yazılır): 5.12 `llm:eval` (altın brief testleri fake ile unit testte kalır), 9.5 JSON log, 2.1'de Larastan, 10.8 Playwright (yerine `make smoke` + elle tarayıcı kontrolü), 1.13 deneme koşusu (Faz 2'nin ilk görevinde yapılır).
 
@@ -752,6 +753,33 @@ Performans ilkeleri (gerektiği yerde): lazy route, stream delta'larını `reque
 - **Dosyalar:** `ai-sessions/*`
 - **Bağımlı:** 11.4
 - **Kabul:** `--check` 0; her fazın en az bir `phase-<N>_<konu>.md` dosyası var.
+
+---
+
+## Faz 12: Arayüz iyileştirmeleri · G7
+
+Faz 11 sonrası elle incelemeden gelen üç istek; dal `phase-12/ui-polish`. Yeni kütüphane yok (ikon satır içi SVG); tek backend değişikliği gönderim hatasına kod eklemek (K24).
+
+### 12.1 Başlık linki ve geri butonu
+
+- **İş:** Kabuktaki "Smart Campaign Composer" başlığı `RouterLink` olur ve `/campaigns`'a gider. Yeni kampanya, kampanya detayı ve dashboard sayfalarında başlığın soluna yuvarlak içinde sola ok simgeli geri butonu; hedef her zaman `/campaigns` (`router.back()` değil: sayfa doğrudan açıldığında da çalışsın), erişilebilir adı `aria-label` ile iki dilde ("Kampanyalara dön"). Dashboard'un altındaki "Kampanyalar" linki ve artık kullanılmayan çeviri anahtarı kaldırılır. Composer'daki kaydedilmemiş değişiklik uyarısı (`onBeforeRouteLeave`) başlık ve geri butonunda da çalışır.
+- **Dosyalar:** `App.vue`, `components/BackLink.vue`, `views/CampaignComposer.vue`, `views/CampaignDashboard.vue`, `i18n/en.ts`, `i18n/tr.ts`, Vitest
+- **Bağımlı:** 10.9
+- **Kabul:** Vitest: başlık ve geri butonu listeye götürür, geri butonunun erişilebilir adı iki dilde var, dashboard'da alt link yok; tarayıcıda üç sayfada buton başlığın solunda; `make e2e` yeşil.
+
+### 12.2 Gönderim hatası kodu (backend) · K24
+
+- **İş:** `DeliveryErrorCode` enum'u: `consent_withdrawn` (atlandı), `provider_temporary` (429/5xx/ulaşılamadı, yeniden denenecek), `retries_exhausted`, `provider_rejected` (kalıcı 4xx), `content_invalid` (uzunluk aşımı veya kanal mesajı yok), `internal` (job tekrar tekrar çöktü). `deliveries.last_error_code` (nullable, yeni migration). `markFailed`, `scheduleRetry` ve `skip` metnin yanında kodu da alır; kodu `SendDeliveryJob` ve `RetryDecision` verir. `CampaignStats` `recent_errors` öğesine `code` ekler (SSE aynı sınıfı kullandığı için ayrıca iş yok). Ham `error` metni ve maskelemesi aynen kalır.
+- **Dosyalar:** `app/Delivery/DeliveryErrorCode.php`, `database/migrations/*_add_last_error_code_to_deliveries_table.php`, `app/Models/Delivery.php`, `app/Delivery/{SendDeliveryJob,RetryPolicy,RetryDecision,CampaignStats}.php`, Pest
+- **Bağımlı:** 8.3, 9.1
+- **Kabul:** Pest: her hata yolu doğru kodu yazar (izin geri çekildi, 429/5xx, deneme tükendi, 4xx, uzunluk aşımı, job çökmesi); stats yanıtında `code` var; `make smoke` yeşil.
+
+### 12.3 Anlaşılır gönderim hataları (dashboard) · K24
+
+- **İş:** "Son hatalar" tablosunun hata sütunu koddan çevrilmiş sade açıklama gösterir (`deliveryError.<code>`, Türkçe/İngilizce; kod yoksa genel açıklama). Altında varsayılan kapalı `<details>` "Teknik ayrıntı": ham hata metni, seçilip kopyalanabilir (yazılım ekibine iletmek için). `types.ts`'te `code` alanı.
+- **Dosyalar:** `views/CampaignDashboard.vue`, `api/types.ts`, `i18n/en.ts`, `i18n/tr.ts`, Vitest
+- **Bağımlı:** 12.2
+- **Kabul:** Vitest: her kod iki dilde açıklamaya dönüşür, bilinmeyen veya boş kod genel metne düşer, ham metin yalnızca "Teknik ayrıntı" açılınca görünür; tarayıcıda mock provider hatalarıyla kontrol.
 
 ---
 
