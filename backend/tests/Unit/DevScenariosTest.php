@@ -8,6 +8,7 @@ use App\Content\PersonalizationRenderer;
 use App\Enums\Channel;
 use App\Llm\ContentEvent;
 use App\Llm\ContentGenerator;
+use App\Llm\Fake\BriefReader;
 use App\Llm\Fake\DevScenarios;
 use App\Llm\FakeLlmClient;
 use App\Llm\LlmRequest;
@@ -96,6 +97,32 @@ it('answers a segment request with the scenario rule as JSON', function (): void
         ->and(array_column($answer['rule']['conditions'], 'field'))->toBe(['last_cart_add_at', 'last_purchase_at'])
         ->and($response->usage->inputTokens)->toBeGreaterThan(0)
         ->and($response->usage->outputTokens)->toBeGreaterThan(0);
+});
+
+it('lays the filters the brief states over the scenario rule', function (): void {
+    $scenarios = new DevScenarios(new BriefReader(devRegistry()));
+    $segment = fn (string $brief): array => json_decode($scenarios->respond(devRequest('segment', $brief))->text, true, flags: JSON_THROW_ON_ERROR);
+
+    // The generic scenario's "everyone" condition goes away once the brief names real filters.
+    $caseBrief = $segment('1 haftadır sipariş vermemiş İstanbul\'daki 25 yaş altı erkekler için kampanya');
+    expect($caseBrief['rule']['conditions'])->toEqualCanonicalizing([
+        ['field' => 'city', 'operator' => 'eq', 'value' => 'İstanbul'],
+        ['field' => 'gender', 'operator' => 'eq', 'value' => 'male'],
+        ['field' => 'age', 'operator' => 'lt', 'value' => 25],
+        ['field' => 'last_purchase_at', 'operator' => 'not_within_last_days', 'value' => 7],
+    ])->and($caseBrief['explanation'])->toContain('Şehir: İstanbul');
+
+    // The brief wins on a field the scenario also sets (here 90 days becomes 30), the rest of the scenario stays.
+    $inactive = $segment('30 gündür giriş yapmayan Ankara müşterileri');
+    expect($inactive['rule']['conditions'])->toBe([
+        ['field' => 'last_login_at', 'operator' => 'not_within_last_days', 'value' => 30],
+        ['field' => 'city', 'operator' => 'eq', 'value' => 'Ankara'],
+    ]);
+
+    // The worked example keeps its old rule exactly, and a brief with no filters keeps the scenario's answer.
+    $withoutReader = json_decode((new DevScenarios)->respond(devRequest('segment', DEV_CART_BRIEF))->text, true, flags: JSON_THROW_ON_ERROR);
+    expect($segment(DEV_CART_BRIEF)['rule'])->toBe($withoutReader['rule'])
+        ->and($segment('Yaz indirimi duyurusu hazırla')['rule']['conditions'][0]['field'])->toBe('registered_at');
 });
 
 it('answers a content request with sms and email text', function (): void {

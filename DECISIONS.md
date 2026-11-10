@@ -163,6 +163,12 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** One click less in the main flow. The marker lives in the store because a new campaign changes page between the extraction and the stream. Existing text is never overwritten silently.
 - **Alternatives:** A backend job started by the audience endpoint (needs a new state and a way to show its progress); generating after every extraction (replaces edited text); a component-local flag (lost on the page change).
 
+## K25: The key-less fake reads the brief and varies its content
+
+- **Decision:** The development fake (K9) no longer answers with one fixed rule per scenario. `BriefReader` reads the filters a Turkish brief states in plain words (city, gender, age, "N days/weeks/months without an order/login/cart", loyalty tier, category, platform) with narrow patterns, and `DevScenarios` lays them over the keyword scenario's conditions field by field: the brief wins on a shared field, and the generic "everyone" condition is dropped once a real filter is read. The explanation is written from the final conditions in the chips' wording. A phrase that is not clear adds no condition. Allowed values come from `FieldRegistry`, and the answer still goes through `SegmentRuleParser` (K7, K11). Content variants, the shared `%OFFER%` slot and the "generate again" counter are added in 13.3 and 13.4 under this same decision.
+- **Rationale:** A key-less demo should behave like a real model closely enough to show that the brief reaches the audience. Narrow patterns are deterministic and testable; a missing condition is a visible gap, while a wrong one silently picks the wrong customers.
+- **Alternatives:** An NLP library or a second model for parsing (a dependency and non-determinism for a test double); random picks (cannot be asserted); extending the keyword lists only (still one fixed rule per scenario).
+
 ## Setup notes (Phase 2)
 
 - **API only:** no web routes, views or Vite in the backend; errors share one `{error:{code,message,details}}` body.

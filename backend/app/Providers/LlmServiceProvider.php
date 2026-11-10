@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Content\ContentValidator;
 use App\Llm\ClaudeLlmClient;
 use App\Llm\ContentGenerator;
+use App\Llm\Fake\BriefReader;
 use App\Llm\Fake\DevScenarios;
 use App\Llm\FakeLlmClient;
 use App\Llm\LlmClient;
@@ -63,7 +64,7 @@ class LlmServiceProvider extends ServiceProvider
         $driver = (string) config('llm.driver');
 
         return match ($driver) {
-            'fake' => new FakeLlmClient(config('llm.fake.dev_scenarios') === true ? new DevScenarios : null),
+            'fake' => new FakeLlmClient(config('llm.fake.dev_scenarios') === true ? new DevScenarios($this->app->make(BriefReader::class)) : null),
             'claude' => $this->claudeClient(),
             default => throw new InvalidArgumentException(
                 "Unknown LLM_DRIVER '{$driver}'; allowed: auto, claude, fake."
