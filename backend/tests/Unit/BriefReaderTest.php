@@ -70,6 +70,19 @@ it('leaves a filter out when the phrase is not clear', function (string $brief):
     'empty' => [''],
 ]);
 
+it('reads the facts a message should repeat', function (string $brief, ?int $discount, ?string $city, array $categories): void {
+    expect((new BriefReader(briefRegistry()))->facts($brief))->toBe(['discount' => $discount, 'city' => $city, 'categories' => $categories]);
+})->with([
+    'percent sign first' => ['İstanbul için %20 indirim', 20, 'İstanbul', []],
+    'percent sign last' => ['20% indirimli kampanya', 20, null, []],
+    'yüzde with digits' => ['yüzde 15 indirim', 15, null, []],
+    'yüzde written out' => ['yüzde yirmi indirim', 20, null, []],
+    'no discount' => ['elektronik kategorisi için duyuru', null, null, ['elektronik']],
+    'two cities name no single city' => ['Ankara ve İzmir müşterileri', null, null, []],
+    '"yüzde" with no number' => ['yüzde yüz memnuniyet', null, null, []],
+    'a discount over 99' => ['%150 indirim', null, null, []],
+]);
+
 it('describes the conditions in the chips\' wording', function (): void {
     $reader = new BriefReader(briefRegistry());
 

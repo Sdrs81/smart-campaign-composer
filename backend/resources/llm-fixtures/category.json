@@ -20,13 +20,36 @@
         "unsupported_criteria": [],
         "explanation": "Favori kategorisi elektronik olan ve son 60 günde giriş yapmış müşteriler seçildi."
     },
-    "content": {
-        "sms": {
-            "body": "Merhaba {{first_name}}, elektronikte yeni ürünler geldi! Seçili modellere göz atmak için bizi ziyaret et."
+    "content": [
+        {
+            "offer": "yeni ürünler ve fırsatlar",
+            "sms": {
+                "body": "Merhaba {{first_name}}, %CATEGORY% kategorisinde %OFFER% var! Göz atmak için bizi ziyaret et."
+            },
+            "email": {
+                "subject": "%CATEGORY% kategorisinde yeni fırsatlar",
+                "body": "Merhaba {{first_name}},\n\n%CATEGORY% kategorisinde senin için seçtiklerimiz yayında: %OFFER% var. Hemen göz atabilirsin.\n\nKeyifli alışverişler dileriz."
+            }
         },
-        "email": {
-            "subject": "Elektronikte yeni ürünler seni bekliyor",
-            "body": "Merhaba {{first_name}},\n\nElektronik kategorisinde yeni ürünlerimiz yayında. Senin için seçtiğimiz modellere göz atabilirsin.\n\nKeyifli alışverişler dileriz."
+        {
+            "offer": "kaçırılmayacak fırsatlar",
+            "sms": {
+                "body": "{{first_name}}, ilgini çeken %CATEGORY% kategorisinde %OFFER% seni bekliyor."
+            },
+            "email": {
+                "subject": "İlgini çeken kategoride yenilikler",
+                "body": "Merhaba {{first_name}},\n\n%CATEGORY% kategorisini sevdiğini biliyoruz. Bu hafta %OFFER% seni bekliyor.\n\nSevgiler."
+            }
+        },
+        {
+            "offer": "seçili ürünlerde avantajlar",
+            "sms": {
+                "body": "Merhaba {{first_name}}, %CATEGORY% kategorisinde %OFFER% ile alışveriş yapmanın tam zamanı!"
+            },
+            "email": {
+                "subject": "%CATEGORY% alışverişi için doğru zaman",
+                "body": "Merhaba {{first_name}},\n\n%CATEGORY% kategorisinde %OFFER% ile alışveriş yapabilirsin. Seçili ürünlere göz atmayı unutma.\n\nİyi alışverişler dileriz."
+            }
         }
-    }
+    ]
 }

@@ -32,8 +32,11 @@ final class BriefReader
 
     private const NUMBER_WORDS = [
         'bir' => 1, 'iki' => 2, 'uc' => 3, 'dort' => 4, 'bes' => 5, 'alti' => 6, 'yedi' => 7,
-        'sekiz' => 8, 'dokuz' => 9, 'on' => 10, 'yirmi' => 20, 'otuz' => 30,
+        'sekiz' => 8, 'dokuz' => 9, 'on' => 10, 'yirmi' => 20, 'otuz' => 30, 'kirk' => 40, 'elli' => 50,
     ];
+
+    // "%20", "20%" or "yüzde 20 / yüzde yirmi"; a discount over 99% is not a discount the brief means.
+    private const DISCOUNT_PATTERN = '/%\s*(\d{1,2})(?!\d)|(?<!\d)(\d{1,2})\s*%|yuzde\s+(\d{1,2}|[a-z]+)/';
 
     private const UNIT_DAYS = ['gun' => 1, 'hafta' => self::DAYS_PER_WEEK, 'ay' => self::DAYS_PER_MONTH];
 
@@ -80,6 +83,39 @@ final class BriefReader
             $this->category($words),
             $this->platform($words),
         ]));
+    }
+
+    /**
+     * The details a message should repeat, so SMS and email carry the same facts (K25): the discount, a
+     * single city and the categories the brief names.
+     *
+     * @return array{discount: int|null, city: string|null, categories: list<string>}
+     */
+    public function facts(string $brief): array
+    {
+        $city = null;
+        $categories = [];
+        foreach ($this->read($brief) as $condition) {
+            if ($condition['field'] === 'city' && $condition['operator'] === 'eq') {
+                $city = (string) $condition['value'];
+            }
+            if ($condition['field'] === 'favorite_category') {
+                $categories = (array) $condition['value'];
+            }
+        }
+
+        return ['discount' => $this->discount(self::fold($brief)), 'city' => $city, 'categories' => $categories];
+    }
+
+    private function discount(string $folded): ?int
+    {
+        if (preg_match(self::DISCOUNT_PATTERN, $folded, $match) !== 1) {
+            return null;
+        }
+        $amount = end($match);
+        $percent = ctype_digit($amount) ? (int) $amount : (self::NUMBER_WORDS[$amount] ?? 0);
+
+        return $percent >= 1 && $percent <= 99 ? $percent : null;
     }
 
     /** One line in the chips' own wording (field label + operator template), for the rule explanation. */

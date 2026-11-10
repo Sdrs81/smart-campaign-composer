@@ -1,0 +1,46 @@
+{
+    "name": "vip-spender",
+    "keywords": ["vip", "harcama", "en cok alisveris", "sik alisveris"],
+    "segment": {
+        "rule": {
+            "version": 1,
+            "conditions": [
+                { "field": "orders_count", "operator": "gte", "value": 10 }
+            ]
+        },
+        "unsupported_criteria": [],
+        "explanation": "En az 10 sipariş vermiş sık alışveriş yapan müşteriler seçildi."
+    },
+    "content": [
+        {
+            "offer": "özel ayrıcalıklar",
+            "sms": {
+                "body": "Merhaba {{first_name}}, en sevdiğimiz müşterilerimizdensin! Sana özel %OFFER% var."
+            },
+            "email": {
+                "subject": "En sevdiğimiz müşterilerimizdensin",
+                "body": "Merhaba {{first_name}},\n\nSık alışveriş yapan değerli müşterilerimize teşekkür etmek istiyoruz. Sana özel %OFFER% var.\n\nKeyifli alışverişler dileriz."
+            }
+        },
+        {
+            "offer": "özel ayrıcalıklar",
+            "sms": {
+                "body": "{{first_name}}, bizi tercih ettiğin için teşekkürler. Seçkin müşterilerimize özel %OFFER% seni bekliyor."
+            },
+            "email": {
+                "subject": "Seçkin müşterilerimize özel",
+                "body": "Merhaba {{first_name}},\n\nBizi sık tercih ettiğin için teşekkürler. Seçkin müşterilerimize özel %OFFER% seni bekliyor.\n\nSevgiler."
+            }
+        },
+        {
+            "offer": "özel ayrıcalıklar",
+            "sms": {
+                "body": "Merhaba {{first_name}}, sadakatine teşekkür ederiz. Bu ay senin için %OFFER% hazırladık."
+            },
+            "email": {
+                "subject": "Sadakatine teşekkür ederiz",
+                "body": "Merhaba {{first_name}},\n\nSadakatine teşekkür ederiz. Bu ay senin için %OFFER% hazırladık.\n\nİyi alışverişler dileriz."
+            }
+        }
+    ]
+}

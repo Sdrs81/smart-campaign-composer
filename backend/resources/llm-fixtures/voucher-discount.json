@@ -1,0 +1,46 @@
+{
+    "name": "discount",
+    "keywords": ["indirim", "kupon", "firsat", "kampanya kodu"],
+    "segment": {
+        "rule": {
+            "version": 1,
+            "conditions": [
+                { "field": "orders_count", "operator": "gte", "value": 1 }
+            ]
+        },
+        "unsupported_criteria": [],
+        "explanation": "En az bir sipariş vermiş müşteriler seçildi."
+    },
+    "content": [
+        {
+            "offer": "kaçırılmayacak fırsatlar",
+            "sms": {
+                "body": "Merhaba {{first_name}}, %OFFER% seni bekliyor! Süre sınırlı, hemen göz at."
+            },
+            "email": {
+                "subject": "Sana özel indirim fırsatı",
+                "body": "Merhaba {{first_name}},\n\nSana özel hazırladığımız fırsat yayında: %OFFER% seni bekliyor. Süre sınırlı olduğu için kaçırma.\n\nKeyifli alışverişler dileriz."
+            }
+        },
+        {
+            "offer": "kaçırılmayacak fırsatlar",
+            "sms": {
+                "body": "{{first_name}}, bugüne özel %OFFER% var. Alışverişe hemen başla!"
+            },
+            "email": {
+                "subject": "Bugüne özel fırsat",
+                "body": "Merhaba {{first_name}},\n\nBugüne özel %OFFER% var. Alışverişe hemen başlayabilirsin.\n\nSevgiler."
+            }
+        },
+        {
+            "offer": "kaçırılmayacak fırsatlar",
+            "sms": {
+                "body": "Merhaba {{first_name}}, fırsat bitmeden yakala: %OFFER% seni bekliyor."
+            },
+            "email": {
+                "subject": "Fırsat bitmeden yakala",
+                "body": "Merhaba {{first_name}},\n\nFırsat bitmeden yakala: %OFFER% seni bekliyor. Detaylar için sayfamıza göz at.\n\nİyi alışverişler dileriz."
+            }
+        }
+    ]
+}

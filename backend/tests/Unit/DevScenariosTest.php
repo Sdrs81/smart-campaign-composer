@@ -54,7 +54,12 @@ it('picks the scenario by keyword, also for capital Turkish letters', function (
     'long time no login' => ['Uzun süredir giriş yapmayan kullanıcılar', 'inactive-login'],
     'capital GİRİŞ' => ['GİRİŞ YAPMAYANLARA hatırlatma', 'inactive-login'],
     'dotless ı and ş together' => ['Sadakat programındaki müşteriler', 'loyalty-tier'],
-    'no keyword' => ['Yaz indirimi duyurusu hazırla', 'generic'],
+    'no keyword' => ['Yaz duyurusu hazırla', 'generic'],
+    'discount' => ['Yaz indirimi duyurusu hazırla', 'discount'],
+    'new member' => ['Yeni üye olanlara hoş geldin mesajı', 'new-member'],
+    'a tier word does not hide "yeni üye"' => ['Yeni üyelerimize teşekkür et', 'new-member'],
+    'big spenders' => ['VIP müşterilerimize teşekkür et', 'vip-spender'],
+    'win back' => ['1 haftadır sipariş vermemiş müşteriler için kampanya', 'win-back'],
     'empty' => ['', 'generic'],
 ]);
 
@@ -62,7 +67,21 @@ it('has a fixture for every promised scenario and a generic one', function (): v
     $names = array_column(devFixtures(), 'name');
     sort($names);
 
-    expect($names)->toBe(['cart-abandon', 'category', 'generic', 'inactive-login', 'loyalty-tier']);
+    expect($names)->toBe(['cart-abandon', 'category', 'discount', 'generic', 'inactive-login', 'loyalty-tier', 'new-member', 'vip-spender', 'win-back']);
+});
+
+it('spreads ten different briefs over at least six scenarios, not mostly the generic one', function (): void {
+    $scenarios = new DevScenarios;
+    $briefs = [
+        'Sepeti terk edenlere hatırlatma', 'Elektronik kategorisini sevenlere duyuru', 'Yaz indirimi duyurusu hazırla',
+        'Uzun süredir giriş yapmayanlara mesaj', 'Gold üyelerimize teşekkür et', 'Yeni üye olanlara hoş geldin',
+        'VIP müşterilerimize özel teklif', 'Alışveriş yapmayan müşterileri geri kazan', 'Kupon kodu gönderelim', 'Bir şey duyuralım',
+    ];
+
+    $names = array_map(fn (string $brief): string => $scenarios->scenarioNameFor($brief), $briefs);
+
+    expect(array_unique($names))->toHaveCount(9)
+        ->and(array_count_values($names)['generic'])->toBe(1);
 });
 
 it('ships segment rules the real parser accepts', function (): void {
@@ -75,17 +94,87 @@ it('ships segment rules the real parser accepts', function (): void {
     }
 });
 
-it('ships messages that fit the limits even for very long customer values', function (): void {
+// One brief per scenario, so every fixture is reached through the keyword that picks it.
+const DEV_SCENARIO_BRIEFS = [
+    'cart-abandon' => 'sepeti terk edenler',
+    'category' => 'elektronik kategorisi',
+    'discount' => 'indirim duyurusu',
+    'generic' => 'duyuru',
+    'inactive-login' => 'giriş yapmayanlar',
+    'loyalty-tier' => 'sadakat üyeleri',
+    'new-member' => 'yeni üye olanlar',
+    'vip-spender' => 'vip müşteriler',
+    'win-back' => 'sipariş vermemiş müşteriler',
+];
+
+it('has a variant list with the shared offer slot in both channels, for every scenario', function (): void {
+    foreach (devFixtures() as $fixture) {
+        expect(count($fixture['content']))->toBeGreaterThanOrEqual(3, $fixture['name']);
+
+        foreach ($fixture['content'] as $variant) {
+            expect($variant['sms']['body'])->toContain('%OFFER%')
+                ->and($variant['email']['body'])->toContain('%OFFER%')
+                ->and($variant['offer'])->not->toBe('');
+        }
+    }
+});
+
+it('puts the same discount, city and category in the SMS and the email of every variant', function (): void {
+    $registry = new FieldRegistry(fn (): array => ['Kahramanmaraş', 'İstanbul']);
+    $scenarios = new DevScenarios(new BriefReader($registry));
+
+    foreach (DEV_SCENARIO_BRIEFS as $name => $keywords) {
+        $brief = "Kahramanmaraş'taki müşterilere %20, moda ve kozmetik ürünleri, {$keywords}";
+        expect($scenarios->scenarioNameFor($brief))->toBe($name);
+
+        foreach (range(0, $scenarios->variantCount($brief) - 1) as $variant) {
+            $content = $scenarios->contentVariant($brief, $variant);
+            foreach (['Kahramanmaraş', '%20'] as $fact) {
+                expect($content['sms']['body'])->toContain($fact)
+                    ->and($content['email']['body'])->toContain($fact);
+            }
+            expect($content['sms']['body'].$content['email']['body'])->not->toContain('%OFFER%')->not->toContain('%CATEGORY%');
+        }
+    }
+
+    $category = $scenarios->contentVariant('elektronik ve kozmetik kategorisi için %20 indirim', 1);
+    expect($category['sms']['body'])->toContain('elektronik ve kozmetik')
+        ->and($category['email']['body'])->toContain('elektronik ve kozmetik');
+});
+
+it('writes no fixed city name and no other city than the brief names', function (): void {
+    $cities = ['Ankara', 'İstanbul', 'İzmir', 'Bursa', 'Antalya'];
+    $scenarios = new DevScenarios(new BriefReader(new FieldRegistry(fn (): array => $cities)));
+
+    foreach (DEV_SCENARIO_BRIEFS as $name => $keywords) {
+        $brief = "İstanbul'daki müşteriler için {$keywords}";
+        foreach (range(0, $scenarios->variantCount($brief) - 1) as $variant) {
+            $content = $scenarios->contentVariant($brief, $variant);
+            $text = $content['sms']['body'].$content['email']['subject'].$content['email']['body'];
+
+            expect($text)->toContain('İstanbul')
+                ->and($text)->not->toContain('Ankara')->not->toContain('İzmir')->not->toContain('Bursa')->not->toContain('Antalya');
+        }
+    }
+});
+
+it('ships messages that fit the limits even for very long customer values and the longest facts in the brief', function (): void {
     $validator = new ContentValidator(new PersonalizationRenderer, 160, 80, 2000);
     $longest = ['first_name' => 30, 'last_name' => 30, 'city' => 30];
+    $scenarios = new DevScenarios(new BriefReader(new FieldRegistry(fn (): array => ['Kahramanmaraş'])));
 
-    foreach (devFixtures() as $fixture) {
-        $content = $fixture['content'];
-        $sms = new MessageContent(Channel::Sms, null, $content['sms']['body']);
-        $email = new MessageContent(Channel::Email, $content['email']['subject'], $content['email']['body']);
+    foreach (DEV_SCENARIO_BRIEFS as $name => $keywords) {
+        // The longest city, a two-digit discount and two categories at once.
+        foreach (["Kahramanmaraş'taki %99 moda kozmetik {$keywords}", $keywords] as $brief) {
+            foreach (range(0, $scenarios->variantCount($brief) - 1) as $variant) {
+                $content = $scenarios->contentVariant($brief, $variant);
+                $sms = new MessageContent(Channel::Sms, null, $content['sms']['body']);
+                $email = new MessageContent(Channel::Email, $content['email']['subject'], $content['email']['body']);
 
-        expect($validator->validate($sms, $longest)?->messages())->toBeNull("sms of {$fixture['name']}")
-            ->and($validator->validate($email, $longest)?->messages())->toBeNull("email of {$fixture['name']}");
+                expect($validator->validate($sms, $longest)?->messages())->toBeNull("sms of {$name} #{$variant}")
+                    ->and($validator->validate($email, $longest)?->messages())->toBeNull("email of {$name} #{$variant}");
+            }
+        }
     }
 });
 
@@ -122,7 +211,7 @@ it('lays the filters the brief states over the scenario rule', function (): void
     // The worked example keeps its old rule exactly, and a brief with no filters keeps the scenario's answer.
     $withoutReader = json_decode((new DevScenarios)->respond(devRequest('segment', DEV_CART_BRIEF))->text, true, flags: JSON_THROW_ON_ERROR);
     expect($segment(DEV_CART_BRIEF)['rule'])->toBe($withoutReader['rule'])
-        ->and($segment('Yaz indirimi duyurusu hazırla')['rule']['conditions'][0]['field'])->toBe('registered_at');
+        ->and($segment('Yaz duyurusu hazırla')['rule']['conditions'][0]['field'])->toBe('registered_at');
 });
 
 it('answers a content request with sms and email text', function (): void {

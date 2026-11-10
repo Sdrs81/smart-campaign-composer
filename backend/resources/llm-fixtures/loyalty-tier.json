@@ -1,6 +1,6 @@
 {
     "name": "loyalty-tier",
-    "keywords": ["sadakat", "uye", "gold", "platinum", "seviye"],
+    "keywords": ["sadakat", "gold", "platinum", "seviye"],
     "segment": {
         "rule": {
             "version": 1,
@@ -13,15 +13,38 @@
             ]
         },
         "unsupported_criteria": [],
-        "explanation": "Gold ve platinum sadakat seviyesindeki müşteriler seçildi."
+        "explanation": "Sadakat seviyesi gold veya platinum olan müşteriler seçildi."
     },
-    "content": {
-        "sms": {
-            "body": "Merhaba {{first_name}}, sadık müşterimiz olduğun için teşekkürler! Sana özel avantajlar seni bekliyor."
+    "content": [
+        {
+            "offer": "yeni avantajlar",
+            "sms": {
+                "body": "Merhaba {{first_name}}, sadık müşterimiz olduğun için teşekkürler! Seviyene özel %OFFER% var."
+            },
+            "email": {
+                "subject": "Sadakatin için teşekkür ederiz",
+                "body": "Merhaba {{first_name}},\n\nBizimle olduğun için çok teşekkür ederiz. Üyelik seviyene özel %OFFER% var; ayrıntıları hesabında görebilirsin.\n\nKeyifli alışverişler dileriz."
+            }
         },
-        "email": {
-            "subject": "Sadakatin için teşekkür ederiz",
-            "body": "Merhaba {{first_name}},\n\nBizimle olduğun için çok teşekkür ederiz. Üyelik seviyene özel avantajları hesabında görebilirsin.\n\nKeyifli alışverişler dileriz."
+        {
+            "offer": "yeni avantajlar",
+            "sms": {
+                "body": "{{first_name}}, değerli üyemizsin. Üyelik seviyene özel %OFFER% seni bekliyor."
+            },
+            "email": {
+                "subject": "Üyelerimize özel bir teşekkür",
+                "body": "Merhaba {{first_name}},\n\nÜyelerimiz bizim için çok değerli. Üyelik seviyene özel %OFFER% seni bekliyor.\n\nSevgiler."
+            }
+        },
+        {
+            "offer": "yeni avantajlar",
+            "sms": {
+                "body": "Merhaba {{first_name}}, ayrıcalıklı üyelerimize özel: %OFFER% hesabında seni bekliyor."
+            },
+            "email": {
+                "subject": "Ayrıcalıklı üyelere özel",
+                "body": "Merhaba {{first_name}},\n\nAyrıcalıklı üyelerimiz için hazırladık: %OFFER% hesabında seni bekliyor.\n\nİyi alışverişler dileriz."
+            }
         }
-    }
+    ]
 }

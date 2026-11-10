@@ -1,0 +1,50 @@
+{
+    "name": "new-member",
+    "keywords": ["yeni uye", "yeni kayit", "hos geldin", "kayit olan"],
+    "segment": {
+        "rule": {
+            "version": 1,
+            "conditions": [
+                {
+                    "field": "registered_at",
+                    "operator": "within_last_days",
+                    "value": 30
+                }
+            ]
+        },
+        "unsupported_criteria": [],
+        "explanation": "Son 30 günde kayıt olan yeni müşteriler seçildi."
+    },
+    "content": [
+        {
+            "offer": "hoş geldin fırsatı",
+            "sms": {
+                "body": "Aramıza hoş geldin {{first_name}}! İlk alışverişin için %OFFER% var."
+            },
+            "email": {
+                "subject": "Aramıza hoş geldin",
+                "body": "Merhaba {{first_name}},\n\nAramıza katıldığın için çok mutluyuz. İlk alışverişin için %OFFER% var.\n\nKeyifli alışverişler dileriz."
+            }
+        },
+        {
+            "offer": "hoş geldin fırsatı",
+            "sms": {
+                "body": "Merhaba {{first_name}}, yeni üyemize özel %OFFER% seni bekliyor. Keşfetmeye başla!"
+            },
+            "email": {
+                "subject": "Yeni üyeliğine özel bir sürpriz",
+                "body": "Merhaba {{first_name}},\n\nYeni üyeliğin için teşekkürler. Sana özel %OFFER% seni bekliyor; mağazamızı keşfetmeye başlayabilirsin.\n\nSevgiler."
+            }
+        },
+        {
+            "offer": "hoş geldin fırsatı",
+            "sms": {
+                "body": "{{first_name}}, ilk siparişinde %OFFER% seni bekliyor. Hoş geldin!"
+            },
+            "email": {
+                "subject": "İlk siparişin için hazırız",
+                "body": "Merhaba {{first_name}},\n\nİlk siparişini vermen için hazırız: %OFFER% seni bekliyor. Hoş geldin!\n\nİyi alışverişler dileriz."
+            }
+        }
+    ]
+}

@@ -14,6 +14,8 @@ use LogicException;
  * Ready-made answers for running the app without an API key (K9). The scenario is chosen by keywords in
  * the brief, from the fixtures in resources/llm-fixtures; a brief that matches none gets the generic one.
  * Fixtures are read in file-name order and the first keyword match wins.
+ *
+ * @phpstan-type Scenario array{name: string, keywords: list<string>, segment: array<string, mixed>, content: list<array{offer: string, sms: array{body: string}, email: array{subject: string, body: string}}>}
  */
 final class DevScenarios
 {
@@ -26,10 +28,16 @@ final class DevScenarios
 
     private const BRIEF_PATTERN = '#<brief>(.*?)</brief>#s';
 
+    // Two names keep an SMS inside its limit; a brief naming more gets the first two.
+    private const MAX_CATEGORIES_NAMED = 2;
+
+    // Reads naturally in "%CATEGORY% kategorisinde" when the brief names no category.
+    private const NO_CATEGORY_NAMED = 'seçili ürün';
+
     // A rough size for the usage the call log shows; the real count comes from a real model.
     private const CHARACTERS_PER_TOKEN = 4;
 
-    /** @var list<array{name: string, keywords: list<string>, segment: array<string, mixed>, content: array<string, mixed>}>|null */
+    /** @var list<Scenario>|null */
     private ?array $scenarios = null;
 
     /** @param  BriefReader|null  $reader  adds the filters the brief states itself (city, age, ...); without it the scenario's own rule is used */
@@ -41,7 +49,7 @@ final class DevScenarios
         $scenario = $this->scenarioFor($brief);
         $answer = match ($request->purpose) {
             'segment' => $this->segmentFor($scenario, $brief),
-            'content' => $scenario['content'],
+            'content' => $this->contentVariant($brief),
             default => throw new LogicException("DevScenarios has no answer for purpose '{$request->purpose}'; supported: segment, content."),
         };
         $text = json_encode($answer, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -54,12 +62,45 @@ final class DevScenarios
         return $this->scenarioFor($brief)['name'];
     }
 
+    public function variantCount(string $brief): int
+    {
+        return count($this->scenarioFor($brief)['content']);
+    }
+
+    /**
+     * One ready-made SMS + email pair of the brief's scenario. Both texts are written with the same
+     * %OFFER% slot, filled once from the brief (discount, single city, categories), so the key facts are
+     * the same in the SMS and the email by construction (K25). A fact the brief does not state falls back
+     * to the variant's own default offer; city names are never written into the fixtures.
+     *
+     * @return array{sms: array{body: string}, email: array{subject: string, body: string}}
+     */
+    public function contentVariant(string $brief, int $variant = 0): array
+    {
+        $variants = $this->scenarioFor($brief)['content'];
+        $chosen = $variants[$variant % count($variants)];
+        $facts = $this->reader?->facts($brief) ?? ['discount' => null, 'city' => null, 'categories' => []];
+
+        $offer = $facts['discount'] !== null ? "%{$facts['discount']} indirim" : $chosen['offer'];
+        if ($facts['city'] !== null) {
+            $offer = "{$facts['city']} için {$offer}";
+        }
+        $category = implode(' ve ', array_slice($facts['categories'], 0, self::MAX_CATEGORIES_NAMED)) ?: self::NO_CATEGORY_NAMED;
+
+        $fill = fn (string $text): string => strtr($text, ['%OFFER%' => $offer, '%CATEGORY%' => $category]);
+
+        return [
+            'sms' => ['body' => $fill($chosen['sms']['body'])],
+            'email' => ['subject' => $fill($chosen['email']['subject']), 'body' => $fill($chosen['email']['body'])],
+        ];
+    }
+
     /**
      * The scenario's conditions, with what the brief states itself laid over them field by field: the brief
      * wins on a shared field, and the generic scenario's "everyone" condition is dropped once the brief
      * names a real filter.
      *
-     * @param  array{name: string, keywords: list<string>, segment: array<string, mixed>, content: array<string, mixed>}  $scenario
+     * @param  Scenario  $scenario
      * @return array<string, mixed>
      */
     private function segmentFor(array $scenario, string $brief): array
@@ -87,7 +128,7 @@ final class DevScenarios
         return $segment;
     }
 
-    /** @return array{name: string, keywords: list<string>, segment: array<string, mixed>, content: array<string, mixed>} */
+    /** @return Scenario */
     private function scenarioFor(string $brief): array
     {
         $folded = BriefReader::fold($brief);
@@ -117,7 +158,7 @@ final class DevScenarios
         return $match[1] ?? '';
     }
 
-    /** @return list<array{name: string, keywords: list<string>, segment: array<string, mixed>, content: array<string, mixed>}> */
+    /** @return list<Scenario> */
     private function scenarios(): array
     {
         if ($this->scenarios !== null) {
