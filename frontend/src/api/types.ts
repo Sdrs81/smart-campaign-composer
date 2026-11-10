@@ -91,11 +91,24 @@ export interface Preview {
   messages: PreviewMessage[]
 }
 
+// Mirrors App\Delivery\DeliveryErrorCode (K24); the dashboard explains each one in plain language.
+export const DELIVERY_ERROR_CODES = [
+  'consent_withdrawn',
+  'provider_temporary',
+  'retries_exhausted',
+  'provider_rejected',
+  'content_invalid',
+  'internal',
+] as const
+export type DeliveryErrorCode = (typeof DELIVERY_ERROR_CODES)[number]
+
 export interface DeliveryError {
   delivery_id: number
   channel: Channel
   status: DeliveryStatus
   attempts: number
+  // null for a delivery stored before codes existed; an unknown string if the backend is newer.
+  code: string | null
   error: string
   at: string
 }

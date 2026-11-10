@@ -134,6 +134,20 @@ export const tr: typeof en = {
     status: 'Durum',
     attempts: 'Deneme',
     error: 'Hata',
+    technicalDetail: 'Teknik ayrıntı',
+  },
+  deliveryError: {
+    consent_withdrawn:
+      'Müşteri, kitle belirlendikten sonra bu kanal için iznini geri çekti; bu yüzden mesaj gönderilmedi.',
+    provider_temporary:
+      'Gönderim servisinde geçici bir sorun oldu. Başarısız denemeler otomatik olarak tekrarlanır.',
+    retries_exhausted: 'Gönderim servisi sürekli hata verdi, bu yüzden mesaj gönderilemedi.',
+    provider_rejected:
+      'Gönderim servisi bu mesajı kabul etmedi; örneğin numara veya adres geçersiz olabilir.',
+    content_invalid: 'Mesaj gönderilemedi: metni eksik ya da bu kanal için fazla uzun.',
+    internal:
+      'Beklenmeyen bir hata bu mesajı durdurdu. Lütfen teknik ayrıntıyı yazılım ekibine iletin.',
+    unknown: 'Mesaj teslim edilemedi. Nedeni teknik ayrıntıda görebilirsiniz.',
   },
   progress: {
     sent: 'Gönderildi',

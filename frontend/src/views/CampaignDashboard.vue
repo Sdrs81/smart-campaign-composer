@@ -3,7 +3,12 @@ import { computed, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { api, parseStats } from '../api/client'
-import type { Channel, CampaignStats } from '../api/types'
+import {
+  DELIVERY_ERROR_CODES,
+  type CampaignStats,
+  type Channel,
+  type DeliveryErrorCode,
+} from '../api/types'
 import BackLink from '../components/BackLink.vue'
 import ChannelProgress from '../components/ChannelProgress.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -39,6 +44,11 @@ const connection = computed(() => {
   if (connected.value) return t('dashboard.live')
   return stats.value === null ? t('dashboard.connecting') : t('dashboard.reconnecting')
 })
+const isKnownCode = (code: string | null): code is DeliveryErrorCode =>
+  DELIVERY_ERROR_CODES.some((known) => known === code)
+// A missing code (older row) or one this frontend does not know yet still gets a sentence.
+const explain = (code: string | null): string =>
+  t(`deliveryError.${isKnownCode(code) ? code : 'unknown'}`)
 const formatTime = (iso: string): string => new Date(iso).toLocaleTimeString(locale.value)
 </script>
 
@@ -107,7 +117,17 @@ const formatTime = (iso: string): string => new Date(iso).toLocaleTimeString(loc
                 <td class="px-3 py-2">{{ t(`channel.${failure.channel}`) }}</td>
                 <td class="px-3 py-2">{{ t(`deliveryStatus.${failure.status}`) }}</td>
                 <td class="px-3 py-2">{{ failure.attempts }}</td>
-                <td class="px-3 py-2">{{ failure.error }}</td>
+                <td class="px-3 py-2">
+                  <p>{{ explain(failure.code) }}</p>
+                  <details class="mt-1 text-xs text-slate-600">
+                    <summary class="cursor-pointer focus:outline-2 focus:outline-indigo-600">
+                      {{ t('dashboard.technicalDetail') }}
+                    </summary>
+                    <p class="mt-1 wrap-break-word whitespace-pre-wrap select-all">
+                      {{ failure.error }}
+                    </p>
+                  </details>
+                </td>
               </tr>
             </tbody>
           </table>

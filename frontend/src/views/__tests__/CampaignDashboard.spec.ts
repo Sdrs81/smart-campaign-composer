@@ -6,9 +6,16 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { createPinia } from 'pinia'
 
 import App from '../../App.vue'
-import type { CampaignStats, CampaignStatus } from '../../api/types'
+import {
+  DELIVERY_ERROR_CODES,
+  type CampaignStats,
+  type CampaignStatus,
+  type DeliveryError,
+} from '../../api/types'
 import ChannelProgress from '../../components/ChannelProgress.vue'
 import { setLocale } from '../../i18n'
+import { en } from '../../i18n/en'
+import { tr } from '../../i18n/tr'
 import { routes } from '../../router'
 import CampaignDashboard from '../CampaignDashboard.vue'
 
@@ -89,6 +96,23 @@ async function mountDashboard() {
   return { wrapper, source }
 }
 
+function dashboardError(overrides: Partial<DeliveryError> = {}): DeliveryError {
+  return {
+    delivery_id: 9,
+    channel: 'sms',
+    status: 'failed',
+    attempts: 1,
+    code: 'internal',
+    error: 'raw error',
+    at: '2026-01-01T10:00:00Z',
+    ...overrides,
+  }
+}
+
+function emitErrors(source: FakeEventSource, errors: DeliveryError[]): void {
+  source.emit('stats', JSON.stringify(snapshot('sending', { sent: 1 }, { recent_errors: errors })))
+}
+
 const widthOf = (wrapper: Awaited<ReturnType<typeof mountDashboard>>['wrapper'], segment: string) =>
   Number(wrapper.find(`[data-segment="${segment}"]`).attributes('width'))
 
@@ -144,6 +168,7 @@ describe('CampaignDashboard', () => {
                 channel: 'sms',
                 status: 'failed',
                 attempts: 3,
+                code: 'provider_temporary',
                 error: 'provider 503',
                 at: '2026-01-01T10:00:00Z',
               },
@@ -155,8 +180,50 @@ describe('CampaignDashboard', () => {
     await nextTick()
 
     const cells = wrapper.findAll('tbody tr td').map((cell) => cell.text())
-    expect(cells).toContain('provider 503')
     expect(cells).toContain('3')
+    expect(cells.at(-1)).toContain('The delivery service had a temporary problem')
+  })
+
+  it('keeps the raw error behind a collapsed "Technical detail" and explains it in plain words', async () => {
+    const { wrapper, source } = await mountDashboard()
+    emitErrors(source, [
+      dashboardError({ code: 'provider_rejected', error: 'Provider answered 400: bad' }),
+    ])
+    await nextTick()
+
+    const details = wrapper.find('details')
+    expect(details.attributes('open')).toBeUndefined()
+    expect(details.find('summary').text()).toBe('Technical detail')
+    expect(details.text()).toContain('Provider answered 400: bad')
+    // The visible sentence is the explanation, not the provider's text.
+    expect(wrapper.find('tbody td:last-child p').text()).toContain('refused this message')
+    expect(wrapper.find('tbody td:last-child p').text()).not.toContain('Provider answered')
+  })
+
+  it('has a plain sentence for every error code in both languages', async () => {
+    for (const code of DELIVERY_ERROR_CODES) {
+      expect(en.deliveryError[code], `${code} in English`).toBeTruthy()
+      expect(tr.deliveryError[code], `${code} in Turkish`).toBeTruthy()
+    }
+
+    setLocale('tr')
+    const { wrapper, source } = await mountDashboard()
+    emitErrors(source, [dashboardError({ code: 'consent_withdrawn' })])
+    await nextTick()
+
+    expect(wrapper.find('tbody td:last-child p').text()).toBe(tr.deliveryError.consent_withdrawn)
+    expect(wrapper.find('summary').text()).toBe('Teknik ayrıntı')
+  })
+
+  it.each([
+    ['a missing code', null],
+    ['a code this version does not know', 'brand_new_code'],
+  ])('falls back to a generic sentence for %s', async (_name, code) => {
+    const { wrapper, source } = await mountDashboard()
+    emitErrors(source, [dashboardError({ code })])
+    await nextTick()
+
+    expect(wrapper.find('tbody td:last-child p').text()).toBe(en.deliveryError.unknown)
   })
 
   it('shows a reconnect state when the connection drops and goes live again', async () => {
@@ -206,6 +273,7 @@ describe('CampaignDashboard', () => {
                 channel: 'email',
                 status: 'failed',
                 attempts: 3,
+                code: 'retries_exhausted',
                 error: 'provider 503',
                 at: '2026-01-01T10:00:00Z',
               },
@@ -231,9 +299,10 @@ describe('CampaignDashboard', () => {
       'Deneme',
       'Hata',
     ])
-    // The error text itself comes from the server and is shown as received.
+    // The sentence is translated; the server's raw text sits in the collapsed technical detail as received.
     const cells = wrapper.findAll('tbody tr td').map((cell) => cell.text())
-    expect(cells).toContain('provider 503')
+    expect(cells.at(-1)).toContain(tr.deliveryError.retries_exhausted)
+    expect(wrapper.find('details').text()).toContain('provider 503')
     expect(cells).toContain('Başarısız')
     expect(text).not.toContain('Recent errors')
   })
