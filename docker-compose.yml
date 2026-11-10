@@ -39,6 +39,9 @@ x-env: &env
 
 x-backend: &backend
   image: smart-campaign-backend:dev
+  # The image is built locally by the app service, never pulled. Without this, a first `docker compose up`
+  # tries the registry for the workers' copy and prints "pull access denied" before it builds the image.
+  pull_policy: never
   env_file:
     - path: .env
       required: false

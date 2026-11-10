@@ -7,8 +7,10 @@ A marketer writes a campaign brief in plain language. Claude turns it into a seg
 Requirements: Docker with Compose 2.24 or newer (the optional `.env` uses the `required: false` field). Node, PHP and Composer are not needed on the host (Node is needed only for `make e2e` and `make smoke`).
 
 ```
-docker compose up -d --build
+docker compose up
 ```
+
+The first run builds the images. Add `-d` to run the stack in the background, and `--build` after pulling new code so the images are rebuilt (`docker compose up -d --build`, which is what `make up` runs).
 
 No `.env` file is needed: every default lives in `docker-compose.yml`. To use Claude or tune a value, run `cp .env.example .env` first and edit it.
 

@@ -72,7 +72,7 @@ class SendDeliveryJob implements ShouldQueue
         MessageProvider $provider,
         RetryPolicy $retryPolicy,
         PersonalizationRenderer $renderer,
-        ChannelRateLimiter $rateLimiter,
+        SendRateLimiter $rateLimiter,
     ): void {
         $delivery = Delivery::query()->find($this->deliveryId);
 
@@ -105,7 +105,7 @@ class SendDeliveryJob implements ShouldQueue
         MessageProvider $provider,
         RetryPolicy $retryPolicy,
         PersonalizationRenderer $renderer,
-        ChannelRateLimiter $rateLimiter,
+        SendRateLimiter $rateLimiter,
     ): void {
         $customer = $delivery->customer;
 

@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Redis;
  * The global outbound limit per channel, shared by every worker through Redis (K17). A worker waits for
  * its turn here instead of calling the provider and burning a retry on a 429.
  */
-final readonly class ChannelRateLimiter
+final readonly class ChannelRateLimiter implements SendRateLimiter
 {
     private const WINDOW_SECONDS = 1;
 

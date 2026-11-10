@@ -10,6 +10,7 @@ use App\Delivery\ChannelRateLimiter;
 use App\Delivery\HttpMessageProvider;
 use App\Delivery\MessageProvider;
 use App\Delivery\RetryPolicy;
+use App\Delivery\SendRateLimiter;
 use App\Llm\Prompts\ContentPrompt;
 use App\Models\Customer;
 use App\Segment\FieldRegistry;
@@ -47,6 +48,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(MessageProvider::class, fn (): MessageProvider => HttpMessageProvider::fromConfig());
         $this->app->bind(RetryPolicy::class, fn (): RetryPolicy => RetryPolicy::fromConfig());
         $this->app->bind(ChannelRateLimiter::class, fn (): ChannelRateLimiter => ChannelRateLimiter::fromConfig());
+        // The send job asks for the interface; the metrics endpoint reads the peak from the concrete limiter.
+        $this->app->bind(SendRateLimiter::class, fn (Application $app): SendRateLimiter => $app->make(ChannelRateLimiter::class));
 
         // The prompt quotes the same limits the validator enforces, so it reads them from the same config.
         $this->app->bind(ContentPrompt::class, fn (): ContentPrompt => new ContentPrompt(

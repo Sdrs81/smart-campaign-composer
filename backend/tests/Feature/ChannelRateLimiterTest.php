@@ -26,7 +26,10 @@ function clearSendPeaks(): void
     }
 }
 
-/** The throttle window starts at the first permit, so the test starts just after a clock second begins. */
+/**
+ * The throttle window is the clock second (Laravel starts it at time()), so a test that must stay inside one
+ * window starts just after a second begins.
+ */
 function startOfClockSecond(): void
 {
     $microsecondsLeft = MICROSECONDS_PER_SECOND - (int) ((microtime(true) - floor(microtime(true))) * MICROSECONDS_PER_SECOND);
@@ -86,6 +89,7 @@ it('does not slow one channel down because another is saturated', function (): v
 
 it('says which channel was saturated when the wait runs out', function (): void {
     $limiter = new ChannelRateLimiter(1, 0);
+    startOfClockSecond();
     $limiter->await(Channel::Email);
 
     $limiter->await(Channel::Email);
