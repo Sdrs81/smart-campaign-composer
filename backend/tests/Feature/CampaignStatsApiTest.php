@@ -111,7 +111,20 @@ it('lists the ten most recent errors without customer data', function (): void {
     expect($errors)->toHaveCount(CampaignStats::RECENT_ERROR_LIMIT)
         ->and($errors[0]['error'])->toBe('error 12')
         ->and($errors[9]['error'])->toBe('error 3')
-        ->and(array_keys($errors[0]))->toBe(['delivery_id', 'channel', 'status', 'attempts', 'error', 'at']);
+        ->and(array_keys($errors[0]))->toBe(['delivery_id', 'channel', 'status', 'attempts', 'code', 'error', 'at']);
+});
+
+it('gives each error its code, and null for a row written before codes existed', function (): void {
+    $campaign = statsCampaign();
+    $coded = statsDelivery($campaign, 'sms', 'skipped', ['last_error' => 'consent withdrawn', 'last_error_code' => 'consent_withdrawn']);
+    $old = statsDelivery($campaign, 'sms', 'failed', ['last_error' => 'old error', 'attempts' => 1]);
+    DB::table('deliveries')->where('id', $coded->id)->update(['updated_at' => now()->subMinute()]);
+
+    $errors = $this->getJson("/api/campaigns/{$campaign->id}/stats")->json('data.recent_errors');
+
+    expect($errors[0]['delivery_id'])->toBe($old->id)
+        ->and($errors[0]['code'])->toBeNull()
+        ->and($errors[1]['code'])->toBe('consent_withdrawn');
 });
 
 it('keeps the error of a retried delivery that later succeeded and shows its status', function (): void {

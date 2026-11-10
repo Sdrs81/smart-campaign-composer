@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Delivery\DeliveryErrorCode;
 use App\Enums\DeliveryStatus;
 use App\Exceptions\InvalidDeliveryTransition;
 use App\Models\Delivery;
@@ -26,9 +27,9 @@ function callDeliveryMethod(Delivery $delivery, string $method): void
 {
     match ($method) {
         'markSent' => $delivery->markSent('msg-1'),
-        'markFailed' => $delivery->markFailed('boom'),
-        'scheduleRetry' => $delivery->scheduleRetry(CarbonImmutable::now()->addSecond(), 'timeout'),
-        'skip' => $delivery->skip('opted out'),
+        'markFailed' => $delivery->markFailed(DeliveryErrorCode::Internal, 'boom'),
+        'scheduleRetry' => $delivery->scheduleRetry(CarbonImmutable::now()->addSecond(), DeliveryErrorCode::ProviderTemporary, 'timeout'),
+        'skip' => $delivery->skip(DeliveryErrorCode::ConsentWithdrawn, 'opted out'),
     };
 }
 
@@ -97,19 +98,21 @@ it('names the states and the allowed next ones in the error', function () {
 it('marks a failure with its error and counts the attempt', function () {
     $delivery = (new Delivery)->forceFill(['status' => DeliveryStatus::Sending]);
 
-    $delivery->markFailed('provider rejected the number');
+    $delivery->markFailed(DeliveryErrorCode::ProviderRejected, 'provider rejected the number');
 
     expect($delivery->status)->toBe(DeliveryStatus::Failed)
         ->and($delivery->last_error)->toBe('provider rejected the number')
+        ->and($delivery->last_error_code)->toBe(DeliveryErrorCode::ProviderRejected)
         ->and($delivery->attempts)->toBe(1);
 });
 
 it('skips without counting an attempt', function () {
     $delivery = (new Delivery)->forceFill(['status' => DeliveryStatus::Pending]);
 
-    $delivery->skip('sms opt-in withdrawn');
+    $delivery->skip(DeliveryErrorCode::ConsentWithdrawn, 'sms opt-in withdrawn');
 
     expect($delivery->status)->toBe(DeliveryStatus::Skipped)
         ->and($delivery->last_error)->toBe('sms opt-in withdrawn')
+        ->and($delivery->last_error_code)->toBe(DeliveryErrorCode::ConsentWithdrawn)
         ->and($delivery->attempts)->toBe(0);
 });

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Delivery\DeliveryErrorCode;
 use App\Enums\Channel;
 use App\Enums\DeliveryStatus;
 use App\Models\Campaign;
@@ -53,7 +54,7 @@ it('releases the claim and sets the next attempt when scheduling a retry', funct
     $delivery->forceFill(['claimed_at' => now()])->save();
     $retryAt = now()->addSeconds(5)->startOfSecond(); // timestamptz columns keep whole seconds
 
-    $delivery->scheduleRetry($retryAt, 'timeout');
+    $delivery->scheduleRetry($retryAt, DeliveryErrorCode::ProviderTemporary, 'timeout');
     $delivery->save();
 
     $stored = $delivery->fresh();
@@ -62,6 +63,7 @@ it('releases the claim and sets the next attempt when scheduling a retry', funct
         ->and($stored->claimed_at)->toBeNull()
         ->and($stored->next_attempt_at?->equalTo($retryAt))->toBeTrue()
         ->and($stored->last_error)->toBe('timeout')
+        ->and($stored->last_error_code)->toBe(DeliveryErrorCode::ProviderTemporary)
         ->and($stored->attempts)->toBe(1);
 });
 
