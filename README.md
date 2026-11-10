@@ -4,12 +4,13 @@ A marketer writes a campaign brief in plain language. Claude turns it into a seg
 
 ## Setup
 
-Requirements: Docker. Node, PHP and Composer are not needed on the host (Node is needed only for `make e2e` and `make smoke`).
+Requirements: Docker with Compose 2.24 or newer (the optional `.env` uses the `required: false` field). Node, PHP and Composer are not needed on the host (Node is needed only for `make e2e` and `make smoke`).
 
 ```
-cp .env.example .env
 docker compose up -d --build
 ```
+
+No `.env` file is needed: every default lives in `docker-compose.yml`. To use Claude or tune a value, run `cp .env.example .env` first and edit it.
 
 Then open <http://localhost:8080>. The API health check is at <http://localhost:8080/api/health>, metrics at <http://localhost:8080/api/metrics>.
 

@@ -169,6 +169,12 @@ Each decision is written when the first task that needs it lands. Use this templ
 - **Rationale:** A key-less demo should behave like a real model closely enough to show that the brief reaches the audience. Narrow patterns are deterministic and testable; a missing condition is a visible gap, while a wrong one silently picks the wrong customers.
 - **Alternatives:** An NLP library or a second model for parsing (a dependency and non-determinism for a test double); random picks (cannot be asserted); extending the keyword lists only (still one fixed rule per scenario).
 
+## K27: Setup is one command, without a `.env` file
+
+- **Decision:** `docker-compose.yml` marks `env_file` as optional (`required: false`, Compose 2.24+) for the backend roles and the mock provider. Every value the containers need is set in a shared `x-env` block as `${VAR:-<.env.example value>}`, so a `.env` (for the API key or a tuned rate) wins and its absence changes nothing. The defaults are kept equal to `.env.example`, and a comment in each file points to the other. `make up` still copies `.env.example` to `.env`.
+- **Rationale:** The case requires `docker compose up` to work on a clean clone. Compose reads `.env` for interpolation by itself, so no extra tool is needed, and no secret enters the repository.
+- **Alternatives:** Committing a `.env` (secrets risk); a `cp` step in the README (breaks the one-command requirement); copying in the entrypoint (the container cannot write to the host).
+
 ## Setup notes (Phase 2)
 
 - **API only:** no web routes, views or Vite in the backend; errors share one `{error:{code,message,details}}` body.
