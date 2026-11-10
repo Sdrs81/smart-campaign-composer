@@ -4,12 +4,15 @@ A marketer writes a campaign brief in plain language. Claude turns it into a seg
 
 ## Setup
 
-Requirements: Docker. Node, PHP and Composer are not needed on the host (Node is needed only for `make e2e` and `make smoke`).
+Requirements: Docker with Compose 2.24 or newer (the optional `.env` uses the `required: false` field). Node, PHP and Composer are not needed on the host (Node is needed only for `make e2e` and `make smoke`).
 
 ```
-cp .env.example .env
-docker compose up -d --build
+docker compose up
 ```
+
+The first run builds the images. Add `-d` to run the stack in the background, and `--build` after pulling new code so the images are rebuilt (`docker compose up -d --build`, which is what `make up` runs).
+
+No `.env` file is needed: every default lives in `docker-compose.yml`. To use Claude or tune a value, run `cp .env.example .env` first and edit it.
 
 Then open <http://localhost:8080>. The API health check is at <http://localhost:8080/api/health>, metrics at <http://localhost:8080/api/metrics>.
 
@@ -112,7 +115,7 @@ Errors share one body: `{"error":{"code":"...","message":"...","details":{}}}`.
 
 - **`make test`** runs the backend (Pest), mock provider (Pest, Redis db 1) and frontend (Vitest) suites inside Docker. Backend integration tests use the real Postgres and Redis containers, in a separate `campaign_test` database and Redis db, so development data is never touched.
 - **`make lint`** runs Pint, Larastan, ESLint, the type check and Prettier.
-- **`make smoke`** (stack running, Node on the host) sends a large campaign through the mock provider with its fault injection on, then compares the app's database with the provider's own counters: no duplicates, nothing lost, peak rate ≤ 100 per second per channel.
+- **`make smoke`** (stack running, Node on the host) sends a large campaign through the mock provider with its fault injection on, then checks the app's database against the provider's counters (no duplicates, nothing lost) and that the sender's own peak (`send_peak_per_second`) stays ≤ 100 per second per channel.
 - **`make e2e`** drives the real stack in Chromium: brief → audience → streamed content → edit → approve → dashboard `completed`. Screenshots land in `frontend/e2e/artifacts/`.
 
 The Claude Code tooling has its own tests:
@@ -138,7 +141,19 @@ Average segment attempts: 1.00
 Content repaired: 0 of 10
 ```
 
-With a real key in `.env` the same command measures Claude (2 API calls per brief). That run has not been made for this README, so there is no model result here.
+With a real key in `.env` the same command measures Claude (2 API calls per brief). Result with `claude-sonnet-5-5`, run on 2026-11-10 (one run, so it shows no spread between runs):
+
+```
+Scored 10 of 10 briefs.
+Valid rule and content: 10/10 (100%)
+Expected claims met:    9/10 (90%)
+Passed:                 9/10 (90%)
+Average segment attempts: 1.00
+Content repaired: 0 of 10
+Average latency: segment 2751 ms, content 5219 ms (per brief; includes repair rounds and retries)
+```
+
+Every answer was valid on the first try. The one miss is `web-books` ("expected 2 conditions, got 3"): the rule was valid but had one condition more than the golden brief expects. The eval does not record which one.
 
 ## Assumptions and scope
 
@@ -156,4 +171,8 @@ With a real key in `.env` the same command measures Claude (2 API calls per brie
 - GSM-7 vs UCS-2 segment counting for SMS; the limit counts visible characters.
 - Segment rules are a flat AND list; there is no OR or nested logic.
 - A real SMS/email provider; delivery goes to the bundled mock.
-- A `llm:eval` result against the real model.
+- Bonus features, none of them built:
+  - Scheduled sending: an approved campaign starts at once.
+  - A/B variants: each campaign has one SMS and one email text.
+  - Content in the customer's language: `customers.language` is stored, but the content is written in Turkish only.
+  - A CI pipeline: tests, lint, smoke and e2e run locally with `make`.

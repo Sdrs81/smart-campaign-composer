@@ -5,22 +5,24 @@ declare(strict_types=1);
 // Loads config/llm.php directly: no framework boot, env is set per case.
 function llmConfig(string $driver, string $apiKey): array
 {
-    $previous = [$_ENV['LLM_DRIVER'] ?? null, $_ENV['ANTHROPIC_API_KEY'] ?? null];
+    $names = ['LLM_DRIVER', 'ANTHROPIC_API_KEY'];
+    // $_ENV and $_SERVER are kept apart: phpunit.xml pins these names in $_SERVER only (K28), and the
+    // Feature tests that run later need that value back.
+    $previousEnv = array_intersect_key($_ENV, array_flip($names));
+    $previousServer = array_intersect_key($_SERVER, array_flip($names));
 
-    foreach (['LLM_DRIVER' => $driver, 'ANTHROPIC_API_KEY' => $apiKey] as $name => $value) {
+    foreach (array_combine($names, [$driver, $apiKey]) as $name => $value) {
         $_ENV[$name] = $_SERVER[$name] = $value;
     }
 
     try {
         return require dirname(__DIR__, 2).'/config/llm.php';
     } finally {
-        foreach (['LLM_DRIVER' => $previous[0], 'ANTHROPIC_API_KEY' => $previous[1]] as $name => $value) {
-            if ($value === null) {
-                unset($_ENV[$name], $_SERVER[$name]);
-            } else {
-                $_ENV[$name] = $_SERVER[$name] = $value;
-            }
+        foreach ($names as $name) {
+            unset($_ENV[$name], $_SERVER[$name]);
         }
+        $_ENV = [...$_ENV, ...$previousEnv];
+        $_SERVER = [...$_SERVER, ...$previousServer];
     }
 }
 

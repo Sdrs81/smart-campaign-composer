@@ -9,6 +9,7 @@ use App\Models\Delivery;
 use App\Models\LlmCall;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Redis;
 
 uses(RefreshDatabase::class);
 
@@ -54,6 +55,7 @@ it('serves Prometheus text with a HELP and TYPE line per metric', function (): v
 
     foreach ([
         'deliveries_total' => 'gauge',
+        'send_peak_per_second' => 'gauge',
         'llm_calls_total' => 'counter',
         'llm_latency_ms_avg' => 'gauge',
         'queue_depth' => 'gauge',
@@ -79,6 +81,19 @@ it('reports delivery counts per channel and status, with zeros for the empty one
         ->toContain("deliveries_total{channel=\"sms\",status=\"pending\"} 0\n")
         ->toContain("deliveries_total{channel=\"email\",status=\"pending\"} 1\n")
         ->toContain("deliveries_total{channel=\"email\",status=\"sent\"} 0\n");
+});
+
+it('reports the sender peak per second for every channel in Prometheus format', function (): void {
+    Redis::set('send:peak:sms:peak', 87);
+    Redis::del('send:peak:email:peak');
+
+    $body = $this->get('/api/metrics')->getContent();
+
+    Redis::del('send:peak:sms:peak');
+
+    expect($body)->toContain("# TYPE send_peak_per_second gauge\n")
+        ->toContain("send_peak_per_second{channel=\"sms\"} 87\n")
+        ->toContain("send_peak_per_second{channel=\"email\"} 0\n");
 });
 
 it('reports LLM calls by purpose and outcome and the average latency', function (): void {

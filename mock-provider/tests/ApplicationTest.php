@@ -101,6 +101,28 @@ it('answers 429 with Retry-After when the channel is over its own limit', functi
         ->and(smsStats($application)['total'])->toBe(0);
 });
 
+it('counts a limit 429 and an injected 429 separately in /stats', function (): void {
+    $sleeps = [];
+    $overLimit = buildApplication($sleeps, rateLimit: 0);
+    $overLimit->handle('DELETE', '/stats', '', []);
+
+    postSms($overLimit, freshKey());
+    postSms($overLimit, freshKey());
+    // The injected fault is decided after the limiter lets the request in, so it needs a limit above zero.
+    $injected = buildApplication($sleeps);
+    postSms($injected, freshKey(), ['HTTP_X_MOCK_FAULT' => '429']);
+
+    expect(smsStats($injected)['rate_limited'])->toBe(['limit' => 2, 'injected' => 1])
+        ->and($injected->handle('GET', '/stats', '', [])->body['email']['rate_limited'])->toBe(['limit' => 0, 'injected' => 0]);
+});
+
+it('resets the rate limited counters with the other stats', function (): void {
+    postSms($this->application, freshKey(), ['HTTP_X_MOCK_FAULT' => '429']);
+    $this->application->handle('DELETE', '/stats', '', []);
+
+    expect(smsStats($this->application)['rate_limited'])->toBe(['limit' => 0, 'injected' => 0]);
+});
+
 it('accepts a normal request', function (): void {
     $response = postSms($this->application, freshKey());
 

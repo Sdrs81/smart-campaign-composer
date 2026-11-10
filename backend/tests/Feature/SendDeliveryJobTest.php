@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Delivery\ChannelRateLimiter;
+use App\Delivery\ChannelRateLimitTimeout;
 use App\Delivery\DeliveryErrorCode;
 use App\Delivery\MessageProvider;
 use App\Delivery\RetryPolicy;
 use App\Delivery\SendDeliveryJob;
+use App\Delivery\SendRateLimiter;
 use App\Delivery\SendResult;
 use App\Enums\Channel;
 use App\Enums\DeliveryStatus;
@@ -265,10 +266,15 @@ it('fails without calling the provider when the campaign has no message for the 
 it('gives the claim back and tries again later when the channel stays saturated', function (): void {
     $provider = useProvider([SendResult::sent('msg-1')]);
     $delivery = pendingDelivery();
-    Redis::del('send:sms');
-    config()->set('delivery.rate_per_second', 1);
-    config()->set('delivery.rate_limit_max_wait_seconds', 0);
-    app(ChannelRateLimiter::class)->await(Channel::Sms);
+    // Always full. Using up the real limiter's only slot first was flaky: its window is the clock second, so a
+    // second boundary between that call and the job's own gave the job a fresh slot and it sent.
+    app()->instance(SendRateLimiter::class, new class implements SendRateLimiter
+    {
+        public function await(Channel $channel): void
+        {
+            throw ChannelRateLimitTimeout::waitingFor($channel, 0);
+        }
+    });
 
     $job = runJob($delivery);
 

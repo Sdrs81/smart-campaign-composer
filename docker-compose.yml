@@ -1,8 +1,51 @@
 name: smart-campaign-composer
 
+# Works without a .env file (K27). Compose reads .env for ${VAR} interpolation on its own, so a value set there
+# (the API key, a tuned rate) wins; otherwise the default after ":-" applies. Keep these defaults identical to
+# .env.example. `environment` beats `env_file`, which is optional and only carries extra keys such as APP_DEBUG.
+x-env: &env
+  APP_NAME: ${APP_NAME:-Smart Campaign Composer}
+  APP_ENV: ${APP_ENV:-local}
+  APP_KEY: ${APP_KEY:-}
+  APP_DEBUG: ${APP_DEBUG:-true}
+  APP_URL: ${APP_URL:-http://localhost:8080}
+  LOG_CHANNEL: ${LOG_CHANNEL:-stack}
+  LOG_LEVEL: ${LOG_LEVEL:-debug}
+  DB_CONNECTION: ${DB_CONNECTION:-pgsql}
+  DB_HOST: ${DB_HOST:-postgres}
+  DB_PORT: ${DB_PORT:-5432}
+  DB_DATABASE: ${DB_DATABASE:-campaign}
+  DB_USERNAME: ${DB_USERNAME:-campaign}
+  DB_PASSWORD: ${DB_PASSWORD:-campaign}
+  REDIS_CLIENT: ${REDIS_CLIENT:-phpredis}
+  REDIS_HOST: ${REDIS_HOST:-redis}
+  REDIS_PORT: ${REDIS_PORT:-6379}
+  REDIS_PASSWORD: ${REDIS_PASSWORD:-null}
+  QUEUE_CONNECTION: ${QUEUE_CONNECTION:-redis}
+  CACHE_STORE: ${CACHE_STORE:-redis}
+  SESSION_DRIVER: ${SESSION_DRIVER:-array}
+  LLM_DRIVER: ${LLM_DRIVER:-auto}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5-5}
+  PROVIDER_URL: ${PROVIDER_URL:-http://mock-provider:8080}
+  SEND_RATE_PER_SECOND: ${SEND_RATE_PER_SECOND:-100}
+  WORKERS_PER_CHANNEL: ${WORKERS_PER_CHANNEL:-8}
+  MOCK_LATENCY_MIN_MS: ${MOCK_LATENCY_MIN_MS:-10}
+  MOCK_LATENCY_MAX_MS: ${MOCK_LATENCY_MAX_MS:-80}
+  MOCK_RATE_500: ${MOCK_RATE_500:-0.05}
+  MOCK_RATE_429: ${MOCK_RATE_429:-0.02}
+  MOCK_RATE_TIMEOUT: ${MOCK_RATE_TIMEOUT:-0.01}
+  MOCK_RATE_ACCEPT_THEN_500: ${MOCK_RATE_ACCEPT_THEN_500:-0.02}
+
 x-backend: &backend
   image: smart-campaign-backend:dev
-  env_file: .env
+  # The image is built locally by the app service, never pulled. Without this, a first `docker compose up`
+  # tries the registry for the workers' copy and prints "pull access denied" before it builds the image.
+  pull_policy: never
+  env_file:
+    - path: .env
+      required: false
+  environment: *env
   restart: unless-stopped
 
 services:
@@ -37,7 +80,10 @@ services:
       context: .
       dockerfile: mock-provider/Dockerfile
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false
+    environment: *env
     depends_on:
       redis:
         condition: service_healthy

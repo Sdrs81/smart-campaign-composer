@@ -102,7 +102,7 @@ final class Application
         $arrivedAt = time();
 
         if (! $this->rateLimiter->tryAcquire($channel, $arrivedAt)) {
-            return $this->rateLimited("The {$channel->value} channel is over its limit per second; retry later.");
+            return $this->rateLimited($channel, RateLimitCause::Limit, "The {$channel->value} channel is over its limit per second; retry later.");
         }
 
         return $this->deliver($channel, $key, $payload, $this->faults->decide($forcedFault), $arrivedAt);
@@ -117,7 +117,7 @@ final class Application
 
         switch ($decision->fault) {
             case Fault::RateLimited:
-                return $this->rateLimited('Injected fault: the provider asked the client to slow down.');
+                return $this->rateLimited($channel, RateLimitCause::Injected, 'Injected fault: the provider asked the client to slow down.');
             case Fault::ServerError:
                 return $this->error(500, 'provider_error', 'Injected fault: the provider failed before accepting the message.');
             case Fault::Timeout:
@@ -174,8 +174,10 @@ final class Application
         return null;
     }
 
-    private function rateLimited(string $message): Response
+    private function rateLimited(Channel $channel, RateLimitCause $cause, string $message): Response
     {
+        $this->stats->recordRateLimited($channel, $cause);
+
         return $this->error(429, 'rate_limited', $message, ['Retry-After' => (string) RateLimiter::RETRY_AFTER_SECONDS]);
     }
 

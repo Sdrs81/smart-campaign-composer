@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Metrics;
 
+use App\Delivery\ChannelRateLimiter;
 use App\Delivery\QueueDepths;
 use App\Enums\CampaignStatus;
 use App\Enums\Channel;
@@ -21,12 +22,16 @@ class PrometheusMetrics
 {
     public const CONTENT_TYPE = 'text/plain; version=0.0.4; charset=utf-8';
 
-    public function __construct(private readonly QueueDepths $queueDepths) {}
+    public function __construct(
+        private readonly QueueDepths $queueDepths,
+        private readonly ChannelRateLimiter $rateLimiter,
+    ) {}
 
     public function __invoke(): string
     {
         return implode('', [
             $this->deliveries(),
+            $this->sendPeak(),
             $this->llmCalls(),
             $this->llmLatency(),
             $this->queueDepth(),
@@ -49,6 +54,16 @@ class PrometheusMetrics
         }
 
         return $this->metric('deliveries_total', 'gauge', 'Deliveries by channel and current status.', $samples);
+    }
+
+    private function sendPeak(): string
+    {
+        $samples = [];
+        foreach (Channel::cases() as $channel) {
+            $samples[] = [['channel' => $channel->value], $this->rateLimiter->peakPerSecond($channel)];
+        }
+
+        return $this->metric('send_peak_per_second', 'gauge', 'Most sends allowed in one clock second per channel, measured by the sender.', $samples);
     }
 
     private function llmCalls(): string

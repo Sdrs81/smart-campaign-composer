@@ -12,9 +12,24 @@ const MICROSECONDS_PER_SECOND = 1_000_000;
 
 beforeEach(function (): void {
     Redis::del('send:sms', 'send:email');
+    clearSendPeaks();
 });
 
-/** The throttle window starts at the first permit, so the test starts just after a clock second begins. */
+/** Peak and per-second buckets of the measurement, for a few seconds around now. */
+function clearSendPeaks(): void
+{
+    foreach (['sms', 'email'] as $channel) {
+        Redis::del("send:peak:{$channel}:peak");
+        for ($second = time() - 15; $second <= time() + 15; $second++) {
+            Redis::del("send:peak:{$channel}:second:{$second}");
+        }
+    }
+}
+
+/**
+ * The throttle window is the clock second (Laravel starts it at time()), so a test that must stay inside one
+ * window starts just after a second begins.
+ */
 function startOfClockSecond(): void
 {
     $microsecondsLeft = MICROSECONDS_PER_SECOND - (int) ((microtime(true) - floor(microtime(true))) * MICROSECONDS_PER_SECOND);
@@ -37,6 +52,25 @@ it('lets through at most the limit in every clock second, with a real Redis', fu
         ->and(count($perSecond))->toBeGreaterThanOrEqual(3);
 });
 
+it('keeps the peak equal to the busiest per-second bucket after 250 permits, with a real Redis', function (): void {
+    $limiter = new ChannelRateLimiter(LIMIT_PER_SECOND, 10);
+    $firstSecond = time();
+    startOfClockSecond();
+
+    for ($permit = 0; $permit < 250; $permit++) {
+        $limiter->await(Channel::Sms);
+    }
+
+    $buckets = [];
+    for ($second = $firstSecond; $second <= time(); $second++) {
+        $buckets[$second] = (int) Redis::get("send:peak:sms:second:{$second}");
+    }
+
+    expect(array_sum($buckets))->toBe(250)
+        ->and($limiter->peakPerSecond(Channel::Sms))->toBe(max($buckets))
+        ->and($limiter->peakPerSecond(Channel::Email))->toBe(0);
+});
+
 it('does not slow one channel down because another is saturated', function (): void {
     $limiter = new ChannelRateLimiter(LIMIT_PER_SECOND, 10);
     startOfClockSecond();
@@ -55,6 +89,7 @@ it('does not slow one channel down because another is saturated', function (): v
 
 it('says which channel was saturated when the wait runs out', function (): void {
     $limiter = new ChannelRateLimiter(1, 0);
+    startOfClockSecond();
     $limiter->await(Channel::Email);
 
     $limiter->await(Channel::Email);

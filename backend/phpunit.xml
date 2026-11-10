@@ -33,6 +33,9 @@
         <server name="LOG_CHANNEL" value="null" force="true"/>
         <!-- Tests queue their own fake LLM scenarios; the ready-made dev answers would hide a missing one. -->
         <server name="LLM_FAKE_DEV_SCENARIOS" value="false" force="true"/>
+        <!-- A key in the container's env_file must not turn a test run into real model calls (K28). -->
+        <server name="LLM_DRIVER" value="fake" force="true"/>
+        <server name="ANTHROPIC_API_KEY" value="" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>

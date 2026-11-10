@@ -1,6 +1,6 @@
 # Smart Campaign Composer: Uygulama Planı
 
-Tarih: 2026-11-04, güncelleme 2026-11-10 · Durum: onaylandı · Tasarım seçenekleri ve yanıtlanan sorular Bölüm 2'de (K1–K26)
+Tarih: 2026-11-04, güncelleme 2026-11-10 · Durum: onaylandı · Tasarım seçenekleri ve yanıtlanan sorular Bölüm 2'de (K1–K28)
 
 ## 0. Bağlam
 
@@ -29,12 +29,14 @@ Yalnızca `DECISIONS.md`'ye girecek kararlar: case'te doğrudan geçenler, mimar
 
 ### Altyapı
 
-| #   | Karar                                                                                                                        | Gerekçe (ilke)                                                                                                                                   | Alternatifler                  | Görevler      |
-| --- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------ | ------------- |
-| K1  | Laravel 12, FrankenPHP klasik mod (Octane yok)                                                                               | Queue, Redis throttle, migration, seeder, Pest, SSE hazır; tek container, stream'de tampon ayarı yok; Octane'in state sızıntısı riski yok (KISS) | Symfony, Slim; nginx + php-fpm | 2.1, 2.4      |
-| K2  | PostgreSQL                                                                                                                   | `COUNT(*) FILTER` ile tek sorguda kanal sayımı, `ON CONFLICT DO NOTHING` ile idempotent snapshot, JSONB                                          | MySQL, SQLite                  | 2.8, 4.4, 8.5 |
-| K3  | Redis: kuyruk + global rate limiter + kilit                                                                                  | Tek bileşen üç işi görür; bu ölçekte RabbitMQ ek operasyon yükü (YAGNI)                                                                          | RabbitMQ, DB queue             | 2.3, 2.8, 8.4 |
-| K4  | Unit testler bağımlılıksız; integration testler docker'daki Postgres/Redis'e karşı (ayrı test DB); `make test` docker içinde | Gerçek bileşen davranışı (`FILTER`, `ON CONFLICT`, throttle) test edilir; değerlendiricinin host'unda bağımlılık gerekmez                        | SQLite in-memory               | 2.8, 2.9      |
+| #   | Karar                                                                                                                                                                                                                                                                    | Gerekçe (ilke)                                                                                                                                                                                                          | Alternatifler                                                                                           | Görevler      |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------- |
+| K1  | Laravel 12, FrankenPHP klasik mod (Octane yok)                                                                                                                                                                                                                           | Queue, Redis throttle, migration, seeder, Pest, SSE hazır; tek container, stream'de tampon ayarı yok; Octane'in state sızıntısı riski yok (KISS)                                                                        | Symfony, Slim; nginx + php-fpm                                                                          | 2.1, 2.4      |
+| K2  | PostgreSQL                                                                                                                                                                                                                                                               | `COUNT(*) FILTER` ile tek sorguda kanal sayımı, `ON CONFLICT DO NOTHING` ile idempotent snapshot, JSONB                                                                                                                 | MySQL, SQLite                                                                                           | 2.8, 4.4, 8.5 |
+| K3  | Redis: kuyruk + global rate limiter + kilit                                                                                                                                                                                                                              | Tek bileşen üç işi görür; bu ölçekte RabbitMQ ek operasyon yükü (YAGNI)                                                                                                                                                 | RabbitMQ, DB queue                                                                                      | 2.3, 2.8, 8.4 |
+| K4  | Unit testler bağımlılıksız; integration testler docker'daki Postgres/Redis'e karşı (ayrı test DB); `make test` docker içinde                                                                                                                                             | Gerçek bileşen davranışı (`FILTER`, `ON CONFLICT`, throttle) test edilir; değerlendiricinin host'unda bağımlılık gerekmez                                                                                               | SQLite in-memory                                                                                        | 2.8, 2.9      |
+| K27 | Kurulum `.env` olmadan tek komut: compose `env_file` isteğe bağlı (`required: false`); container'ların ihtiyaç duyduğu değerler compose'ta `${VAR:-<.env.example değeri>}` varsayılanıyla, `.env` varsa (key gibi) onun değeri kazanır; `make up` kopyalamaya devam eder | Case şartı: temiz klonda `docker compose up` çalışmalı. Compose `.env`'i interpolasyon için kendiliğinden okur, ek araç gerekmez (KISS); sır repoya girmez (Defensive)                                                  | `.env`'i repoya koymak; README'de `cp` adımı (case'e aykırı); entrypoint'te kopyalamak (host'a yazamaz) | 14.1          |
+| K28 | Testler LLM'e karşı yalıtılır: `phpunit.xml` `LLM_DRIVER=fake` ve boş `ANTHROPIC_API_KEY`'i `force` ile sabitler; Feature testlerinde kaçak HTTP isteği (`Http::preventStrayRequests`) hata verir                                                                        | Case şartı: testler gerçek key olmadan mock LLM ile çalışır. `make test` container'ı `.env`'i okuduğu için key eklemek testleri gerçek API'ye yöneltmemeli (Defensive); 2.9'da DB için kullanılan yöntemin aynısı (DRY) | `.env.testing` (deny listesinde; container yine `.env`'i okur); her testte elle `config()`              | 14.2          |
 
 ### Kitle
 
@@ -66,13 +68,13 @@ Yalnızca `DECISIONS.md`'ye girecek kararlar: case'te doğrudan geçenler, mimar
 
 ### Gönderim
 
-| #   | Karar                                                                                                                                                                                            | Gerekçe (ilke)                                                                                                                                                            | Alternatifler                                | Görevler           |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ------------------ |
-| K16 | Onayda kitle `INSERT … SELECT … ON CONFLICT DO NOTHING` ile `deliveries`'e dondurulur; mesaj başına job, `lazyById` ile dağıtılır                                                                | Set-based, tek round-trip, bellek sabit; mesaj başına job retry'ı basit tutar (KISS)                                                                                      | PHP'de döngüyle ekleme; toplu (batch) job    | 8.5                |
-| K17 | Rate limit: kanal başına ayrı kuyruk + `Redis::throttle(...)->block()`; tüm worker'lar için global giden sınır 100/sn; mock provider da aynı sınırı uygular ve 429 döner                         | Case şartı. Atomik Redis işlemleri O(1); `block` ile beklenir, deneme sayacı yanmaz. Sabit pencere sınırda kısa patlamaya izin verebilir; ölçülür, gerekirse token bucket | Lua token bucket; saniyelik batch dispatcher | 7.3, 8.4, 8.7, 8.8 |
-| K18 | Retry hata sınıfına göre: 429 → `Retry-After`; 5xx/timeout → üstel backoff + full jitter, en fazla 5 deneme; diğer 4xx → kalıcı. Kalıcı hata `failed` kalır, dashboard'da görünür                | Case: "retry stratejisini sen tasarla". Gereksiz tekrar ve senkron dalgalanma olmaz; `RetryPolicy` saf sınıf, unit test edilir (SRP)                                      | Sabit aralık; circuit breaker                | 8.1, 8.2, 8.3      |
-| K19 | Çift gönderim üç katmanda önlenir: DB unique (kampanya + kişi + kanal), atomik claim (koşullu UPDATE), provider `Idempotency-Key`. Farklı kampanyalar aynı kişiye gidebilir (frekans sınırı yok) | Case şartı. Satır iki kez oluşmaz, iki worker aynı satırı alamaz, timeout sonrası tekrar provider'da tekilleşir (Defensive)                                               | Redis set; yalnızca `ShouldBeUnique` job     | 3.5, 7.2, 8.3, 8.5 |
-| K20 | Mock provider ayrı container (sade PHP + Redis): idempotency, ayarlanabilir hata enjeksiyonu (gecikme, 500, 429, timeout, kabul edip 500), `/stats`                                              | Case şartı. Gerçek ağ hataları oluşur; bağımsız sayaçlar tekrarın olmadığını kanıtlar (SRP)                                                                               | Ana uygulamada route; başka dil              | 7.1–7.3            |
+| #   | Karar                                                                                                                                                                                                                                                                                                                             | Gerekçe (ilke)                                                                                                                                                                                                                            | Alternatifler                                | Görevler                 |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ------------------------ |
+| K16 | Onayda kitle `INSERT … SELECT … ON CONFLICT DO NOTHING` ile `deliveries`'e dondurulur; mesaj başına job, `lazyById` ile dağıtılır                                                                                                                                                                                                 | Set-based, tek round-trip, bellek sabit; mesaj başına job retry'ı basit tutar (KISS)                                                                                                                                                      | PHP'de döngüyle ekleme; toplu (batch) job    | 8.5                      |
+| K17 | Rate limit: kanal başına ayrı kuyruk + `Redis::throttle(...)->block()`; tüm worker'lar için global giden sınır 100/sn; mock provider da aynı sınırı uygular ve 429 döner. Uyum gönderen tarafta ölçülür (çağrı saniyesine göre tepe, `/api/metrics`); provider'ın kabul tepesi kendi limitiyle sınırlı olduğu için kanıt sayılmaz | Case şartı. Atomik Redis işlemleri O(1); `block` ile beklenir, deneme sayacı yanmaz. Sabit pencere sınırda kısa patlamaya izin verebilir; ölçülür (14.3), aşarsa kayan 1 sn pencere (token bucket da 1 sn içinde 2× patlamaya izin verir) | Lua token bucket; saniyelik batch dispatcher | 7.3, 8.4, 8.7, 8.8, 14.3 |
+| K18 | Retry hata sınıfına göre: 429 → `Retry-After`; 5xx/timeout → üstel backoff + full jitter, en fazla 5 deneme; diğer 4xx → kalıcı. Kalıcı hata `failed` kalır, dashboard'da görünür                                                                                                                                                 | Case: "retry stratejisini sen tasarla". Gereksiz tekrar ve senkron dalgalanma olmaz; `RetryPolicy` saf sınıf, unit test edilir (SRP)                                                                                                      | Sabit aralık; circuit breaker                | 8.1, 8.2, 8.3            |
+| K19 | Çift gönderim üç katmanda önlenir: DB unique (kampanya + kişi + kanal), atomik claim (koşullu UPDATE), provider `Idempotency-Key`. Farklı kampanyalar aynı kişiye gidebilir (frekans sınırı yok)                                                                                                                                  | Case şartı. Satır iki kez oluşmaz, iki worker aynı satırı alamaz, timeout sonrası tekrar provider'da tekilleşir (Defensive)                                                                                                               | Redis set; yalnızca `ShouldBeUnique` job     | 3.5, 7.2, 8.3, 8.5       |
+| K20 | Mock provider ayrı container (sade PHP + Redis): idempotency, ayarlanabilir hata enjeksiyonu (gecikme, 500, 429, timeout, kabul edip 500), `/stats`                                                                                                                                                                               | Case şartı. Gerçek ağ hataları oluşur; bağımsız sayaçlar tekrarın olmadığını kanıtlar (SRP)                                                                                                                                               | Ana uygulamada route; başka dil              | 7.1–7.3                  |
 
 ### Takip ve kapsam
 
@@ -94,15 +96,15 @@ Yalnızca `DECISIONS.md`'ye girecek kararlar: case'te doğrudan geçenler, mimar
 - **Dil:** Projenin tüm dosyaları ve içerikleri İngilizce yazılır: kod, yorumlar, config dosyaları (`.gitignore` yorumları dahil), `README.md`, `DECISIONS.md`, `CLAUDE.md`, rules/skills/agents, hook ve script mesajları, commit mesajları, PR başlığı ve açıklaması. Türkçe kalanlar: bu plan (`docs/plan.md`, çalışma belgesi), Claude'un sohbetteki raporları ve dosya bazlı özetler. Ürün içeriği (LLM'in ürettiği kampanya metni) ürün gereği Türkçe kalır (5.9, 11.1). Arayüz metinleri ise Türkçe/İngilizce seçilebilir (K23); çeviri dosyaları (`frontend/src/i18n/tr.ts`) de bu "proje dosyaları İngilizce" kuralının bilinçli istisnasıdır.
 - **Takvim (çekirdek akış 5 günde):**
 
-  | Gün | Fazlar                                                  | Gün sonu ölçütü                                                                              |
-  | --- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-  | G1  | Faz 1, Faz 2                                            | `docker compose up` sağlıklı, `make test` yeşil, Claude araçları çalışıyor                   |
-  | G2  | Faz 3, Faz 4, Faz 5.1–5.4                               | Seed ve segment derleyicisi çalışıyor, LLM istemcisi testli                                  |
-  | G3  | Faz 5.5–5.11, Faz 6, Faz 7                              | Brief → kural → sayılar → stream içerik API'den çalışıyor; mock provider ayakta              |
-  | G4  | Faz 8, Faz 9                                            | `make smoke` yeşil, stats/health/metrics hazır                                               |
-  | G5  | Faz 10                                                  | Çekirdek akış tarayıcıda uçtan uca, `make e2e` yeşil                                         |
-  | G6  | Faz 11                                                  | Teslim paketi                                                                                |
-  | G7  | Faz 12, Faz 13, Tampon, İsteğe Bağlı Kısımlar (CI önce) | Arayüz ve fake LLM iyileştirmeleri tarayıcıda, `make test`, `make smoke` ve `make e2e` yeşil |
+  | Gün | Fazlar                                                          | Gün sonu ölçütü                                                                                                                         |
+  | --- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+  | G1  | Faz 1, Faz 2                                                    | `docker compose up` sağlıklı, `make test` yeşil, Claude araçları çalışıyor                                                              |
+  | G2  | Faz 3, Faz 4, Faz 5.1–5.4                                       | Seed ve segment derleyicisi çalışıyor, LLM istemcisi testli                                                                             |
+  | G3  | Faz 5.5–5.11, Faz 6, Faz 7                                      | Brief → kural → sayılar → stream içerik API'den çalışıyor; mock provider ayakta                                                         |
+  | G4  | Faz 8, Faz 9                                                    | `make smoke` yeşil, stats/health/metrics hazır                                                                                          |
+  | G5  | Faz 10                                                          | Çekirdek akış tarayıcıda uçtan uca, `make e2e` yeşil                                                                                    |
+  | G6  | Faz 11                                                          | Teslim paketi                                                                                                                           |
+  | G7  | Faz 12, Faz 13, Faz 14, Tampon, İsteğe Bağlı Kısımlar (CI önce) | Arayüz ve fake LLM iyileştirmeleri tarayıcıda; temiz klonda yalnızca `docker compose up`; `make test`, `make smoke` ve `make e2e` yeşil |
 
 - **Gerideysek önce kesilecekler** (çekirdek akışı bozmayanlar, README'de "yapılmadı" olarak yazılır): 5.12 `llm:eval` (altın brief testleri fake ile unit testte kalır), 9.5 JSON log, 2.1'de Larastan, 10.8 Playwright (yerine `make smoke` + elle tarayıcı kontrolü), 1.13 deneme koşusu (Faz 2'nin ilk görevinde yapılır).
 
@@ -836,9 +838,54 @@ Sıra bağımlılığa göre: 13.3 ve 13.4, 13.2'deki brief okuyucusunu kullanı
 
 ---
 
+## Faz 14: Case denetimi düzeltmeleri · G7
+
+Plan dışı faz: Faz 13 sonrası kodun case dosyasına karşı denetiminden gelen bulgular; dal `phase-14/audit-fixes`. Çekirdek akış değişmez; düzeltmeler kurulum, test yalıtımı ve hız limiti kanıtı; sonda README kapanışı. Yeni kütüphane ve migration yok. Sıra önceliğe göre.
+
+| Bulgu                                                            | Önem   | Görev |
+| ---------------------------------------------------------------- | ------ | ----- |
+| H1. Temiz klonda `docker compose up`, `.env` olmadığı için düşer | Kritik | 14.1  |
+| H2. `.env`'de key varken testler fake LLM'den çıkar              | Orta   | 14.2  |
+| H3. Smoke'un ≤100/sn kontrolü yapısı gereği hep geçer            | Orta   | 14.3  |
+| E1. Bonuslar yok ve README'de belirtilmemiş                      | Düşük  | 14.4  |
+| E2. Gerçek modelle `llm:eval` sonucu yok                         | Düşük  | 14.4  |
+
+### 14.1 Tek komutla kurulum · K27
+
+- **İş:** `docker-compose.yml`: backend anchor'ı (`x-backend`) ve `mock-provider` için `env_file: [{ path: .env, required: false }]`. Container'ların `.env` olmadan da ihtiyaç duyduğu değerler (DB, Redis, kuyruk/cache/session sürücüleri, `LLM_DRIVER`, `ANTHROPIC_MODEL`, `PROVIDER_URL`, `SEND_RATE_PER_SECOND`, `WORKERS_PER_CHANNEL`, `MOCK_*`) ortak bir `x-env` bloğunda `${VAR:-<.env.example değeri>}` ile verilir; `ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}`. Varsayılanlar `.env.example` ile aynı kalır, iki dosyada da yorumla birbirine bağlanır. README kurulumu tek komuta iner (`docker compose up`; key için isteğe bağlı `cp .env.example .env`) ve gereken en düşük Compose sürümünü (2.24, `required` alanı) yazar. `make up` ve Makefile'daki `.env` hedefi aynen kalır.
+- **Dosyalar:** `docker-compose.yml`, `.env.example` (yorum), `README.md`, `DECISIONS.md`
+- **Bağımlı:** Faz 13
+- **Kabul:** Geçici klasöre temiz klon, `.env` yok → `docker compose up -d --wait` tüm servisler healthy; `curl localhost:8080/api/health` → 200 ve `llm_driver: fake`; aynı klonda `make smoke` yeşil. `.env`'i olan çalışma klasöründe `make up` davranışı değişmez.
+
+### 14.2 Testlerde LLM yalıtımı · K28
+
+- **İş:** `backend/phpunit.xml`'e `<server name="LLM_DRIVER" value="fake" force="true"/>` ve `<server name="ANTHROPIC_API_KEY" value="" force="true"/>` (2.9'daki DB sabitlemesiyle aynı yöntem). `tests/Pest.php`: `tests/Feature` için `beforeEach` ile `Http::preventStrayRequests()`; `Http::fake` kuran testler etkilenmez. `LlmConfigTest` sürücüyü `$_ENV` ile değiştirdiği için sabitlemeyle çakışırsa kendi değerini çakışmayacak biçimde verir. Yeni bir Feature test, test ortamında sürücünün `fake` olduğunu doğrular.
+- **Dosyalar:** `backend/phpunit.xml`, `backend/tests/Pest.php`, `backend/tests/Feature/*` (yeni küçük test), gerekirse `backend/tests/Unit/LlmConfigTest.php`, `DECISIONS.md`
+- **Bağımlı:** Faz 13
+- **Kabul:** `.env`'e dokunmadan, sahte değerle: `docker compose run --rm -e ANTHROPIC_API_KEY=not-a-real-key -e LLM_DRIVER=auto app vendor/bin/pest` tümü yeşil ve dışarıya istek yok; `make test` yeşil.
+
+### 14.3 Hız limitinin gönderen tarafta ölçülmesi · K17
+
+- **İş:**
+  - **Ölçüm:** `ChannelRateLimiter` izin verdiği her çağrıyı Redis'te çağrı saniyesinin kovasına sayar ve kanal başına tepe değeri tek Lua betiğiyle tutar (mock'taki `RAISE_PEAK_SCRIPT` kalıbı). `/api/metrics`'e `send_peak_per_second{channel}` gauge'u eklenir. Mock provider `/stats`'a 429 ile reddedilen istek sayısı eklenir (`rate_limited`; limit kaynaklı ve enjekte edilen ayrı).
+  - **Smoke:** `send_peak_per_second ≤ SEND_RATE_PER_SECOND` kontrolü eklenir ve sonuç tablosunda gösterilir. Provider'ın `peak_per_second` değeri yalnızca bilgi olarak kalır: kendi limitiyle sınırlı olduğu için kanıt değildir.
+  - **Karar noktası:** 3 ardışık smoke'ta tepe 100'ü aşarsa limiter kayan 1 sn pencereye geçer (Redis sorted set + Lua: son 1 sn'deki çağrı sayısı limitin altındaysa ekle); böylece herhangi bir 1 sn aralığında ≤100 olur. Aşmazsa limiter değişmez. Her iki durumda ölçüm sonucu K17'ye yazılır.
+- **Dosyalar:** `app/Delivery/ChannelRateLimiter.php`, `app/Metrics/PrometheusMetrics.php`, `mock-provider/src/{Application,Stats}.php`, `scripts/smoke.mjs`, Pest (backend ve mock), `DECISIONS.md` (K17)
+- **Bağımlı:** 8.4, 8.8, 9.3
+- **Kabul:** Integration (gerçek Redis): 250 alım sonrası tepe sayacı saniye kovalarıyla birebir; `/api/metrics` satırı Prometheus biçiminde. `make smoke` 3 ardışık koşuda yeşil; tabloda gönderen tepe/sn ≤100 ve `rate_limited` sütunu var; çıktı rapora eklenir.
+
+### 14.4 README kapanışı ve gerçek model ölçümü
+
+- **İş:** README "Not done" listesine bonusların durumu: zamanlanmış gönderim, A/B varyantları, kullanıcının diline göre içerik (`customers.language` var, içerik yalnızca Türkçe) ve CI pipeline yapılmadı. Kurulum bloğunun 14.1 ile uyumu kontrol edilir. İsteğe bağlı: sen `.env`'e gerçek key koyup `docker compose exec app php artisan llm:eval` çalıştırırsın; Claude çıktıyı README'nin "LLM evaluation" bölümüne ekler (Claude `.env`'e erişmez).
+- **Dosyalar:** `README.md`
+- **Bağımlı:** 14.1–14.3
+- **Kabul:** Okuyarak onay; `node scripts/scrub-sessions.mjs --check` 0.
+
+---
+
 ## Doğrulama (uçtan uca)
 
-1. `docker compose up` (key'siz) → `http://localhost:8080` → örnek brief → kanal sayıları → içerik akarak gelir → SMS'i düzenle (161. karakterde engel) → onayla → dashboard `completed`.
+1. `docker compose up` (temiz klon, `.env` ve key olmadan; 14.1) → `http://localhost:8080` → örnek brief → kanal sayıları → içerik akarak gelir → SMS'i düzenle (161. karakterde engel) → onayla → dashboard `completed`.
 2. `make test` (Pest unit + integration, Vitest), `make smoke` (tekrar 0, hız ≤100/sn, sayılar tutarlı), `make e2e`.
 3. `curl localhost:8080/api/health`, `curl localhost:8080/api/metrics`.
 4. İsteğe bağlı: `.env`'e gerçek key → `php artisan llm:eval` raporu.
