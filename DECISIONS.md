@@ -1,192 +1,93 @@
 # Decisions
 
-Each decision is written when the first task that needs it lands. Use this template:
+The important decisions of this project and why they were made.
 
-```
-## K<n>: <short title>
+## 1. Technology: Laravel 12 on FrankenPHP, PostgreSQL, Redis
 
-- **Decision:** what was chosen.
-- **Rationale:** why, in one or two sentences.
-- **Alternatives:** what was rejected.
-```
+- **Decision:** Laravel 12 (PHP 8.4) served by FrankenPHP in classic mode, without Octane. PostgreSQL 17 is the only relational store. One Redis 7 serves the queue (separate `sms` and `email` queues), the global rate limiter and locks.
+- **Rationale:** Laravel has the queue, Redis throttling, migrations, seeders, Pest and streamed responses built in, and classic mode means one container, no stream buffering to tune and no state leaking between requests. PostgreSQL gives per-channel counts in one query (`COUNT(*) FILTER`), an idempotent audience snapshot (`ON CONFLICT DO NOTHING`) and JSONB for structured values. One Redis does all three of its jobs; RabbitMQ would add operational load at this scale.
 
-## K1: Laravel 12 on FrankenPHP, classic mode
+## 2. One command to set up, one image in four roles
 
-- **Decision:** Laravel 12 (PHP 8.4) served by FrankenPHP in classic mode, without Octane.
-- **Rationale:** Queue, Redis throttling, migrations, seeders, Pest and SSE are built in. One container, no stream buffering to tune, and no state leaking between requests.
-- **Alternatives:** Symfony, Slim; nginx + php-fpm.
+- **Decision:** `docker compose up` on a clean clone is the whole setup. `.env` is optional: every value the containers need has a default in `docker-compose.yml`, kept equal to `.env.example`, so a `.env` only adds the API key or a tuned value. The backend image runs in four roles: `app` migrates, seeds an empty `customers` table and serves; `worker-sms` and `worker-email` each listen to one channel queue; one `worker-campaign` starts approved campaigns.
+- **Rationale:** The case requires one-command setup with the seed and the mock provider, and no secret should enter the repository. One queue per channel keeps a slow channel from holding up the other, and a separate campaign worker keeps an audience freeze from blocking sends.
 
-## K2: PostgreSQL
+## 3. Behavior data as wide summary columns on customers
 
-- **Decision:** PostgreSQL 17 is the only relational store.
-- **Rationale:** `COUNT(*) FILTER` gives per-channel counts in one query, `ON CONFLICT DO NOTHING` makes the audience snapshot idempotent, and JSONB holds structured values.
-- **Alternatives:** MySQL, SQLite.
+- **Decision:** Demographics, account, purchase, cart, loyalty and consent data live as summary columns on `customers`, and segment conditions are comparisons on indexed columns. Each channel has its own opt-in flag next to its address. A new field means a new column plus a `FieldRegistry` entry. The seed creates 5,000 customers with Faker and a fixed seed, so every setup produces the same data.
+- **Rationale:** An event-collection pipeline is out of scope, and indexed column comparisons keep audience counting simple.
 
-## K3: Redis for queue, rate limiter and locks
+## 4. Segment rule: a flat AND list that never becomes SQL
 
-- **Decision:** One Redis 7 serves the queue (separate `sms` and `email` queues), the global rate limiter and locks.
-- **Rationale:** One component does all three jobs; RabbitMQ would add operational load at this scale.
-- **Alternatives:** RabbitMQ, database queue.
+- **Decision:** A segment rule is a flat list of conditions joined by AND, with a schema `version`. Multiple values use `in` / `not_in`, and `not_within_last_days`, `neq` and `not_in` also match null values (never bought, no favorite category), because "not X" should include people who have no X at all. `FieldRegistry` is the single source for fields, columns, types, operators, value limits and Turkish labels. The flow is registry → `SegmentRuleParser` (an invalid `SegmentRule` cannot exist) → a query builder with bound values, so column names reach SQL only through the registry and LLM output never becomes SQL. Consent is not a segment field but a channel filter: a customer may receive a channel when its opt-in is set and its address is not empty, defined once in `SegmentQueryCompiler::consentSql()` and used by both counting and filtering.
+- **Rationale:** Asking the model for SQL would make every answer a possible injection; a closed rule language can be validated completely. Typical briefs fit AND lists, so validation and the prompt stay short, and an AND/OR tree can be added later without breaking the version field. One registry feeding the parser, compiler, prompt and JSON schema stops them drifting apart, and one consent definition keeps the count the marketer sees equal to the people who are sent to.
 
-## K4: Real services for integration tests
+## 5. LLM client behind an interface, with a fake for tests and the key-less demo
 
-- **Decision:** Unit tests need no database, Redis or framework boot. Integration tests run against the Postgres and Redis containers, in a separate `campaign_test` database created by `docker/postgres/init.sql`. `make test` runs inside Docker.
-- **Rationale:** `FILTER`, `ON CONFLICT` and throttling only show up on the real services. A separate database can be wiped freely.
-- **Alternatives:** SQLite in memory.
+- **Decision:** Callers depend on the `LlmClient` interface. `ClaudeLlmClient` talks to the Messages API over Laravel's HTTP client. `FakeLlmClient` answers offline: tests queue the exact answers or failures they expect, and the key-less demo reads the filters a Turkish brief states in plain words with narrow patterns (`BriefReader`). Fake answers go through the same parser and validators as Claude's. `LLM_DRIVER=auto` resolves to `claude` when `ANTHROPIC_API_KEY` is set, otherwise to `fake` with a logged warning. The model comes from `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`).
+- **Rationale:** Tests and `docker compose up` must work without a key, and the warning stops a missing key from passing as a working setup. A demo that reacts to the brief shows the whole flow, and narrow patterns stay deterministic: a missed condition is visible, a wrong one would silently pick the wrong customers.
 
-## K5: Behavior data as wide summary columns on customers
+## 6. Prompts: versioned files, the brief as data, no customer data
 
-- **Decision:** Demographics, account, purchase, cart, loyalty and consent data live as summary columns on `customers`. Segment conditions are comparisons on indexed columns. The sample brief (`last_cart_add_at` in the last 30 days and `last_purchase_at` not in the last 30 days, never-purchased included) is only an example, so the columns are not narrowed to it. A new field means a new column plus a `FieldRegistry` entry. `customers` has no `created_at`/`updated_at`; `registered_at` is the domain date.
-- **Rationale:** An event-collection pipeline is out of scope, and indexed column comparisons keep audience counting simple (KISS).
-- **Alternatives:** Event tables queried with `EXISTS`.
+- **Decision:** Each prompt is a versioned file in `resources/prompts/`, covered by a snapshot test, and its version is logged with every call. Marketer text goes inside `<brief>`, `<tone>` and `<audience>` tags and is treated as data; input or model text that contains those tags is refused. The model never sees a customer row: the content prompt gets channel counts and the longest length of each variable in the audience, not the values.
+- **Rationale:** A versioned prompt makes a change visible in review and in the call log. The tags limit prompt injection through the brief. Sending lengths instead of values keeps personal data out of a third-party API while still letting the model leave room for personalization.
 
-## K6: Segment language is a flat AND list
+## 7. Reliability chain: validate, repair, retry and log
 
-- **Decision:** A segment rule is a flat list of conditions joined by AND, with a schema `version`. Multiple values use `in` / `not_in`. Operators per field type live in `FieldType::allowedOperators()`: `enum` takes `eq, neq, in, not_in, is_null, not_null`; `number` takes `eq, neq, gt, gte, lt, lte, between, is_null, not_null`; `date` takes `within_last_days, not_within_last_days, between, is_null, not_null`. `not_within_last_days`, `neq` and `not_in` also match null values (never bought, no favorite category), because "not X" should include people who have no X at all. Value limits (`in` ≤ 50 items, days 1-365) are constants on `FieldDefinition`.
-- **Rationale:** Typical briefs fit AND lists, so validation and the prompt stay short (YAGNI), and an AND/OR tree can be added later without breaking the version field.
-- **Alternatives:** A nested AND/OR tree; JSON Logic.
+- **Decision:** `ClaudeLlmClient` asks for structured output (`json_schema`; the segment schema is built from `FieldRegistry`), and the backend validates every answer anyway: parse → validate → typed value object. **Repair** is for a wrong answer: it goes back to the model with its path-based errors, at most 2 rounds, then the caller gets the errors. Text no field can express goes to `unsupported_criteria`. **Retry** is for a failed call: 429, 5xx and connection errors get up to 3 attempts, honoring `retry-after`, then raise `LlmUnavailable` (503). A refusal or a cut-off answer is never parsed and maps to 502. `RecordingLlmClient` writes one `llm_calls` row per call (tokens, latency, attempt, outcome, errors, raw output, never the prompt), and `llm:eval` scores 10 golden briefs through the same code.
+- **Rationale:** The case rewards reliable structured output. The schema makes a shape mismatch rare, but value limits, operators per type and character limits do not fit a schema, so the validators decide. Feeding the errors back lets the model fix its own answer, while retrying a refusal would only spend money. Failures, retries and latency stay measurable, and a decorator adds the log without touching the clients.
 
-## K7: LLM output never becomes SQL
+## 8. Content streams over POST server-sent events
 
-- **Decision:** `FieldRegistry` is the single source for fields, columns, types, operators, value limits and Turkish labels. The flow is registry → `SegmentRuleParser` (an invalid `SegmentRule` cannot exist) → a query builder with bound values. Column names reach SQL only through the registry. `age` is registered against `birth_date` with `derivedFromBirthDate`; the compiler (4.3) turns it into a date comparison. The city list is read lazily from the DB and cached for an hour (`FieldRegistry` takes a closure, so unit tests need no database). Contact details, names and consent flags are not registered; consent is a separate channel filter.
-- **Rationale:** The case requires it, and one registry feeding the parser, compiler, prompt and JSON schema stops them drifting apart (DRY).
-- **Alternatives:** Asking the LLM for SQL or a `where` string.
+- **Decision:** `POST /api/campaigns/{id}/content/stream` answers `text/event-stream` with `delta` events (pieces of the model's raw JSON), then either `final` (the validated content) or `error`. The browser reads it with `fetch` and its own SSE parser, because `EventSource` cannot POST. Only live status (`/stats/stream`, GET) uses `EventSource`.
+- **Rationale:** The stream starts a paid, side-effecting generation, so it must not be a GET. The text drawn while streaming is only a preview; what is saved is what passed validation. Both streams are one-way, so WebSockets would add a server for no gain.
 
-## K8: Consent is checked twice
+## 9. Limits count what the recipient sees
 
-- **Decision:** Opt-in is checked when the audience is counted and frozen, and again right before sending; a customer whose consent changed in between is `skipped`. "May receive a channel" (opt-in set and a non-empty address) is defined once, as `SegmentQueryCompiler::consentSql()`. Both the channel filter and the `COUNT(*) FILTER` aggregates in `AudienceService` use it, so counting and filtering cannot disagree. `AudienceService` counts in two queries: one aggregate scan (per-channel counts, unique total, longest personalisation values) and one sample.
-- **Rationale:** Consent can change between approval and sending, so a single check is not enough (defensive). One SQL definition stops the count the marketer sees from drifting from the people who are actually sent to.
-- **Alternatives:** Checking consent only when the audience is counted; a separate query per channel.
+- **Decision:** SMS body ≤ 160, email subject ≤ 80 and email body (plain text) ≤ 2000, counted in visible characters (`grapheme_strlen`; the frontend uses `Intl.Segmenter`). The count is the worst case after personalization: each variable is filled with the longest value in the audience for that channel, or its fallback if that is longer. A message may use only `{{first_name}}`, `{{last_name}}` and `{{city}}`, each with a fallback ("Değerli müşterimiz" for the first name), filled in one regex pass so a value that looks like `{{city}}` is inserted as text, never expanded. Model output and a person's edit both go through the same `ContentValidator`, which returns every problem with its field path. The limits live only in `config/delivery.php`, and the sending step checks again. GSM-7 vs UCS-2 segments are not modeled.
+- **Rationale:** The limit must hold on the recipient's phone, not just on the template. One validator and one config stop the model, the editor and the frontend from drifting apart, and a closed variable list leaves no room for template injection.
 
-## K9: LLM driver chosen from the API key
+## 10. Human approval as a campaign state machine
 
-- **Decision:** Callers depend on the `LlmClient` interface. `ClaudeLlmClient` talks to the Messages API over Laravel's HTTP client; `FakeLlmClient` answers offline. `LLM_DRIVER=auto` resolves to `claude` when `ANTHROPIC_API_KEY` is set, otherwise to `fake` with a logged warning. The model comes from `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`; Haiku 5.5 is the cheaper option).
-- **Rationale:** Tests and `docker compose up` must work without a key; the warning stops a missing key from passing as a working setup. `Http::fake` makes the Claude client easy to test, and moving to an SDK later changes one class (DIP).
-- **Alternatives:** The official PHP SDK.
+- **Decision:** `Campaign` is a rich model: `defineAudience()`, `setContent()`, `approve()`, `startSending()`, `complete()` and `fail()` are the only way to change `status`. Flow: `draft → audience_ready → content_ready → approved → sending → completed`. Audience and content can be redone until approval, and a person can edit only the generated SMS and email text, and only before approval. `approved → approved` is allowed, so approving twice is a no-op. Any other move throws `InvalidCampaignTransition` (HTTP 409). The one exception is `completeIfFinished()`, which writes `sending → completed` with a single conditional `UPDATE … WHERE NOT EXISTS (pending/sending deliveries)`, so two workers finishing together cannot complete the campaign early or twice. A campaign ends `completed` even when some or all of its deliveries failed; `failed` is defined (`sending → failed`), but no code path uses it yet.
+- **Rationale:** An invalid transition fails early, next to the data it protects. Idempotent approval makes a double click harmless. Failures belong to deliveries, where the dashboard shows how many and why; a campaign-level failure rule (for example "nothing was sent") is left open.
 
-## K10: Structured output from a registry-built JSON schema
+## 11. Freeze the audience in SQL at approval, dispatch from a job
 
-- **Decision:** `ClaudeLlmClient` asks the API for structured output (`output_config.format` of type `json_schema`), with the schema built from `FieldRegistry` and the content limits. The backend validates every answer anyway (K11).
-- **Rationale:** The case requires JSON output. The schema makes a shape mismatch rare in the model, so fewer repair rounds are needed; business rules (value limits, operators per type, character limits) do not fit a schema and stay in the validators.
-- **Alternatives:** Prompt-only JSON; forced tool use as a fallback (not built: the API supports structured output, so it would be unused code).
+- **Decision:** `POST /api/campaigns/{id}/approve` takes a lock, re-reads the campaign, refuses an empty audience (422), re-validates both messages and queues one `StartCampaignJob`, unique per campaign. That job freezes the audience with one `INSERT … SELECT … ON CONFLICT DO NOTHING` per channel, moves the campaign to `sending` and queues one `SendDeliveryJob` per delivery. Running it again adds no rows and re-queues only pending deliveries, and approving a campaign that is still `approved` queues it again, so a lost or crashed start is recovered safely. Opt-in is checked when the audience is counted, when it is frozen, and right before each send; a customer whose consent changed is `skipped`.
+- **Rationale:** The freeze is one statement inside Postgres, so no customer row reaches PHP and memory stays flat. A job keeps the request fast and makes the start repeatable. Consent can change between approval and sending, so a single check is not enough.
 
-## K11: Reliability chain and the LLM call log
+## 12. One rate limit per channel, enforced on both sides
 
-- **Decision:** An LLM answer goes parse → validate → typed value object. A rejected answer goes back to the model with its path-based errors, at most 2 repair rounds (`llm.max_repair_attempts`), then the caller gets the errors. Text no field can express goes to `unsupported_criteria`; an answer with no conditions and a non-empty `unsupported_criteria` ends at once, since a repair cannot fix it. A brief is 10-1000 characters and may not contain `<brief>` tags (`llm.brief`). Transport failures are never repaired: `LlmUnavailable` maps to 503, the other `LlmException`s to 502, once in `bootstrap/app.php`.
-- **Call log:** `RecordingLlmClient` wraps any `LlmClient` and writes one `llm_calls` row per call (purpose, prompt version, model, tokens, latency, attempt, outcome `succeeded|failed|invalid|aborted`, errors, raw output). The prompt is never stored, so the log holds no personal data. `LlmClient` stays the raw client, so tests queue scenarios on `FakeLlmClient`; `LlmServiceProvider` builds the callers that must be logged (`SegmentExtractor`, later `ContentGenerator`) with the recording client, and the extractor marks a rejected call `invalid`.
-- **Rationale:** The case rewards reliable structured output. Failures, retries and latency stay visible and measurable (`llm:eval`, metrics), and a decorator adds this without touching the clients (OCP).
-- **Alternatives:** A single attempt with no repair; unlimited retries; logging inside each client; storing the full prompt.
+- **Decision:** Sending is limited to 100 per second per channel (`SEND_RATE_PER_SECOND`). The mock provider enforces the same limit itself and answers 429 with `Retry-After: 1`. The app's limiter waits for a free slot instead of burning a retry. It also records the highest number of calls granted in one second, exposed as `send_peak_per_second{channel}`, and the smoke test checks that value against the limit.
+- **Rationale:** Testing the sender against a provider that really refuses proves the throttle. The provider's own peak cannot show that the sender behaved, because the provider refuses anything above the limit, so the sender's own peak is the evidence. Fixed one-second windows allow a short burst at a boundary; in six smoke runs the sender peak never went above 100, so a sliding window was not needed.
 
-## K12: Content streams over POST server-sent events, parsed partially in the browser
+## 13. Retry by failure class, with full jitter
 
-- **Decision:** `POST /api/campaigns/{id}/content/stream` answers `text/event-stream` with `delta` (a piece of the model's raw JSON), then either `final` (the validated content and a `repaired` flag) or `error` (code, message, path-based problems). The browser reads it with `fetch` and its own `SseParser` (`streamSse`, 10.1), because `EventSource` cannot POST. While deltas arrive, `useContentStream` (10.4) collects them and, once per animation frame, parses the JSON so far with the `partial-json` library (flags `STR | OBJ`: unfinished strings and objects are completed, unfinished numbers and literals are not guessed). `final` replaces the drawn text with the validated content; cancel aborts the request, which makes the server drop the model stream, and clears the unvalidated text. Only live status (`/stats/stream`, GET) uses `EventSource`.
-- **Rationale:** The stream starts a paid, side-effecting generation, so it must not be a GET. Re-parsing the whole prefix per frame is O(n²) but n stays under 3 KB, and one frame bounds the work however fast deltas come. `partial-json` is small, typed and maintained; hand-writing a tolerant JSON parser would be more code to get wrong.
-- **Alternatives:** WebSocket (Reverb); polling; `best-effort-json-parser` or `jsonrepair` (heavier, repair guesses more than completing a prefix needs); a hand-written prefix parser; having the server send already-parsed fields.
+- **Decision:** Every provider answer is sorted into one of four classes: 2xx `Sent`, 429 `RateLimited` (with `Retry-After` when usable), 5xx / timeout / connection error `Transient`, any other 4xx `Permanent`. `RetryPolicy` is a pure class: `Transient` waits a random time between 0 and `min(cap, base · 2^(n-1))` (full jitter), `RateLimited` waits the longer of `Retry-After` and that backoff, `Permanent` never retries, and after 5 failed attempts every class gives up. Base (200 ms), cap (10 s) and attempts live in `config/delivery.php`. A permanent or exhausted delivery stays `failed`, with a fixed error code that the dashboard explains in plain language.
+- **Rationale:** Retrying a permanent error wastes calls, and retrying all failures at one fixed interval makes workers come back together. Full jitter spreads them, and honoring `Retry-After` avoids a second refusal.
 
-## K13: Limits count what the recipient sees
+## 14. Three layers against double sends
 
-- **Decision:** SMS body ≤ 160, email subject ≤ 80 and email body (plain text) ≤ 2000, counted in visible characters (`grapheme_strlen`; the frontend uses `Intl.Segmenter`). The count is the worst case after personalisation: each variable is filled with the longest value in the audience for that channel (`AudienceService`), or its fallback if that is longer. Model output and a person's edit both become a `MessageContent` and go through the same `ContentValidator`, which returns every problem with the field path (`sms.body`, `email.subject`). The limits live only in `config/delivery.php` and are read when the validator is resolved. The sending step checks again. Operator segments (GSM-7 vs UCS-2) are not modelled.
-- **Rationale:** The limit must hold on the recipient's phone, not just on the template. One validator and one config stop the model, the editor and the frontend from drifting apart.
-- **Alternatives:** Counting the template length, a fixed budget per variable, counting GSM segments.
-
-## K14: Personalisation with a closed variable list
-
-- **Decision:** A message may use only `{{first_name}}`, `{{last_name}}` and `{{city}}` (`Variables`), each with a fallback used when the customer has no value ("Değerli müşterimiz" for the first name). `PersonalizationRenderer` fills them in one regex pass, so cost is O(n) and a value that looks like `{{city}}` is inserted as text, never expanded. An unknown placeholder is reported, not rendered. Length is counted in visible characters with `grapheme_strlen` (a Turkish letter, an emoji or a joined family emoji is 1). The worst case counts each variable as the longer of the audience's longest value and its fallback, since a customer with no value gets the fallback. Spaces inside the braces are accepted (`{{ first_name }}`).
-- **Rationale:** A closed list leaves no room for template injection, and one pass keeps rendering linear. Counting what the reader sees keeps the limit true on the recipient's phone.
-- **Alternatives:** Twig or Blade as the template engine; counting bytes or code points.
-
-## K15: Human approval as a campaign state machine
-
-- **Decision:** `Campaign` is a rich model: `defineAudience()`, `setContent()`, `approve()`, `startSending()`, `complete()` and `fail()` are the only way to change `status`, which is not mass assignable. Flow: `draft → audience_ready → content_ready → approved → sending → completed | failed`. Audience and content can be redone until approval (`audience_ready` and `content_ready` accept themselves, and `content_ready` can return to `audience_ready`), because the rule is read-only and the brief is what changes. A person can edit only the generated SMS and email text, and only before approval. `approved → approved` is allowed, so approving twice is a no-op. Any other move throws `InvalidCampaignTransition` (HTTP 409 with `from`, `to` and `allowed`). The methods change the model in memory only; the caller saves it.
-- **Rationale:** An invalid transition fails early, next to the data it protects. Idempotent approval makes a double click harmless.
-- **Alternatives:** A rule editor (YAGNI); status set from services or controllers.
-- **One exception (task 8.6):** `Campaign::completeIfFinished()` writes `sending → completed` with a single conditional `UPDATE … WHERE NOT EXISTS (pending/sending deliveries)` instead of `complete()`. The check and the change must be one statement, or two workers finishing together could complete the campaign early or twice. It stays inside the model and only makes the transition `CampaignStatus` already allows.
-
-## K16: Freeze the audience in SQL at approval, dispatch from a job
-
-- **Decision:** `POST /api/campaigns/{id}/approve` takes a `Cache::lock` on the campaign, re-reads it under the lock, and only moves a `content_ready` campaign to `approved` (any other pre-approval state is a 409). It refuses an audience of 0 with 422 `audience_empty`, and re-validates both messages with the same `ContentValidator` against the stored longest values. It then queues one `StartCampaignJob` and returns; a repeat after sending has started returns 200 with the current state and queues nothing. A repeat while the campaign is still `approved` tries to queue `StartCampaignJob` again, because the first push may have been lost (the request saved the status, then the queue failed). The job is `ShouldBeUnique` per campaign (30 s), so a double click while the first job waits queues nothing, and a push that was really lost is retried once that lock has expired. A late retry job is not dropped: `SendDeliveryJob` hands itself back to the queue when its delivery's `next_attempt_at` is still in the future. `StartCampaignJob` runs `AudienceSnapshotter` (one `INSERT … SELECT … ON CONFLICT DO NOTHING` per channel, with the consent condition applied again and the idempotency key `sha256("campaign:customer:channel")` computed in SQL), moves the campaign to `sending`, and streams the pending delivery ids with `lazyById(1000)`, queuing one `SendDeliveryJob` each on the `sms` or `email` queue. A second run adds no rows and re-queues only deliveries still pending, so a crash during dispatch is recovered by running the job again. A held lock gives 409 `approval_in_progress` after `approval_lock_wait_seconds`.
-- **Rationale:** The freeze is one statement inside Postgres, so no customer row reaches PHP and memory stays flat. Doing it in a job keeps the request fast and lets a failed start be repeated safely. The lock plus the status re-read turns two clicks into one approval.
-- **Alternatives:** Looping over customers in PHP; one batch job for the whole campaign; a `DB::transaction` with `lockForUpdate` instead of a cache lock (the lock must also cover the dispatch).
-
-## K17: One rate limit per channel, enforced on both sides
-
-- **Decision:** Sending is limited to 100 per second per channel (`SEND_RATE_PER_SECOND`). The mock provider enforces the same limit itself, with a per-second Redis `INCR` counter per channel, and answers 429 with `Retry-After: 1` when it is exceeded. The main app's limiter (task 8.4) uses `Redis::throttle(...)->block()` so a worker waits instead of burning a retry.
-- **Rationale:** The provider limit is the case requirement. Testing the sender against a provider that really refuses proves the throttle, rather than trusting it. Fixed one-second windows allow a short burst at a boundary, which is measured in 8.8.
-- **Alternatives:** A token bucket in Lua; a batch dispatcher that sends once per second.
-- **Measurement (14.3):** The provider's own `peak_per_second` cannot prove the sender stayed under the limit, because the provider refuses anything above it. `ChannelRateLimiter` now counts every call it grants in that clock second's Redis bucket and keeps the per-channel peak with one Lua script (`send:peak:{channel}:*`). `/api/metrics` exposes it as `send_peak_per_second{channel}`, and the smoke test checks it against `SEND_RATE_PER_SECOND` (it clears the counters first, so the peak belongs to the run). The provider's `/stats` also counts 429s as `rate_limited.limit` (the sender went over) and `rate_limited.injected` (fault injection, expected). The provider peak stays in the table as information only.
-- **Result (14.3):** In six smoke runs the sender peak never went above 100 per second on either channel (sms 100/100/89/100/100/100, email 100/100/96/97/98/97), so the fixed window is kept and the sliding-window switch planned for a peak above 100 did not trigger. The provider counted at most one limit 429 per run (0 to 1): a call granted at the end of one second can arrive in the next, which is a measurement skew of the two clocks, not a second of more than 100 grants. If a later run shows a sender peak above 100 in three smoke runs in a row, replace the throttle with a sliding one-second window (Redis sorted set and Lua).
-
-## K18: Retry by failure class, with full jitter
-
-- **Decision:** `HttpMessageProvider` (8.1) sorts every answer into one of four classes: 2xx `Sent`, 429 `RateLimited` (with the `Retry-After` seconds when usable), 5xx / timeout / connection error `Transient`, any other 4xx `Permanent`. `RetryPolicy` (8.2) is a pure class that turns a failed result and the number of finished attempts into a `RetryDecision`: `Transient` waits a random time between 0 and `min(cap, base · 2^(n-1))` (full jitter, n = finished attempts); `RateLimited` waits `max(Retry-After, that backoff)`; `Permanent` never retries; after the 5th failed attempt every class gives up. The random source is injected. Base (200 ms), cap (10 s) and the 5 attempts live in `config/delivery.php` and are estimates to tune. A permanent or exhausted delivery stays `failed` and shows on the dashboard.
-- **Rationale:** Retrying a permanent error wastes calls; retrying all failures at one fixed interval makes workers come back together. Full jitter spreads them, and honouring `Retry-After` avoids a second refusal. A pure class is unit-tested without time or network.
-- **Alternatives:** A fixed interval; a circuit breaker (YAGNI).
-
-## K19: Three layers against double sends
-
-- **Decision:** (1) A DB unique key on `deliveries` (`campaign_id`, `customer_id`, `channel`) means a row exists once; the snapshot uses `ON CONFLICT DO NOTHING`. (2) An atomic claim, a conditional `UPDATE` from `pending` (or a stale `sending`) to `sending`, means two workers cannot take the same row. (3) The provider `Idempotency-Key` (sha256 of campaign, customer and channel, unique on the row) deduplicates a retry after a timeout. Different campaigns may reach the same customer (no frequency cap). `Delivery` is a rich model: `markSent()`, `markFailed()`, `scheduleRetry()` (back to `pending`) and `skip()` are the only way to change its status, and `sent`, `failed` and `skipped` are final. `attempts` counts finished provider attempts (sent, retry, failed), not skips. The database fills `created_at` and `updated_at`, because the snapshot is a raw `INSERT … SELECT`.
+- **Decision:** (1) A DB unique key on `deliveries` (`campaign_id`, `customer_id`, `channel`) means a row exists once. (2) An atomic claim, a conditional `UPDATE` from `pending` (or a stale `sending`) to `sending`, means two workers cannot take the same row. (3) The provider `Idempotency-Key` (sha256 of campaign, customer and channel, unique on the row) deduplicates a retry after a timeout. `Delivery` is a rich model, and `sent`, `failed` and `skipped` are final.
 - **Rationale:** Each layer covers a failure the others cannot: duplicate rows, concurrent workers, and an ambiguous network failure.
-- **Alternatives:** A Redis set; only `ShouldBeUnique` jobs.
 
-## K20: Mock provider as a separate plain-PHP container
+## 15. Mock provider as a separate plain-PHP container with fault injection
 
-- **Decision:** `mock-provider/` is its own container: plain PHP (`php -S`, 16 workers, no framework) with counters in Redis. A missing `Idempotency-Key` or a bad recipient is a 400 (permanent for the main app). `/stats` reports per channel `total`, `duplicates_prevented` and `peak_per_second`.
-- **Rationale:** Independent counters prove nothing was sent twice, and real network failures happen between containers.
-- **Alternatives:** A route inside the Laravel app; a framework.
+- **Decision:** `mock-provider/` is its own container: plain PHP (`php -S`, no framework) with counters in Redis. It adds latency and injects 500s, 429s, timeouts and accept-then-500 (stored, but answered with an error) at rates set by `MOCK_*`. A missing `Idempotency-Key` or a bad recipient is a 400 (permanent for the main app). `/stats` reports per channel the total, the duplicates it prevented and the peak per second.
+- **Rationale:** Independent counters prove nothing was sent twice, and real network failures happen between containers. Timeouts and accept-then-500 create exactly the ambiguous failures the `Idempotency-Key` exists for.
 
-## K21: Live status from one grouped query, computed on request
+## 16. Live status computed on request
 
-- **Decision:** `GET /api/campaigns/{id}/stats` (`CampaignStats`, 9.1) reads progress with a single `GROUP BY channel, status` over `deliveries` (served by the `campaign_id, channel, status` index) that also sums `attempts`. Every channel and status is returned, zero when absent. Retries are `SUM(attempts)` minus one per `sent` or `failed` delivery, because the last attempt of those is not a retry (a `pending` delivery with attempts has that many scheduled retries). The send rate is the `sent` rows with `sent_at` in the last 5 seconds divided by 5. Recent errors are the 10 newest deliveries with a `last_error`, by `updated_at`, without any customer column. The SSE stream (9.2), `/api/metrics` (9.3) and health (9.4) follow the same rule: computed at request time, no extra counter state, no extra container.
-- **Stream, metrics, health:** `GET /api/campaigns/{id}/stats/stream` polls the same query every second and sends a `stats` frame only when the snapshot changed, a comment heartbeat every 15 s otherwise, and an `end` event once the campaign is final or the stream is 10 minutes old; the browser's `EventSource` reconnects after 3 s. `/api/metrics` is Prometheus text computed from the tables and Redis on each scrape. `/api/health` treats the database and Redis as critical (503 when either is down); a down provider only makes the status `degraded`, because the app still works and sends retry. The provider state is cached for 15 s so a stalled DNS lookup cannot slow every poll.
-- **Rationale:** One indexed query keeps the cost constant per poll, and derived counters could drift from the rows. `EventSource` reconnects by itself and no extra container is needed (KISS). Leaving customer data out keeps phone numbers and emails out of the API and logs.
-- **Alternatives:** Polling from the browser; Redis counters; several count queries; Reverb/WebSockets.
+- **Decision:** `GET /api/campaigns/{id}/stats` reads progress with one `GROUP BY channel, status` query over `deliveries`; every channel and status is returned, zero when absent. The SSE stream polls the same query every second and sends a frame only when the snapshot changed. `/api/metrics` (Prometheus text) and `/api/health` are computed at request time too. Health treats the database and Redis as critical (503 when either is down); a down provider only makes the status `degraded`, because the app still works and sends retry. Customer data is left out of these responses.
+- **Rationale:** One indexed query keeps the cost constant per poll, and derived counters could drift from the rows. No extra counter state or container is needed, and phone numbers and emails stay out of the API and logs.
 
-## K22: No authentication
+## 17. Frontend: Vue 3, TypeScript, Pinia and Tailwind behind nginx
 
-- **Decision:** The app has no login, users or tokens. It is a single-marketer local demo, and the README says so.
-- **Rationale:** The case does not ask for it (YAGNI), and auth would add routes, state and tests that prove nothing about the campaign flow.
-- **Alternatives:** Sanctum token authentication.
+- **Decision:** The frontend is a Vue 3 single-page app in TypeScript, built with Vite, with Pinia for state, Vue Router for the pages and Tailwind for styling. nginx serves the built app and proxies `/api` to the backend, so the browser talks to one origin. The interface is available in Turkish and English (`vue-i18n`); the switch only changes the interface text, never the message content that is sent to customers.
+- **Rationale:** The case asks for Vue. Typed code and a typed store keep the screens that share one campaign (brief, audience, streamed content, dashboard) consistent with the API. One origin avoids CORS and keeps the stream and the dashboard on the same address as the page. The language switch is a display choice of the marketer, so it needs no server state.
 
-## K23: Interface language is chosen in the browser with vue-i18n
+## 18. Test strategy: real services, a pinned fake LLM, and end-to-end checks
 
-- **Decision:** The UI is available in English and Turkish through `vue-i18n` (Composition API, `legacy: false`). One header button switches to the other language, named in itself ("Türkçe" / "English"). The choice is saved in `localStorage` (`locale`); with nothing saved, a Turkish browser gets Turkish and everything else English. The page's `<html lang>` follows the choice. Messages live in `src/i18n/en.ts` (the master) and `tr.ts`, typed `typeof en`, so a missing or extra key fails type-check; a test also checks that both languages use the same `{parameters}` and none of the characters vue-i18n reserves (`{ } @ | $`). Only text the frontend writes is translated: error text from the API, the model-written SMS/email text, the campaign brief, and the segment chip labels (which the backend already sends in Turkish from `FieldRegistry` and `Operator::template()`) are shown as received.
-- **Rationale:** The switch is a display choice of one marketer, so it needs no server state or login, and it must not change what is sent to customers (that language is set by the brief and the model). Keeping the rule labels and API messages on the server keeps one source of truth for them (K7, K13) instead of a second copy in the frontend.
-- **Alternatives:** Translating API errors by `code` in the frontend (a second copy of every message); the backend choosing the language from an `Accept-Language` header (the content limits and rule labels would then depend on the request); a per-language route prefix (`/tr/campaigns`), which adds routes for no gain in a single-marketer demo.
-
-## K24: Delivery errors carry a fixed code that the dashboard explains in plain language
-
-- **Decision:** Every retry, failure and skip stores a code from a small fixed set in `deliveries.last_error_code` (`App\Delivery\DeliveryErrorCode`: `consent_withdrawn`, `provider_unreachable`, `provider_busy`, `provider_error`, `retries_exhausted`, `provider_rejected`, `content_invalid`, `internal`) next to the raw text in `last_error`. The stats API sends both (`recent_errors[].code` and `.error`). The frontend turns the code into a short sentence in the chosen language and keeps the raw text behind a collapsed "Technical detail" section for engineers. A row without a code (written before the column existed) gets a generic sentence. This narrows K23 for delivery errors only: other API messages are still shown as received.
-- **Rationale:** The user is a marketer, and a provider response such as `Provider answered 500: ...` means nothing to them, while the raw text is exactly what a developer needs. A code set by the code that knows the cause is more robust than guessing the cause from English text, and the set is closed, so the frontend can translate every value and a test can check it.
-- **Alternatives:** Classifying the raw text with regular expressions in the frontend (breaks when a message is reworded); translating on the backend from an `Accept-Language` header (K23 rejected this; the dashboard stream would depend on the request); explaining errors from the delivery status alone (cannot tell a rejected number from an exhausted retry).
-
-## K26: The first content starts by itself after the first audience
-
-- **Decision:** When an audience extraction succeeds on a campaign that has no messages yet, the content stream starts without a click. The campaign store keeps a one-shot marker (`autoGenerateFor`); `ContentStream` spends it on mount and begins the same POST stream as the button (K12). A page reload, opening another campaign and a failed extraction (422/503) never start generation; "Generate again" is unchanged. "Re-run extraction" on a saved campaign does start it, because the server drops the old text together with the old audience; the brief can be edited first (`POST /campaigns/{id}/audience` takes an optional `brief` with the same limits, saved only when the extraction succeeds).
-- **Rationale:** One click less in the main flow. The marker lives in the store because a new campaign changes page between the extraction and the stream. Text is only replaced by an explicit click ("Generate again" or "Re-run extraction"), never by opening or reloading a campaign.
-- **Alternatives:** A backend job started by the audience endpoint (needs a new state and a way to show its progress); generating after every extraction (replaces edited text); a component-local flag (lost on the page change).
-
-## K25: The key-less fake reads the brief and varies its content
-
-- **Decision:** The development fake (K9) no longer answers with one fixed rule per scenario. `BriefReader` reads the filters a Turkish brief states in plain words (city, gender, age, "N days/weeks/months without an order/login/cart", loyalty tier, category, platform) with narrow patterns, and `DevScenarios` lays them over the keyword scenario's conditions field by field: the brief wins on a shared field, and the generic "everyone" condition is dropped once a real filter is read. The explanation is written from the final conditions in the chips' wording. A phrase that is not clear adds no condition. Allowed values come from `FieldRegistry`, and the answer still goes through `SegmentRuleParser` (K7, K11). Content variants, the shared `%OFFER%` slot and the "generate again" counter are added in 13.3 and 13.4 under this same decision.
-- **Rationale:** A key-less demo should behave like a real model closely enough to show that the brief reaches the audience. Narrow patterns are deterministic and testable; a missing condition is a visible gap, while a wrong one silently picks the wrong customers.
-- **Alternatives:** An NLP library or a second model for parsing (a dependency and non-determinism for a test double); random picks (cannot be asserted); extending the keyword lists only (still one fixed rule per scenario).
-
-## K27: Setup is one command, without a `.env` file
-
-- **Decision:** `docker-compose.yml` marks `env_file` as optional (`required: false`, Compose 2.24+) for the backend roles and the mock provider. Every value the containers need is set in a shared `x-env` block as `${VAR:-<.env.example value>}`, so a `.env` (for the API key or a tuned rate) wins and its absence changes nothing. The defaults are kept equal to `.env.example`, and a comment in each file points to the other. `make up` still copies `.env.example` to `.env`.
-- **Rationale:** The case requires `docker compose up` to work on a clean clone. Compose reads `.env` for interpolation by itself, so no extra tool is needed, and no secret enters the repository.
-- **Alternatives:** Committing a `.env` (secrets risk); a `cp` step in the README (breaks the one-command requirement); copying in the entrypoint (the container cannot write to the host).
-
-## K28: Tests pin the fake LLM and refuse stray HTTP calls
-
-- **Decision:** `phpunit.xml` forces `LLM_DRIVER=fake` and an empty `ANTHROPIC_API_KEY` as `<server ... force="true"/>` entries, the same way it pins the database (K4). `tests/Pest.php` calls `Http::preventStrayRequests()` before every Feature test, so a test that does not `Http::fake` its calls fails instead of reaching a real host. A Feature test asserts the fake driver and the stray-request guard. `LlmConfigTest` is unchanged: it sets `$_ENV` and `$_SERVER` itself before loading `config/llm.php`.
-- **Rationale:** With a key in the container's environment (K27 makes that easy), `LLM_DRIVER=auto` resolved to Claude and a test run could spend money and give non-deterministic results. Pinning the driver removes the key from the test run, and the stray-request guard makes any remaining leak loud.
-- **Alternatives:** Relying on developers not to set a key (fails silently); unsetting the variable in `TestCase::setUp` (config is already built by then); `Http::fake()` globally (hides unexpected calls instead of failing).
-
-## Setup notes (Phase 2)
-
-- **API only:** no web routes, views or Vite in the backend; errors share one `{error:{code,message,details}}` body.
-- **Tooling:** Pest as the runner, Larastan level 6, Pint with its default preset.
-- **Config:** content limits and sending defaults live only in `config/delivery.php`.
-- **One backend image, three roles:** `app` migrates and seeds, then serves; the SMS and email workers reuse the image and wait for `app` to be healthy.
-- **Local demo credentials:** `DB_PASSWORD=campaign` in `.env.example`; the database is not published to the host.
+- **Decision:** Unit tests need no database, Redis or framework boot. Integration tests run against the Postgres and Redis containers, in a separate `campaign_test` database and Redis db. `phpunit.xml` forces the fake LLM driver and an empty API key, and `Http::preventStrayRequests()` makes a test that reaches a real host fail. `make test` runs the backend, mock provider and frontend (Vitest) suites inside Docker. `make smoke` sends a large campaign through the faulty mock and checks the database against the provider's counters, and `make e2e` drives the whole flow in Chromium with Playwright.
+- **Rationale:** `FILTER`, `ON CONFLICT` and throttling only show up on the real services, so an in-memory SQLite would hide them; a separate database can be wiped freely. Pinning the driver means a key in the environment can never make a test spend money or give non-deterministic results. Smoke and e2e cover what unit tests cannot: concurrency, real network faults and the browser.

@@ -29,20 +29,20 @@ docker-compose.yml  Makefile  .env.example  README.md  DECISIONS.md  CLAUDE.md  
 - **Görev döngüsü:** `/task N.M` → Claude: önce ilgili rule ve dokümanlar (Docs first) → uygulama → test → lint → rapor. Sen doğrularsın, "onay" dersen Claude commit atar.
 - **Git öncesi özet (zorunlu):** Her görevin raporu ve her fazın kapanışı, herhangi bir git komutundan (`add`, `commit`, `push`, PR) hemen önce, değişen/eklenen her dosya için bir özet tablosu içerir: `dosya | yeni/değişti | ne yapıldı | neden`. Ardından kabul kriteri kanıtı (komut + çıktı) ve doküman sorguları gelir. Faz kapanışındaki özet fazın tüm dosyalarını kapsar.
 - **Faz sonu:** `/finish-phase` → `make test` + `make lint`, `review-pr`, `/code-review` (genelde `medium`; Faz 5 ve 8 için `high`), en fazla 2 tur, reddedilen bulgu listesi → dosya bazlı faz özeti → onayla push (`ask`) ve PR. Merge sende.
-- **Kararlar:** Önemli kararlar (case'te doğrudan geçenler, mimariyi belirleyenler, proje akışını kolaylaştıranlar) alındıkları görevin commit'inde `DECISIONS.md`'ye yazılır: karar, gerekçe, alternatifler. Küçük varsayımlar (seed boyutu, içerik dili, yasal metin, Windows'ta `make`) ilgili görevde ve README'de (11.1) belirtilir.
+- **Kararlar:** Önemli kararlar (case'te doğrudan geçenler, mimariyi belirleyenler, proje akışını kolaylaştıranlar) alındıkları görevin commit'inde `DECISIONS.md`'ye yazılır: karar ve gerekçe; önemli bir alternatifin neden seçilmediği gerekçenin içinde kısaca söylenir. Küçük varsayımlar (seed boyutu, içerik dili, yasal metin, Windows'ta `make`) ilgili görevde ve README'de (11.1) belirtilir.
 - **Session export:** Her oturum sonunda `/export` → `ai-sessions/phase-<N>_<konu>.md` (ör. `phase-1_setup.md`; aynı fazda ikinci oturum `phase-1_setup-2.md`); commit'ten önce `node scripts/scrub-sessions.mjs --check`.
 - **Dil:** Projenin tüm dosyaları ve içerikleri İngilizce yazılır: kod, yorumlar, config dosyaları (`.gitignore` yorumları dahil), `README.md`, `DECISIONS.md`, `CLAUDE.md`, rules/skills/agents, hook ve script mesajları, commit mesajları, PR başlığı ve açıklaması. Türkçe kalanlar: bu plan (`docs/plan.md`, çalışma belgesi), Claude'un sohbetteki raporları ve dosya bazlı özetler. Ürün içeriği (LLM'in ürettiği kampanya metni) ürün gereği Türkçe kalır (5.9, 11.1). Arayüz metinleri ise Türkçe/İngilizce seçilebilir; çeviri dosyaları (`frontend/src/i18n/tr.ts`) de bu "proje dosyaları İngilizce" kuralının bilinçli istisnasıdır.
 - **Takvim (çekirdek akış 5 günde):**
 
-  | Gün | Fazlar                                                  | Gün sonu ölçütü                                                                                                                         |
-  | --- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-  | G1  | Faz 1, Faz 2                                            | `docker compose up` sağlıklı, `make test` yeşil, Claude araçları çalışıyor                                                              |
-  | G2  | Faz 3, Faz 4, Faz 5.1–5.4                               | Seed ve segment derleyicisi çalışıyor, LLM istemcisi testli                                                                             |
-  | G3  | Faz 5.5–5.11, Faz 6, Faz 7                              | Brief → kural → sayılar → stream içerik API'den çalışıyor; mock provider ayakta                                                         |
-  | G4  | Faz 8, Faz 9                                            | `make smoke` yeşil, stats/health/metrics hazır                                                                                          |
-  | G5  | Faz 10                                                  | Çekirdek akış tarayıcıda uçtan uca, `make e2e` yeşil                                                                                    |
-  | G6  | Faz 11                                                  | Teslim paketi                                                                                                                           |
-  | G7  | Faz 12, Faz 13, Faz 14 | Arayüz ve fake LLM iyileştirmeleri tarayıcıda; temiz klonda yalnızca `docker compose up`; `make test`, `make smoke` ve `make e2e` yeşil |
+  | Gün | Fazlar                     | Gün sonu ölçütü                                                                                                                         |
+  | --- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+  | G1  | Faz 1, Faz 2               | `docker compose up` sağlıklı, `make test` yeşil, Claude araçları çalışıyor                                                              |
+  | G2  | Faz 3, Faz 4, Faz 5.1–5.4  | Seed ve segment derleyicisi çalışıyor, LLM istemcisi testli                                                                             |
+  | G3  | Faz 5.5–5.11, Faz 6, Faz 7 | Brief → kural → sayılar → stream içerik API'den çalışıyor; mock provider ayakta                                                         |
+  | G4  | Faz 8, Faz 9               | `make smoke` yeşil, stats/health/metrics hazır                                                                                          |
+  | G5  | Faz 10                     | Çekirdek akış tarayıcıda uçtan uca, `make e2e` yeşil                                                                                    |
+  | G6  | Faz 11                     | Teslim paketi                                                                                                                           |
+  | G7  | Faz 12, Faz 13, Faz 14     | Arayüz ve fake LLM iyileştirmeleri tarayıcıda; temiz klonda yalnızca `docker compose up`; `make test`, `make smoke` ve `make e2e` yeşil |
 
 - **Gerideysek önce kesilecekler** (çekirdek akışı bozmayanlar, README'de "yapılmadı" olarak yazılır): 5.12 `llm:eval` (altın brief testleri fake ile unit testte kalır), 9.5 JSON log, 2.1'de Larastan, 10.8 Playwright (yerine `make smoke` + elle tarayıcı kontrolü), 1.13 deneme koşusu (Faz 2'nin ilk görevinde yapılır).
 
@@ -662,7 +662,7 @@ Performans ilkeleri (gerektiği yerde): lazy route, stream delta'larını `reque
 
 ### 11.2 DECISIONS kontrolü
 
-- **İş:** Uygulama boyunca alınan tüm önemli kararlar `DECISIONS.md`'de tam mı; her birinde gerekçe ve reddedilen alternatifler kısa yazılı mı.
+- **İş:** Uygulama boyunca alınan tüm önemli kararlar `DECISIONS.md`'de tam mı; her birinde gerekçe kısa yazılı mı; önemli alternatifler gerekçenin içinde geçiyor mu.
 - **Dosyalar:** `DECISIONS.md`
 - **Bağımlı:** 11.1
 - **Kabul:** Okuyarak onay.
