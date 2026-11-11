@@ -48,7 +48,7 @@ return new class extends Migration
             $table->boolean('sms_opt_in')->default(false);
             $table->boolean('email_opt_in')->default(false);
 
-            // Indexes for the columns segments filter on most (K5).
+            // Indexes for the columns segments filter on most.
             $table->index('city');
             $table->index('loyalty_tier');
             $table->index('favorite_category');

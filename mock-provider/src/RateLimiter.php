@@ -7,7 +7,7 @@ namespace MockProvider;
 use Redis;
 
 /**
- * The provider's own limit per channel and second (K17). Counting in Redis makes it
+ * The provider's own limit per channel and second. Counting in Redis makes it
  * hold across all php -S workers.
  */
 final class RateLimiter

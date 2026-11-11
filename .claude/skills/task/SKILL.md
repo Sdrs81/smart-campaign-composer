@@ -37,7 +37,7 @@ Work through the steps in order. Never skip a step; if one does not apply, say w
 
 ## 5. Decisions
 
-- Always write the decision to `DECISIONS.md` (decision, rationale, alternatives) when this task is the first task listed for a decision K1–K22 in `docs/plan.md` section 2.
+- Always write the decision to `DECISIONS.md` (decision, rationale, alternatives) when this task introduces an important decision.
 
 ## 6. Report, then stop
 

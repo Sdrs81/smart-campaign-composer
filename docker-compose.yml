@@ -1,6 +1,6 @@
 name: smart-campaign-composer
 
-# Works without a .env file (K27). Compose reads .env for ${VAR} interpolation on its own, so a value set there
+# Works without a .env file. Compose reads .env for ${VAR} interpolation on its own, so a value set there
 # (the API key, a tuned rate) wins; otherwise the default after ":-" applies. Keep these defaults identical to
 # .env.example. `environment` beats `env_file`, which is optional and only carries extra keys such as APP_DEBUG.
 x-env: &env

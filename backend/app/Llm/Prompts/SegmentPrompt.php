@@ -13,7 +13,7 @@ use Carbon\CarbonInterface;
 
 /**
  * Builds the segment prompt and its JSON schema from FieldRegistry, so fields, operators and values
- * cannot drift from what the parser accepts (K7).
+ * cannot drift from what the parser accepts.
  */
 final class SegmentPrompt
 {

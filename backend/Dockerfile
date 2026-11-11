@@ -2,7 +2,7 @@
 # Build context is the repository root, because the entrypoint lives in docker/:
 #   docker build -f backend/Dockerfile .
 # FrankenPHP in classic mode (no Octane): every request boots the app, so there is
-# no state leaking between requests and SSE streams are not buffered (K1).
+# no state leaking between requests and SSE streams are not buffered.
 FROM dunglas/frankenphp:1-php8.4
 
 # intl: grapheme_strlen counts visible characters; pcntl: queue:work signals;

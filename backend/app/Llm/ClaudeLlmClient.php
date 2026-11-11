@@ -17,7 +17,7 @@ use Psr\Http\Message\StreamInterface;
 use RuntimeException;
 
 /**
- * Calls the Anthropic Messages API over Laravel's HTTP client (K9).
+ * Calls the Anthropic Messages API over Laravel's HTTP client.
  * The API key only goes into the request header; it is never logged or put in a message.
  */
 final class ClaudeLlmClient implements LlmClient

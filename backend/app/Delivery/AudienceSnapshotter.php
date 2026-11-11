@@ -14,8 +14,8 @@ use App\Segment\ValidationErrors;
 use LogicException;
 
 /**
- * Freezes the audience into deliveries at approval (K16). One INSERT … SELECT per channel runs inside
- * Postgres, so no customer row travels through PHP, and ON CONFLICT DO NOTHING makes a repeat harmless (K19).
+ * Freezes the audience into deliveries at approval. One INSERT … SELECT per channel runs inside
+ * Postgres, so no customer row travels through PHP, and ON CONFLICT DO NOTHING makes a repeat harmless.
  */
 final class AudienceSnapshotter
 {
@@ -39,7 +39,7 @@ final class AudienceSnapshotter
 
     private function freezeChannel(Campaign $campaign, SegmentRule $rule, Channel $channel): int
     {
-        // Opt-in is checked again here, at the moment of freezing, not only when the audience was counted (K8).
+        // Opt-in is checked again here, at the moment of freezing, not only when the audience was counted.
         $customers = $this->compiler->withChannelConsent($this->compiler->compile($rule), $channel)->toBase();
 
         // The key is sha256 of "campaign:customer:channel", computed in the database like the rest of the row.

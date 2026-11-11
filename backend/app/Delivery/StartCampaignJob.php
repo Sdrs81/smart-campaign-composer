@@ -13,7 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
 /**
- * Freezes the audience and hands one SendDeliveryJob per delivery to the channel's queue (K16).
+ * Freezes the audience and hands one SendDeliveryJob per delivery to the channel's queue.
  * Safe to run again: the snapshot ignores existing rows, and a repeated send job exits on a final row.
  * Unique per campaign while it waits or runs, so a repeated approval cannot fan the audience out twice.
  */

@@ -12,7 +12,7 @@ export interface TemplateVariable {
 }
 
 /**
- * The longest the rendered text can get, in visible characters (K13). A variable counts as the longer of the
+ * The longest the rendered text can get, in visible characters. A variable counts as the longer of the
  * audience's longest value and its fallback; an unknown placeholder stays as the literal text it will remain.
  * Mirrors `PersonalizationRenderer::worstCaseLength`, so the counter and the server agree.
  */

@@ -21,7 +21,7 @@ use Throwable;
 
 /**
  * Runs the golden briefs through the same SegmentExtractor and ContentGenerator the app uses, with the
- * selected driver, and reports validity, attempts and latency (K11).
+ * selected driver, and reports validity, attempts and latency.
  *
  * With the fake driver the golden file's scripted ideal answers are queued, so a run checks the pipeline
  * and the expectations (an oracle), not a model. With a key it measures the real model.

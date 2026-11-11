@@ -48,7 +48,7 @@ function onEdit(): void {
   })
 }
 
-// Counts are the worst case after personalisation (K13), the same arithmetic as the server's validator.
+// Counts are the worst case after personalisation, the same arithmetic as the server's validator.
 const longestValues = computed(() => props.campaign.audience_counts?.longest_values ?? {})
 function lengthOf(key: FieldKey): number {
   const channel = key === 'smsBody' ? 'sms' : 'email'

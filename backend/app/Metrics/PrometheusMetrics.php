@@ -14,7 +14,7 @@ use App\Models\Delivery;
 use App\Models\LlmCall;
 
 /**
- * Prometheus text exposition, computed from the tables and Redis on every scrape (K21):
+ * Prometheus text exposition, computed from the tables and Redis on every scrape:
  * no counter state of its own, so it cannot drift from the rows. Counts that go down
  * (deliveries leave `pending`) are gauges; `llm_calls_total` only grows, so it is a counter.
  */

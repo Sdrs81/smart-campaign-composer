@@ -151,7 +151,7 @@ onBeforeRouteLeave(() => store.leaveCurrent())
     />
 
     <!-- Not on the "new" page: it is replaced by the campaign page right after the extraction, which
-         would cancel a stream started here (K26). -->
+         would cancel a stream started here. -->
     <ContentStream
       v-if="
         campaign &&

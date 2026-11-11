@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Segment;
 
 /**
- * Parse, don't validate (K7): the only way to get a SegmentRule from untrusted input such as LLM output.
+ * Parse, don't validate: the only way to get a SegmentRule from untrusted input such as LLM output.
  * Every problem is collected, not just the first, so one repair round can fix them all.
  */
 final class SegmentRuleParser

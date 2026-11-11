@@ -8,7 +8,7 @@ use App\Enums\Channel;
 
 /**
  * The text of one message as written, with its {{variables}} unfilled. Model output and a person's
- * edit are both turned into this before ContentValidator checks them (K13).
+ * edit are both turned into this before ContentValidator checks them.
  */
 final readonly class MessageContent
 {

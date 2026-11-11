@@ -8,7 +8,7 @@ use App\Enums\Channel;
 use App\Segment\ValidationErrors;
 
 /**
- * The one check for message text, used for model output and for a person's edit (K13).
+ * The one check for message text, used for model output and for a person's edit.
  * Length is the worst case the recipient can see: visible characters after filling each variable
  * with the audience's longest value (or its fallback, if that is longer).
  */

@@ -35,7 +35,7 @@ class AppServiceProvider extends ServiceProvider
             fn (): array => $this->cachedCities(),
         ));
 
-        // Limits are read when the validator is resolved, from the single config (K13). Config::integer
+        // Limits are read when the validator is resolved, from the single config. Config::integer
         // throws on a wrong type instead of casting it silently.
         $this->app->bind(ContentValidator::class, fn (Application $app): ContentValidator => new ContentValidator(
             $app->make(PersonalizationRenderer::class),

@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Sends one delivery. The attempt count lives in the database (K18), so Laravel's own attempt counter
+ * Sends one delivery. The attempt count lives in the database, so Laravel's own attempt counter
  * is switched off: a retry is a release with a delay, and only unhandled exceptions are capped.
  */
 class SendDeliveryJob implements ShouldQueue
@@ -82,7 +82,7 @@ class SendDeliveryJob implements ShouldQueue
 
         // A repeated or late job finds the row already final and sends nothing (idempotent).
         if (! $delivery->status->isTerminal()) {
-            // K19 layer two: only one worker wins the row.
+            // Second layer against double sends: only one worker wins the row.
             if (! $this->claim($delivery)) {
                 $this->releaseUntilDue($delivery);
 

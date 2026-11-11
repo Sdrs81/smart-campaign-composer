@@ -14,7 +14,7 @@ enum DeliveryStatus: string
 
     /**
      * The single source of truth for delivery transitions. Pending to Sending is the atomic
-     * claim (a conditional UPDATE, K19); Sending back to Pending is a scheduled retry.
+     * claim (a conditional UPDATE); Sending back to Pending is a scheduled retry.
      *
      * @return list<self>
      */

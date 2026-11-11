@@ -13,7 +13,7 @@ use Carbon\CarbonInterface;
 use JsonException;
 
 /**
- * Brief → validated SegmentRule (K11). The model's answer is only ever input to SegmentRuleParser, so
+ * Brief → validated SegmentRule. The model's answer is only ever input to SegmentRuleParser, so
  * nothing in a brief, however it is phrased, can produce a rule the parser rejects. Validation errors
  * go back to the model for at most $maxRepairAttempts repair rounds. Transport failures
  * (LlmUnavailable, LlmTruncated, LlmRefused, LlmBadResponse) are not repairable and pass through.

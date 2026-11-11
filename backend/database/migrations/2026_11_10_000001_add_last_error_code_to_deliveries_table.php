@@ -11,7 +11,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('deliveries', function (Blueprint $table): void {
-            // One of App\Delivery\DeliveryErrorCode (K24); null for rows written before the column existed.
+            // One of App\Delivery\DeliveryErrorCode; null for rows written before the column existed.
             $table->string('last_error_code', 32)->nullable()->after('last_error');
         });
     }

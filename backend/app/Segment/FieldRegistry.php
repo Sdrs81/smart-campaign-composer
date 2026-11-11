@@ -7,7 +7,7 @@ namespace App\Segment;
 use Closure;
 
 /**
- * The single source of truth for what a segment may filter on (K7). The parser, compiler, prompt and
+ * The single source of truth for what a segment may filter on. The parser, compiler, prompt and
  * JSON schema read it; column names reach SQL only through here.
  */
 final class FieldRegistry

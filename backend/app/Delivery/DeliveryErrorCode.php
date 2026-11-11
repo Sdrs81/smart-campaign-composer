@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Delivery;
 
 /**
- * Why a delivery was retried, failed or skipped, as a small fixed set (K24). The dashboard turns the
+ * Why a delivery was retried, failed or skipped, as a small fixed set. The dashboard turns the
  * code into a plain sentence for the marketer; the raw text in last_error stays for the engineers.
  */
 enum DeliveryErrorCode: string

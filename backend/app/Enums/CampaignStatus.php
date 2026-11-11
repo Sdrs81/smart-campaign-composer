@@ -17,7 +17,7 @@ enum CampaignStatus: string
     /**
      * The single source of truth for the state machine. Audience and content can be redone
      * until approval, because the rule is read-only and the brief is what gets changed, and
-     * approving twice is allowed so a retried request is harmless (K15).
+     * approving twice is allowed so a retried request is harmless.
      *
      * @return list<self>
      */

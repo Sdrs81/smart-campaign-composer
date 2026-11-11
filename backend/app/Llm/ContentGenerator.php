@@ -15,7 +15,7 @@ use Generator;
 use JsonException;
 
 /**
- * Brief → validated SMS and email text, as a stream of events (K11, K12). The first answer is streamed so
+ * Brief → validated SMS and email text, as a stream of events. The first answer is streamed so
  * the marketer sees it appear; it is then parsed and checked by ContentValidator. If it fails, the problems
  * go back to the model in up to $maxRepairAttempts non-streamed repair rounds. The consumer ends with one
  * `final` or `error` event.

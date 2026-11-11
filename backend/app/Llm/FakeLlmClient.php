@@ -10,7 +10,7 @@ use LogicException;
 use Throwable;
 
 /**
- * Offline client driven by a queue of scenarios, consumed one per call (K9).
+ * Offline client driven by a queue of scenarios, consumed one per call.
  * A scenario is a text, a full response, or a throwable to simulate a failure.
  */
 final class FakeLlmClient implements LlmClient

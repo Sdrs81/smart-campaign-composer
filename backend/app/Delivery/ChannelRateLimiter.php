@@ -8,7 +8,7 @@ use App\Enums\Channel;
 use Illuminate\Support\Facades\Redis;
 
 /**
- * The global outbound limit per channel, shared by every worker through Redis (K17). A worker waits for
+ * The global outbound limit per channel, shared by every worker through Redis. A worker waits for
  * its turn here instead of calling the provider and burning a retry on a 429.
  */
 final readonly class ChannelRateLimiter implements SendRateLimiter

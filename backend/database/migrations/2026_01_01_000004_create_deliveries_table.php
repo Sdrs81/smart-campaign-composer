@@ -20,7 +20,7 @@ return new class extends Migration
             $table->timestampTz('next_attempt_at')->nullable();
             $table->timestampTz('claimed_at')->nullable();
             $table->text('last_error')->nullable();
-            $table->string('idempotency_key', 64)->unique(); // sha256 hex, sent to the provider (K19)
+            $table->string('idempotency_key', 64)->unique(); // sha256 hex, sent to the provider
             $table->string('provider_message_id')->nullable();
             $table->timestampTz('sent_at')->nullable();
 
@@ -28,7 +28,7 @@ return new class extends Migration
             $table->timestampTz('created_at')->useCurrent();
             $table->timestampTz('updated_at')->useCurrent();
 
-            // K19 layer one: a recipient gets at most one row per campaign and channel.
+            // First layer against double sends: a recipient gets at most one row per campaign and channel.
             $table->unique(['campaign_id', 'customer_id', 'channel']);
             // Progress counts and the dispatcher read by campaign, channel and status.
             $table->index(['campaign_id', 'channel', 'status']);

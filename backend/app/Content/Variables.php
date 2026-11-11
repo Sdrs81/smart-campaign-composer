@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Content;
 
 /**
- * The only personalisation variables a message may use (K14), each with the text shown when the
- * customer has no value for it. The names match the columns AudienceService measures for K13.
+ * The only personalisation variables a message may use, each with the text shown when the
+ * customer has no value for it. The names match the columns AudienceService measures for the worst-case length.
  */
 final class Variables
 {

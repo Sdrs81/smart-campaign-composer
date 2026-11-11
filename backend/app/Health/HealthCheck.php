@@ -16,7 +16,7 @@ class HealthCheck
 {
     public const OK = 'ok';
 
-    // The app still works without the provider, but sends fail and retry (K21).
+    // The app still works without the provider, but sends fail and retry.
     public const DEGRADED = 'degraded';
 
     private const UP = 'up';

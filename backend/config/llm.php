@@ -14,7 +14,7 @@ return [
     |
     | "requested" is the raw LLM_DRIVER value (auto|claude|fake). "driver" is
     | the resolved value the container binds: with "auto", a missing
-    | ANTHROPIC_API_KEY selects the offline fake client (K9).
+    | ANTHROPIC_API_KEY selects the offline fake client.
     |
     */
 
@@ -37,7 +37,7 @@ return [
         'dev_scenarios' => (bool) env('LLM_FAKE_DEV_SCENARIOS', true),
     ],
 
-    // Validation failures are fed back to the model at most this many times (K11).
+    // Validation failures are fed back to the model at most this many times.
     'max_repair_attempts' => 2,
 
     // Marketer brief accepted by the segment extractor, in characters.

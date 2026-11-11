@@ -118,7 +118,7 @@ describe('CampaignComposer', () => {
     expect(create).toHaveBeenCalledWith(BRIEF)
     // A first extraction sends no brief: the campaign was just created from it.
     expect(extract).toHaveBeenCalledWith(5, undefined)
-    // The "new" page is replaced right after this, so the stream must start on the campaign page (K26).
+    // The "new" page is replaced right after this, so the stream must start on the campaign page.
     expect(stream).not.toHaveBeenCalled()
     expect(router.currentRoute.value.name).toBe('campaign')
     const chips = wrapper.findAll('ul[aria-label="Rule"] li').map((chip) => chip.text())

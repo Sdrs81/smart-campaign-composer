@@ -1033,7 +1033,7 @@ Notes:
 - The Vitest output includes Vue Router warnings (VUE_ROUTER_R0020, R0004) in
   stderr. They are not failures.
 - Full Pest output is saved at
-  C:\Users\[USER]\.claude\projects\c--Users-serda-Desktop-case-smart-campaign-com
+  C:\Users\[USER]\.claude\projects\c--Users-[USER]-Desktop-case-smart-campaign-com
   poser\61bccac9-a86b-466f-8340-2d2a26585866\tool-results\bujkpdw1r.txt
 - No .env files were read.
 
