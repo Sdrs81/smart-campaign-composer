@@ -12,13 +12,13 @@ docker compose up
 
 The first run builds the images. Add `-d` to run the stack in the background, and `--build` after pulling new code so the images are rebuilt (`docker compose up -d --build`, which is what `make up` runs).
 
-No `.env` file is needed: every default lives in `docker-compose.yml`. To use Claude or tune a value, run `cp .env.example .env` first and edit it.
+No `.env` file is needed: every default lives in `docker-compose.yml`. To use Claude or tune a value, run `cp .env.example .env` first and edit it. `make up` creates `.env` from `.env.example` itself if it is missing.
 
 Then open <http://localhost:8080>. The API health check is at <http://localhost:8080/api/health>, metrics at <http://localhost:8080/api/metrics>.
 
 - Migrations and the seed (5,000 customers) run automatically when the `app` container starts.
 - `ANTHROPIC_API_KEY` is optional. Without it the app runs on a built-in fake LLM (`LLM_DRIVER=auto`) and logs a warning; `/api/health` reports the active `llm_driver`. To use Claude, put the key in `.env` and run `docker compose up -d`.
-- Boost (the Laravel MCP server used during development) needs `APP_ENV=local` in `backend/.env`. `.env.example` already sets it for the Docker stack.
+- Boost (the Laravel MCP server used during development) works with the default `APP_ENV=local`.
 - To work on the UI with hot reload, keep the stack running and start `npm run dev` in `frontend/` (needs Node on the host), then open <http://localhost:5173>. Vite forwards `/api` to the stack on port 8080. Without hot reload, `docker compose up -d --build web` rebuilds the served app.
 
 Try it: open the UI, use the sample brief, check the channel counts, watch the content stream in, edit the SMS (the 161st character is refused), approve, and follow the dashboard until the campaign is `completed`.
@@ -27,20 +27,14 @@ Try it: open the UI, use the sample brief, check the channel counts, watch the c
 
 ```mermaid
 flowchart LR
-    Browser["Browser<br/>Vue 3 + Pinia"] -->|"/ and /api"| Web["web<br/>nginx"]
-    Web -->|"/api proxy"| App["app<br/>Laravel 12 / FrankenPHP"]
-    App --> PG[("PostgreSQL 17")]
-    App --> Redis[("Redis 7<br/>queue · limiter · locks")]
-    App -.->|"brief / content"| LLM["Claude API<br/>or fake client"]
-    Redis --> WC["worker-campaign<br/>default queue"]
-    Redis --> WS["worker-sms x N<br/>sms queue"]
-    Redis --> WE["worker-email x N<br/>email queue"]
-    WC --> PG
-    WS -->|"Idempotency-Key"| Mock["mock-provider<br/>plain PHP"]
-    WE -->|"Idempotency-Key"| Mock
-    WS --> PG
-    WE --> PG
-    Mock --> Redis
+    Browser["Browser<br/>Vue 3"] -->|"/ and /api"| Web["web<br/>nginx"]
+    Web --> App["app<br/>Laravel 12"]
+    App --> PG[("PostgreSQL")]
+    App --> Redis[("Redis<br/>queues · limiter")]
+    App -.-> LLM["Claude API<br/>or fake client"]
+    Redis --> Workers["workers<br/>campaign · sms · email"]
+    Workers --> PG
+    Workers -->|"Idempotency-Key"| Mock["mock-provider"]
 ```
 
 - **Backend:** Laravel 12 on FrankenPHP (classic mode), JSON API only.
@@ -49,7 +43,7 @@ flowchart LR
 - **Frontend:** Vue 3, TypeScript, Pinia and Tailwind, served by nginx, which also proxies `/api` to the backend. The interface is available in Turkish and English.
 - **Mock provider:** a separate container that enforces 100 messages per second per channel and injects delays and failures (500, 429, timeouts, accept-then-500).
 
-The decisions behind these choices are recorded in [DECISIONS.md](DECISIONS.md).
+The decisions behind these choices are recorded in [DECISIONS.md](DECISIONS.md). The Claude working sessions used to build the project are exported in [ai-sessions/](ai-sessions/).
 
 ## Flow
 
@@ -157,17 +151,14 @@ Every answer was valid on the first try. The one miss is `web-books` ("expected 
 
 ## Assumptions and scope
 
-- There is no authentication: this is a single-marketer local demo (K22).
+- This is a single-marketer local demo with 5,000 seeded customers.
 - Campaign content is Turkish. The interface is Turkish or English.
-- The seed has 5,000 customers.
-- Legal SMS text (İYS registration, opt-out wording) is not added to messages.
-- There is no frequency cap across campaigns: one customer can receive several campaigns.
 
 ## Not done
 
 - Authentication and multi-user support.
-- Legal SMS text (İYS, opt-out wording).
-- Frequency capping across campaigns.
+- Legal SMS text (İYS registration, opt-out wording).
+- Frequency capping across campaigns: one customer can receive several campaigns.
 - GSM-7 vs UCS-2 segment counting for SMS; the limit counts visible characters.
 - Segment rules are a flat AND list; there is no OR or nested logic.
 - A real SMS/email provider; delivery goes to the bundled mock.
