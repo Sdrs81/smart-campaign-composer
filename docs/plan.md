@@ -1,6 +1,6 @@
 # Smart Campaign Composer: Uygulama Planı
 
-Tarih: 2026-11-04, güncelleme 2026-11-10 · Durum: onaylandı · Tasarım seçenekleri ve yanıtlanan sorular Bölüm 2'de (K1–K28)
+Tarih: 2026-11-04 - güncelleme 2026-11-10
 
 ## 0. Bağlam
 
@@ -15,7 +15,7 @@ Insider One case'i: pazarlamacı doğal dille bir brief yazar; Claude brief'ten 
 - **Gönderim:** Onayda kitle `deliveries` tablosuna tek bir `INSERT … SELECT` ile dondurulur (unique: kampanya + kişi + kanal) → mesaj başına job → Redis throttle (kanal başına ≤100/sn) → mock provider (`Idempotency-Key` ile). Retry: hata sınıfına göre üstel backoff + jitter, 429'da `Retry-After`.
 - **Mock provider:** Ayrı container, sade PHP + Redis. Gecikme, 500, 429, timeout ve "kabul edip 500 dön" hatalarını ayarlanabilir oranlarla üretir; tekrar eden mesajları sayar.
 - **Canlı akış:** İçerik üretimi SSE (POST + `fetch` stream), dashboard SSE (`EventSource`, değişince snapshot). `/api/health`, `/api/metrics` (Prometheus text).
-- **Frontend:** Vue 3 + TypeScript + Vite + Pinia + Vue Router + Tailwind + vue-i18n (Türkçe/İngilizce arayüz, K23); nginx statik servis ve `/api` reverse proxy.
+- **Frontend:** Vue 3 + TypeScript + Vite + Pinia + Vue Router + Tailwind + vue-i18n (Türkçe/İngilizce arayüz); nginx statik servis ve `/api` reverse proxy.
 - **Test ve kurulum:** Pest (unit + gerçek Postgres/Redis'e karşı integration), Vitest, Playwright e2e (fake LLM). `docker compose up` (migrate + seed otomatik), `make test` (docker içinde, host bağımlılığı yok).
 
 ```
@@ -23,88 +23,26 @@ backend/  frontend/  mock-provider/  docker/  scripts/  ai-sessions/  docs/
 docker-compose.yml  Makefile  .env.example  README.md  DECISIONS.md  CLAUDE.md  .claude/  .mcp.json
 ```
 
-## 2. Kararlar
-
-Yalnızca `DECISIONS.md`'ye girecek kararlar: case'te doğrudan geçenler, mimariyi belirleyenler ve proje akışını kolaylaştıranlar. Tasarım seçenekleri ve yanıtlanan sorular burada birleşti. Her karar, "Görevler" sütunundaki ilk görevin commit'inde `DECISIONS.md`'ye yazılır; aynı sütun kararın plana nerede işlendiğini gösterir. Küçük varsayımlar (seed boyutu, içerik dili, yasal metin, Windows'ta `make`) ilgili görevde ve README'de (11.1); süreç kuralları (süre, raporlama, `.env` erişimi, Claude araçları) Bölüm 3'te ve Faz 1'de.
-
-### Altyapı
-
-| #   | Karar                                                                                                                                                                                                                                                                    | Gerekçe (ilke)                                                                                                                                                                                                          | Alternatifler                                                                                           | Görevler      |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------- |
-| K1  | Laravel 12, FrankenPHP klasik mod (Octane yok)                                                                                                                                                                                                                           | Queue, Redis throttle, migration, seeder, Pest, SSE hazır; tek container, stream'de tampon ayarı yok; Octane'in state sızıntısı riski yok (KISS)                                                                        | Symfony, Slim; nginx + php-fpm                                                                          | 2.1, 2.4      |
-| K2  | PostgreSQL                                                                                                                                                                                                                                                               | `COUNT(*) FILTER` ile tek sorguda kanal sayımı, `ON CONFLICT DO NOTHING` ile idempotent snapshot, JSONB                                                                                                                 | MySQL, SQLite                                                                                           | 2.8, 4.4, 8.5 |
-| K3  | Redis: kuyruk + global rate limiter + kilit                                                                                                                                                                                                                              | Tek bileşen üç işi görür; bu ölçekte RabbitMQ ek operasyon yükü (YAGNI)                                                                                                                                                 | RabbitMQ, DB queue                                                                                      | 2.3, 2.8, 8.4 |
-| K4  | Unit testler bağımlılıksız; integration testler docker'daki Postgres/Redis'e karşı (ayrı test DB); `make test` docker içinde                                                                                                                                             | Gerçek bileşen davranışı (`FILTER`, `ON CONFLICT`, throttle) test edilir; değerlendiricinin host'unda bağımlılık gerekmez                                                                                               | SQLite in-memory                                                                                        | 2.8, 2.9      |
-| K27 | Kurulum `.env` olmadan tek komut: compose `env_file` isteğe bağlı (`required: false`); container'ların ihtiyaç duyduğu değerler compose'ta `${VAR:-<.env.example değeri>}` varsayılanıyla, `.env` varsa (key gibi) onun değeri kazanır; `make up` kopyalamaya devam eder | Case şartı: temiz klonda `docker compose up` çalışmalı. Compose `.env`'i interpolasyon için kendiliğinden okur, ek araç gerekmez (KISS); sır repoya girmez (Defensive)                                                  | `.env`'i repoya koymak; README'de `cp` adımı (case'e aykırı); entrypoint'te kopyalamak (host'a yazamaz) | 14.1          |
-| K28 | Testler LLM'e karşı yalıtılır: `phpunit.xml` `LLM_DRIVER=fake` ve boş `ANTHROPIC_API_KEY`'i `force` ile sabitler; Feature testlerinde kaçak HTTP isteği (`Http::preventStrayRequests`) hata verir                                                                        | Case şartı: testler gerçek key olmadan mock LLM ile çalışır. `make test` container'ı `.env`'i okuduğu için key eklemek testleri gerçek API'ye yöneltmemeli (Defensive); 2.9'da DB için kullanılan yöntemin aynısı (DRY) | `.env.testing` (deny listesinde; container yine `.env`'i okur); her testte elle `config()`              | 14.2          |
-
-### Kitle
-
-| #   | Karar                                                                                                                                                                                                                | Gerekçe (ilke)                                                                                                                                                       | Alternatifler                    | Görevler      |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------- |
-| K5  | Davranış verisi kullanıcı üzerinde geniş özet kolonlarda (demografi, hesap, alışveriş, sepet, sadakat, izin). Örnek brief: `last_cart_add_at` son 30 gün ∧ `last_purchase_at` son 30 günde değil (hiç almamış dahil) | Olay toplama hattı kapsam dışı; koşullar indeksli kolon karşılaştırması (KISS). Örnek brief yalnızca örnek, alanlar dar tutulmaz. Yeni alan = kolon + registry kaydı | Olay tabloları + `EXISTS`        | 3.1, 3.2, 4.3 |
-| K6  | Segment dili: düz AND listesi, `in`/`not_in` ile çoklu değer, şema versiyonlu                                                                                                                                        | Tipik brief'leri karşılar; doğrulama ve prompt kısa kalır (YAGNI); AND/OR ağacına genişleme kolay                                                                    | İç içe AND/OR ağacı, JSON Logic  | 4.1, 4.2      |
-| K7  | LLM çıktısı asla SQL olmaz: `FieldRegistry` (tek kaynak) → `SegmentRuleParser` (geçersiz `SegmentRule` var olamaz) → binding'li query builder                                                                        | Case şartı. Registry prompt'u, JSON şemasını, doğrulayıcıyı ve derleyiciyi besler (DRY); kolon adı yalnızca registry'den (Defensive)                                 | LLM'den SQL veya `where` üretmek | 4.1–4.3, 5.5  |
-| K8  | İzin iki noktada kontrol edilir: kitle sayımı ve snapshot'ta, gönderim anında tekrar (değiştiyse `skipped`)                                                                                                          | Case şartı; onay ile gönderim arasında izin değişebilir (Defensive)                                                                                                  | Yalnızca kitle anında            | 4.4, 8.3, 8.5 |
-
-### LLM
-
-| #   | Karar                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Gerekçe (ilke)                                                                                                                                                                                                                           | Alternatifler                                                        | Görevler             |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | -------------------- |
-| K9  | `LlmClient` arayüzü; `ClaudeLlmClient` Laravel HTTP client ile; model env'den (`claude-sonnet-5-5`, Haiku 5.5 maliyet seçeneği); key yoksa `FakeLlmClient` otomatik                                                                                                                                                                                                                                                                                                                                                 | Case şartı: testler key'siz. `docker compose up` key'siz çalışır; `Http::fake` ile test kolay; SDK'ya geçiş tek sınıf (DIP)                                                                                                              | Resmi PHP SDK                                                        | 2.3, 5.1, 5.2, 5.11  |
-| K10 | Yapılandırılmış çıktı: structured outputs (JSON şeması registry'den); API desteklemiyorsa zorunlu tool use. Backend doğrulaması her durumda                                                                                                                                                                                                                                                                                                                                                                         | Case şartı: JSON çıktı. Şema uyumu modelde garanti edilir, onarım turu azalır; iş kuralları şemaya sığmaz. Güncel API 5.2'de `claude-api` skill ile doğrulanır                                                                           | Yalnızca prompt ile JSON                                             | 5.2, 5.5, 5.9        |
-| K11 | Güvenilirlik zinciri: parse → doğrula → hataları Claude'a geri ver, en fazla 2 onarım → tipli değer nesnesi ya da yol bazlı anlamlı hata. Eşleşmeyen ifade `unsupported_criteria`'ya. Her çağrı `llm_calls`'a; `llm:eval` ile ölçülür                                                                                                                                                                                                                                                                               | Case'in en önemli kısmı. Uydurma yerine açık "eşleştiremedim"; prompt injection doğrulamayı aşamaz; hata ve gecikme görünür                                                                                                              | Tek deneme; sınırsız retry                                           | 5.4, 5.6, 5.10, 5.12 |
-| K12 | İçerik stream'i: SSE, POST + `fetch` stream; backend ham JSON delta'larını iletir, frontend kısmi JSON'u gösterir, doğrulanmış sonuç `final` olayıyla gelir                                                                                                                                                                                                                                                                                                                                                         | Case şartı: stream. Tek yönlü akışa yeterli; yan etkili işlem GET olmaz. Kısmi ayrıştırma her karede O(n²) ama n < 3 KB                                                                                                                  | WebSocket (Reverb), polling                                          | 6.3, 10.1, 10.4      |
-| K25 | Key'siz geliştirme fake'i (K9) brief'i kural tabanlı okur (şehir, cinsiyet, yaş, sipariş/giriş/sepet süresi, sadakat, kategori, platform) ve anahtar kelime senaryosunun koşullarıyla alan bazında birleştirir. İçerik senaryo başına birkaç hazır varyanttan gelir; anahtar bilgi tek `%OFFER%` yuvasıyla SMS'e ve email'e aynı yazılır; yeniden üretim brief başına Redis sayacıyla sıradaki varyanta geçer. Çıktı yine parse → doğrula zincirinden geçer; `ClaudeLlmClient`, prompt'lar ve test kuyruğu değişmez | Key'siz demo gerçek modele yakın davranmalı. Kural tabanlı okuma deterministik ve test edilir; tek yuva tutarlılığı yapısal olarak garanti eder (DRY); sayaç Redis'te, çünkü FrankenPHP her isteği ayrı işler ve bellekteki sayaç kalmaz | Rastgele varyant; NLP kütüphanesi; prompt'a varyant numarası eklemek | 13.2–13.4            |
-
-### İçerik ve onay
-
-| #   | Karar                                                                                                                                                                                                                                                                                                                                                           | Gerekçe (ilke)                                                                                                                                                 | Alternatifler                                                                             | Görevler                       |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------ |
-| K13 | Limitler kullanıcının gördüğü karakterle (grapheme: backend `grapheme_strlen`, frontend `Intl.Segmenter`): SMS ≤160, konu ≤80, email gövdesi düz metin ≤2.000. Kişiye giden metin üzerinden, kitlenin her değişken için en uzun değeriyle en kötü durum. LLM ve insan aynı doğrulayıcıdan geçer; limitler tek config'te, frontend `/api/content/rules`'tan alır | Case şartı. Limit alıcıda garanti edilir, gönderimde tekrar kontrol (Defensive); tek kaynak (DRY). Operatördeki GSM-7/UCS-2 segment farkı bilinen sadeleştirme | Şablon uzunluğu, sabit bütçe, GSM segment sayımı                                          | 2.4, 4.4, 5.7, 5.8, 6.4, 10.5  |
-| K14 | Kişiselleştirme: izinli değişken listesi (`{{first_name}}`, `{{last_name}}`, `{{city}}`), her biri fallback'li; tek geçişte render; bilinmeyen değişken reddedilir                                                                                                                                                                                              | Case şartı. Şablon enjeksiyonu yok; render O(n)                                                                                                                | Twig/Blade gibi şablon motoru                                                             | 5.7, 5.8                       |
-| K15 | İnsan onayı: kampanya durum makinesi (zengin model). Yalnızca üretilen SMS ve email metni, yalnızca onaydan önce düzenlenir; kural salt-okur (brief değiştirilip yeniden üretilir); onay kilitli ve idempotent                                                                                                                                                  | Case akışı; geçersiz geçiş erken hata verir (Rich Domain Model, Defensive); kural editörü gereksiz (YAGNI)                                                     | Kural editörü                                                                             | 3.3, 6.2, 6.4, 8.5, 10.5, 10.6 |
-| K26 | Kitle ilk kez başarıyla çıkarıldığında frontend içerik stream'ini kendiliğinden başlatır (yalnızca kampanyada henüz mesaj yoksa); "Tekrar oluştur" butonu ve backend akışı (K12) değişmez                                                                                                                                                                       | Gereksiz bir tıklama kalkar; stream zaten POST + SSE olduğu için ek job veya durum gerekmez (KISS); var olan içerik habersiz ezilmez (Defensive)               | Kitle endpoint'inden sonra backend job'ı ile üretim; her kitle çıkarımında yeniden üretim | 13.1                           |
-
-### Gönderim
-
-| #   | Karar                                                                                                                                                                                                                                                                                                                             | Gerekçe (ilke)                                                                                                                                                                                                                            | Alternatifler                                | Görevler                 |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ------------------------ |
-| K16 | Onayda kitle `INSERT … SELECT … ON CONFLICT DO NOTHING` ile `deliveries`'e dondurulur; mesaj başına job, `lazyById` ile dağıtılır                                                                                                                                                                                                 | Set-based, tek round-trip, bellek sabit; mesaj başına job retry'ı basit tutar (KISS)                                                                                                                                                      | PHP'de döngüyle ekleme; toplu (batch) job    | 8.5                      |
-| K17 | Rate limit: kanal başına ayrı kuyruk + `Redis::throttle(...)->block()`; tüm worker'lar için global giden sınır 100/sn; mock provider da aynı sınırı uygular ve 429 döner. Uyum gönderen tarafta ölçülür (çağrı saniyesine göre tepe, `/api/metrics`); provider'ın kabul tepesi kendi limitiyle sınırlı olduğu için kanıt sayılmaz | Case şartı. Atomik Redis işlemleri O(1); `block` ile beklenir, deneme sayacı yanmaz. Sabit pencere sınırda kısa patlamaya izin verebilir; ölçülür (14.3), aşarsa kayan 1 sn pencere (token bucket da 1 sn içinde 2× patlamaya izin verir) | Lua token bucket; saniyelik batch dispatcher | 7.3, 8.4, 8.7, 8.8, 14.3 |
-| K18 | Retry hata sınıfına göre: 429 → `Retry-After`; 5xx/timeout → üstel backoff + full jitter, en fazla 5 deneme; diğer 4xx → kalıcı. Kalıcı hata `failed` kalır, dashboard'da görünür                                                                                                                                                 | Case: "retry stratejisini sen tasarla". Gereksiz tekrar ve senkron dalgalanma olmaz; `RetryPolicy` saf sınıf, unit test edilir (SRP)                                                                                                      | Sabit aralık; circuit breaker                | 8.1, 8.2, 8.3            |
-| K19 | Çift gönderim üç katmanda önlenir: DB unique (kampanya + kişi + kanal), atomik claim (koşullu UPDATE), provider `Idempotency-Key`. Farklı kampanyalar aynı kişiye gidebilir (frekans sınırı yok)                                                                                                                                  | Case şartı. Satır iki kez oluşmaz, iki worker aynı satırı alamaz, timeout sonrası tekrar provider'da tekilleşir (Defensive)                                                                                                               | Redis set; yalnızca `ShouldBeUnique` job     | 3.5, 7.2, 8.3, 8.5       |
-| K20 | Mock provider ayrı container (sade PHP + Redis): idempotency, ayarlanabilir hata enjeksiyonu (gecikme, 500, 429, timeout, kabul edip 500), `/stats`                                                                                                                                                                               | Case şartı. Gerçek ağ hataları oluşur; bağımsız sayaçlar tekrarın olmadığını kanıtlar (SRP)                                                                                                                                               | Ana uygulamada route; başka dil              | 7.1–7.3                  |
-
-### Takip ve kapsam
-
-| #   | Karar                                                                                                                                                                                                                                                                                                 | Gerekçe (ilke)                                                                                                                                           | Alternatifler                                                                                                | Görevler      |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------- |
-| K21 | Canlı durum SSE ile (1 sn, yalnızca değişince, tek `GROUP BY` sorgusu); `/api/metrics` Prometheus text, sorgu anında hesaplanır; `/api/health`: DB/Redis kritik, provider `degraded`                                                                                                                  | Case şartı. Ek container ve sayaç durumu yok (KISS); `EventSource` kendiliğinden yeniden bağlanır                                                        | Polling; Reverb; sayaç tabanlı metrik                                                                        | 9.1–9.4, 10.7 |
-| K22 | Kimlik doğrulama yok: tek pazarlamacı, yerel demo                                                                                                                                                                                                                                                     | Case'te istenmiyor (YAGNI); README'de açıkça yazılır                                                                                                     | Sanctum token                                                                                                | 11.1          |
-| K23 | Arayüz dili tarayıcıda seçilir (vue-i18n, Türkçe/İngilizce, başlıkta tek buton, seçim `localStorage`'da); yalnızca frontend'in kendi metinleri çevrilir, API mesajları ve model içeriği olduğu gibi gösterilir                                                                                        | Dil bir görüntüleme tercihidir: sunucu durumu gerekmez, müşteriye giden içerik değişmez; kural etiketleri ve hata mesajları tek kaynakta (backend) kalır | `Accept-Language` ile backend çevirisi; hata kodlarını frontend'de çevirmek; dil önekli rotalar              | 10.9          |
-| K24 | Gönderim hataları dashboard'da sade bir açıklamayla gösterilir: backend her hataya küçük, sabit bir kod (`deliveries.last_error_code`) yazar, frontend kodu Türkçe/İngilizce açıklamaya çevirir; ham hata metni kapalı "Teknik ayrıntı" altında kalır. K23'ü yalnızca gönderim hataları için daraltır | Kullanıcı pazarlamacı, ham provider metni ona anlamsız; ham metin yazılım ekibine iletmek için korunur. Sabit kod kümesi metin eşleştirmeden sağlam      | Ham metinden regex ile sınıflama; `Accept-Language` ile backend çevirisi; yalnızca durum sütunundan açıklama | 12.2, 12.3    |
-
-## 3. Çalışma akışı
+## 2. Çalışma akışı
 
 - **Dal:** faz başına bir dal (`phase-N/<ad>`). `main`'e commit yok (hook engeller).
-- **Görev döngüsü:** `/task N.M` → Claude: önce ilgili rule ve dokümanlar (Docs first) → uygulama → test → lint → rapor. Sen doğrularsın, "onay" dersen Claude commit atar ve `plan.md`'deki kutuyu işaretler.
+- **Görev döngüsü:** `/task N.M` → Claude: önce ilgili rule ve dokümanlar (Docs first) → uygulama → test → lint → rapor. Sen doğrularsın, "onay" dersen Claude commit atar.
 - **Git öncesi özet (zorunlu):** Her görevin raporu ve her fazın kapanışı, herhangi bir git komutundan (`add`, `commit`, `push`, PR) hemen önce, değişen/eklenen her dosya için bir özet tablosu içerir: `dosya | yeni/değişti | ne yapıldı | neden`. Ardından kabul kriteri kanıtı (komut + çıktı) ve doküman sorguları gelir. Faz kapanışındaki özet fazın tüm dosyalarını kapsar.
 - **Faz sonu:** `/finish-phase` → `make test` + `make lint`, `review-pr`, `/code-review` (genelde `medium`; Faz 5 ve 8 için `high`), en fazla 2 tur, reddedilen bulgu listesi → dosya bazlı faz özeti → onayla push (`ask`) ve PR. Merge sende.
-- **Kararlar:** Bölüm 2'deki her karar, "Görevler" sütunundaki ilk görevin commit'inde `DECISIONS.md`'ye girer. Uygulama sırasında çıkan yeni bir önemli karar önce Bölüm 2'ye eklenir, sonra aynı şekilde yazılır.
+- **Kararlar:** Önemli kararlar (case'te doğrudan geçenler, mimariyi belirleyenler, proje akışını kolaylaştıranlar) alındıkları görevin commit'inde `DECISIONS.md`'ye yazılır: karar, gerekçe, alternatifler. Küçük varsayımlar (seed boyutu, içerik dili, yasal metin, Windows'ta `make`) ilgili görevde ve README'de (11.1) belirtilir.
 - **Session export:** Her oturum sonunda `/export` → `ai-sessions/phase-<N>_<konu>.md` (ör. `phase-1_setup.md`; aynı fazda ikinci oturum `phase-1_setup-2.md`); commit'ten önce `node scripts/scrub-sessions.mjs --check`.
-- **Dil:** Projenin tüm dosyaları ve içerikleri İngilizce yazılır: kod, yorumlar, config dosyaları (`.gitignore` yorumları dahil), `README.md`, `DECISIONS.md`, `CLAUDE.md`, rules/skills/agents, hook ve script mesajları, commit mesajları, PR başlığı ve açıklaması. Türkçe kalanlar: bu plan (`docs/plan.md`, çalışma belgesi), Claude'un sohbetteki raporları ve dosya bazlı özetler. Ürün içeriği (LLM'in ürettiği kampanya metni) ürün gereği Türkçe kalır (5.9, 11.1). Arayüz metinleri ise Türkçe/İngilizce seçilebilir (K23); çeviri dosyaları (`frontend/src/i18n/tr.ts`) de bu "proje dosyaları İngilizce" kuralının bilinçli istisnasıdır.
+- **Dil:** Projenin tüm dosyaları ve içerikleri İngilizce yazılır: kod, yorumlar, config dosyaları (`.gitignore` yorumları dahil), `README.md`, `DECISIONS.md`, `CLAUDE.md`, rules/skills/agents, hook ve script mesajları, commit mesajları, PR başlığı ve açıklaması. Türkçe kalanlar: bu plan (`docs/plan.md`, çalışma belgesi), Claude'un sohbetteki raporları ve dosya bazlı özetler. Ürün içeriği (LLM'in ürettiği kampanya metni) ürün gereği Türkçe kalır (5.9, 11.1). Arayüz metinleri ise Türkçe/İngilizce seçilebilir; çeviri dosyaları (`frontend/src/i18n/tr.ts`) de bu "proje dosyaları İngilizce" kuralının bilinçli istisnasıdır.
 - **Takvim (çekirdek akış 5 günde):**
 
-  | Gün | Fazlar                                                          | Gün sonu ölçütü                                                                                                                         |
-  | --- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-  | G1  | Faz 1, Faz 2                                                    | `docker compose up` sağlıklı, `make test` yeşil, Claude araçları çalışıyor                                                              |
-  | G2  | Faz 3, Faz 4, Faz 5.1–5.4                                       | Seed ve segment derleyicisi çalışıyor, LLM istemcisi testli                                                                             |
-  | G3  | Faz 5.5–5.11, Faz 6, Faz 7                                      | Brief → kural → sayılar → stream içerik API'den çalışıyor; mock provider ayakta                                                         |
-  | G4  | Faz 8, Faz 9                                                    | `make smoke` yeşil, stats/health/metrics hazır                                                                                          |
-  | G5  | Faz 10                                                          | Çekirdek akış tarayıcıda uçtan uca, `make e2e` yeşil                                                                                    |
-  | G6  | Faz 11                                                          | Teslim paketi                                                                                                                           |
-  | G7  | Faz 12, Faz 13, Faz 14, Tampon, İsteğe Bağlı Kısımlar (CI önce) | Arayüz ve fake LLM iyileştirmeleri tarayıcıda; temiz klonda yalnızca `docker compose up`; `make test`, `make smoke` ve `make e2e` yeşil |
+  | Gün | Fazlar                                                  | Gün sonu ölçütü                                                                                                                         |
+  | --- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+  | G1  | Faz 1, Faz 2                                            | `docker compose up` sağlıklı, `make test` yeşil, Claude araçları çalışıyor                                                              |
+  | G2  | Faz 3, Faz 4, Faz 5.1–5.4                               | Seed ve segment derleyicisi çalışıyor, LLM istemcisi testli                                                                             |
+  | G3  | Faz 5.5–5.11, Faz 6, Faz 7                              | Brief → kural → sayılar → stream içerik API'den çalışıyor; mock provider ayakta                                                         |
+  | G4  | Faz 8, Faz 9                                            | `make smoke` yeşil, stats/health/metrics hazır                                                                                          |
+  | G5  | Faz 10                                                  | Çekirdek akış tarayıcıda uçtan uca, `make e2e` yeşil                                                                                    |
+  | G6  | Faz 11                                                  | Teslim paketi                                                                                                                           |
+  | G7  | Faz 12, Faz 13, Faz 14 | Arayüz ve fake LLM iyileştirmeleri tarayıcıda; temiz klonda yalnızca `docker compose up`; `make test`, `make smoke` ve `make e2e` yeşil |
 
 - **Gerideysek önce kesilecekler** (çekirdek akışı bozmayanlar, README'de "yapılmadı" olarak yazılır): 5.12 `llm:eval` (altın brief testleri fake ile unit testte kalır), 9.5 JSON log, 2.1'de Larastan, 10.8 Playwright (yerine `make smoke` + elle tarayıcı kontrolü), 1.13 deneme koşusu (Faz 2'nin ilk görevinde yapılır).
 
@@ -112,15 +50,15 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 
 ---
 
-## Faz 0: Plan · tamamlandı (2026-11-05)
+## Faz 0: Plan
 
-`docs/plan.md` ve `ai-sessions/` (planlama oturumunun export'u: `phase-0_plan.md`), `phase-0/plan` dalı ve PR #1. Kurulum araçları henüz olmadığı için görev formatı ve `finish-phase` dışında, elle yapıldı.
+`docs/plan.md` ve `ai-sessions/` (planlama oturumunun export'u: `phase-0_plan.md`), `phase-0/plan` dalı ve PR. Kurulum araçları henüz olmadığı için görev formatı ve `finish-phase` dışında, elle yapılır.
 
 ---
 
 ## Faz 1: Kurulum (Claude araçları) · G1
 
-Önceki projeden alınanlar: tam `settings.json` baştan, test script'li fail-closed guard hook, iş akışı skill'leri ilk günden, inceleme döngüsünde tur sınırı, hook kanıtı için log satırı. Bu projeye göre değişenler: görev bazlı ilerleme olduğu için tek `task` skill'i (önceki `phase`, `api-endpoint` ve `frontend-feature` yerine), hook'lar Node ile, `.env.example` deny dışında.
+Claude Code çalışma ortamı: tam `settings.json`, test script'li fail-closed guard hook, iş akışı skill'leri, inceleme döngüsünde tur sınırı, hook kanıtı için log satırı. Görev bazlı ilerlemek için tek `task` skill'i vardır; hook'lar Node ile yazılır; `.env.example` deny dışındadır.
 
 **Araç kararları**
 
@@ -133,7 +71,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 | Hooks           | `guard.mjs` (PreToolUse), `format.mjs` (PostToolUse)                                           | Tehlikeli komut ve sır engeli; otomatik format. Node ile: `jq` ve Windows/Git Bash farkı yok, `node:test` ile test edilir. |
 | `settings.json` | Tam liste bir kerede                                                                           | İzin sorularını baştan keser; Claude kendisi düzenleyemez, sen uygularsın.                                                 |
 | MCP             | `context7` (Faz 1), `laravel-boost` (Görev 2.2)                                                | Vue, Pinia, Tailwind, Vitest, Playwright dokümanları; Laravel dokümanı, DB şeması.                                         |
-| Plugin          | `security-guidance`                                                                            | Commit/push sonrası güvenlik bulgusu; önceki projede gerçek bulgular yakaladı.                                             |
+| Plugin          | `security-guidance`                                                                            | Commit/push sonrası güvenlik bulgusu.                                                                                      |
 | Built-in        | `claude-api` skill, `/code-review`, `/security-review`, `/doctor`, `/fewer-permission-prompts` | Claude API dokümanı, inceleme, sağlık kontrolü, izin listesini kullanıma göre genişletme.                                  |
 | Atlananlar      | `phase` skill                                                                                  | Her görevi sen doğruluyorsun; gözetimsiz faz koşusu gerekmiyor.                                                            |
 |                 | `api-endpoint`, `frontend-feature` skill'leri                                                  | Docs-first `task`'ta, konvansiyonlar rule'larda; tekrar olur (DRY).                                                        |
@@ -191,7 +129,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 
 ### 1.7 `task` skill'i
 
-- **İş:** Argüman görev ID'si. Adımlar: 0) `plan.md`'den görevi ve bağımlılıkları oku, ilgili rule dosyalarını önceden oku; 1) Docs first: dokunulan her kütüphane için bir context7/Boost sorgusu, LLM görevlerinde `claude-api` skill; ya da gerekçe; 2) en küçük uygulama; 3) testler (`test-runner`); 4) lint/type-check ana oturumda; 5) görev Bölüm 2'de bir kararın ilk görevi ise o kararı `DECISIONS.md`'ye yaz; 6) rapor: dosya bazlı özet tablosu (`dosya | yeni/değişti | ne yapıldı | neden`), kabul kriteri kanıtı, doküman sorguları, açık konular; hiçbir git komutu çalıştırmadan dur.
+- **İş:** Argüman görev ID'si. Adımlar: 0) `plan.md`'den görevi ve bağımlılıkları oku, ilgili rule dosyalarını önceden oku; 1) Docs first: dokunulan her kütüphane için bir context7/Boost sorgusu, LLM görevlerinde `claude-api` skill; ya da gerekçe; 2) en küçük uygulama; 3) testler (`test-runner`); 4) lint/type-check ana oturumda; 5) görev önemli bir karar içeriyorsa `DECISIONS.md`'ye yaz; 6) rapor: dosya bazlı özet tablosu (`dosya | yeni/değişti | ne yapıldı | neden`), kabul kriteri kanıtı, doküman sorguları, açık konular; hiçbir git komutu çalıştırmadan dur.
 - **Dosyalar:** `.claude/skills/task/SKILL.md`
 - **Bağımlı:** 1.5, 1.6
 - **Kabul:** `/task 1.13` deneme koşusunda tüm adımlar raporda görünür.
@@ -265,7 +203,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 
 ### 2.4 Backend imajı
 
-- **İş:** FrankenPHP + PHP 8.4 (pgsql, redis, pcntl, intl: `grapheme_strlen` için, zip: Composer paketleri açar). Entrypoint: DB'yi bekle → `migrate --force` → tablo boşsa seed. Aynı imaj worker olarak da çalışır.
+- **İş:** FrankenPHP + PHP 8.4 (pgsql, redis, pcntl, intl: `grapheme_strlen` için, zip: Composer paketleri açar). Entrypoint: DB'yi bekle → `migrate --force` → tablo boşsa seed (kontrol edilen tablo `SEED_CHECK_TABLE`, varsayılan `customers`). Aynı imaj worker olarak da çalışır.
 - **Dosyalar:** `backend/Dockerfile`, `docker/backend/entrypoint.sh`
 - **Bağımlı:** 2.1
 - **Kabul:** `docker compose build app` başarılı.
@@ -293,21 +231,21 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 
 ### 2.8 `docker-compose.yml`
 
-- **İş:** `postgres` (init script'i test DB'sini de açar), `redis`, `app`, `worker-sms`, `worker-email` (replica sayısı env'den), `web`; healthcheck'ler, `depends_on: service_healthy`. Mock provider 7.1'de eklenir.
+- **İş:** `postgres` (init script'i test DB'sini de açar; yalnızca boş hacimde çalışır), `redis`, `app`, `worker-sms`, `worker-email` (replica sayısı env'den), `web`; healthcheck'ler, `depends_on: service_healthy`. Mock provider 7.1'de eklenir.
 - **Dosyalar:** `docker-compose.yml`, `docker/postgres/init.sql`
 - **Bağımlı:** 2.4, 2.5, 2.7
 - **Kabul:** Temiz durumda `docker compose up -d` → `docker compose ps` tümü healthy.
 
 ### 2.9 Makefile
 
-- **İş:** `up` (`.env` yoksa `.env.example`'dan kopyalar), `down`, `fresh` (volume'suz yeniden migrate+seed), `logs`, `test` (= `test-backend` + `test-frontend`, docker içinde), `lint`, `smoke` (8.8), `e2e` (10.8). Test ortamı (K4): `test-backend` konteynerde `APP_ENV=testing` ve `DB_DATABASE=campaign_test` ile çalışır; `phpunit.xml` bu iki değeri `force="true"` ile sabitler, böylece konteynerin `env_file` değerleri geliştirme veritabanına bağlanmaz. Backend imajına boş bir `.env` konur (dotenv'in "dosya yok" uyarısı Pest çıktısını kirletmesin).
+- **İş:** `up` (`.env` yoksa `.env.example`'dan kopyalar), `down`, `fresh` (volume'suz yeniden migrate+seed), `logs`, `test` (= `test-backend` + `test-frontend`, docker içinde), `lint`, `smoke` (8.8), `e2e` (10.8). Test ortamı: `test-backend` konteynerde `APP_ENV=testing` ve `DB_DATABASE=campaign_test` ile çalışır; `phpunit.xml` bu iki değeri `force="true"` ile sabitler, böylece konteynerin `env_file` değerleri geliştirme veritabanına bağlanmaz. Backend imajına boş bir `.env` konur (dotenv'in "dosya yok" uyarısı Pest çıktısını kirletmesin).
 - **Dosyalar:** `Makefile`, `backend/phpunit.xml`, `backend/Dockerfile`
 - **Bağımlı:** 2.8
 - **Kabul:** `make test` temiz klonda yeşil ve uyarısız; testler `campaign_test`'e bağlanır (`AppBootTest` konteynerde `testing` görür); `make lint` yeşil.
 
 ### 2.10 README ve DECISIONS iskeleti
 
-- **İş:** README başlıkları (kurulum, mimari, akış, testler, eksikler); `DECISIONS.md` iskeleti ve şablonu (karar, gerekçe, alternatifler); K1–K4 bu görevde yazılır.
+- **İş:** README başlıkları (kurulum, mimari, akış, testler, eksikler); `DECISIONS.md` iskeleti ve şablonu (karar, gerekçe, alternatifler); o ana kadar alınan altyapı kararları (Laravel ve FrankenPHP, PostgreSQL, Redis, test stratejisi) yazılır.
 - **Dosyalar:** `README.md`, `DECISIONS.md`
 - **Bağımlı:** 2.8
 - **Kabul:** Okuyarak onay.
@@ -330,7 +268,6 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 
 - **Dosyalar:** migration, `app/Models/Customer.php`, `app/Enums/Channel.php`, factory, unit test
 - **Bağımlı:** 2.9
-- **Not:** Testler Postgres'e zorlandı, `make test-backend` ile çalışır; `campaign_test` yalnızca yeni `pgdata` hacminde oluşur.
 - **Kabul:** `canReceive` unit testleri (izin yok / iletişim bilgisi yok / izinli) yeşil.
 
 ### 3.2 Seeder
@@ -338,7 +275,6 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 - **İş:** 5.000 kullanıcı, Faker `tr_TR`, sabit seed (deterministik). Dağılımlar her alan için anlamlı ve birbiriyle tutarlı (ör. `first_purchase_at ≤ last_purchase_at`, `orders_count = 0` ise satın alma tarihleri boş, `avg_order_value = total_spent / orders_count`): ağırlıklı ~15 şehir (İstanbul ~%30); hiç alışveriş yapmamış ~%15; son 30 günde sepete ekleyip son 30 günde satın almamış ~%12; sadakat seviyeleri piramit; SMS izni ~%70, email izni ~%80; ~%3 boş `first_name`; ~%10 `en`. Toplu insert (1.000'lik chunk).
 - **Dosyalar:** `database/seeders/CustomerSeeder.php`, `DatabaseSeeder.php`
 - **Bağımlı:** 3.1
-- **Not:** Entrypoint "tablo boşsa seed" kontrolü `customers` tablosuna bakar (`SEED_CHECK_TABLE`); ad değişirse env güncellenir.
 - **Kabul:** `make fresh` iki kez → `SELECT count(*), md5(string_agg(email, ',' ORDER BY id))` aynı; dağılım sorgusu hedeflere ±%3 yakın.
 
 ### 3.3 `Campaign` ve durum makinesi
@@ -368,14 +304,14 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 
 ### 4.1 `FieldRegistry`
 
-- **İş:** Alan → kolon, tip, izinli operatörler, değer kısıtları, Türkçe etiket. 3.1'deki segmentlenebilir tüm alanlar kayıtlıdır (iletişim bilgileri ve isim hariç). Tipler: `enum` (`city`, `gender`, `language`, `platform`, `loyalty_tier`, `favorite_category`; şehir listesi DB'den, cache'li), `number` (`age`, `orders_count`, `total_spent`, `avg_order_value`, `cart_items_count`, `cart_value`), `date` (`registered_at`, `last_login_at`, `first_purchase_at`, `last_purchase_at`, `last_cart_add_at`). Operatörler: `eq`, `neq`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`, `within_last_days`, `not_within_last_days` (null dahil), `is_null`, `not_null`. Doğrulayıcı, derleyici, prompt ve JSON şeması bu tek kaynaktan beslenir (DRY). Hash map, arama O(1).
+- **İş:** Alan → kolon, tip, izinli operatörler, değer kısıtları, Türkçe etiket. 3.1'deki segmentlenebilir tüm alanlar kayıtlıdır (iletişim bilgileri ve isim hariç). Tipler: `enum` (`city`, `gender`, `language`, `platform`, `loyalty_tier`, `favorite_category`; şehir listesi DB'den, cache'li), `number` (`age`, `orders_count`, `total_spent`, `avg_order_value`, `cart_items_count`, `cart_value`), `date` (`registered_at`, `last_login_at`, `first_purchase_at`, `last_purchase_at`, `last_cart_add_at`). Operatörler: `eq`, `neq`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`, `within_last_days`, `not_within_last_days` (null dahil), `is_null`, `not_null`. Her operatörün Türkçe bir cümle kalıbı vardır (`Operator::template()`, arayüzdeki kural çipleri için). Doğrulayıcı, derleyici, prompt ve JSON şeması bu tek kaynaktan beslenir (DRY). Hash map, arama O(1).
 - **Dosyalar:** `app/Segment/FieldRegistry.php`, `FieldDefinition.php`, `Operator.php`, unit test
 - **Bağımlı:** 3.2
 - **Kabul:** Unit: her tip için izinli/yasak operatör tablosu.
 
 ### 4.2 `SegmentRule` ve doğrulayıcı
 
-- **İş:** `SegmentRuleParser::parse(array): SegmentRule|ValidationErrors` ("doğrulama yerine ayrıştır": `SegmentRule` geçersiz olarak var olamaz). Koşullar AND ile bağlanır (K6). Kontroller: yapı, `version`, 1–10 koşul, bilinen alan, tipe uygun operatör, değer tipi ve aralığı (gün 1–365, `in` ≤50 öğe, şehir listede), `between` sırası. Hatalar yol bazlı (`conditions[1].value: ...`); hem onarım prompt'u hem UI kullanır.
+- **İş:** `SegmentRuleParser::parse(array): SegmentRule|ValidationErrors` ("doğrulama yerine ayrıştır": `SegmentRule` geçersiz olarak var olamaz). Koşullar düz bir AND listesidir; çoklu değer `in`/`not_in` ile verilir; şema versiyonludur. Kontroller: yapı, `version`, 1–10 koşul, bilinen alan, tipe uygun operatör, değer tipi ve aralığı (gün 1–365, `in` ≤50 öğe, şehir listede), `between` sırası. Hatalar yol bazlı (`conditions[1].value: ...`); hem onarım prompt'u hem UI kullanır.
 - **Dosyalar:** `app/Segment/SegmentRule.php`, `Condition.php`, `SegmentRuleParser.php`, `ValidationErrors.php`, unit test
 - **Bağımlı:** 4.1
 - **Kabul:** ≥20 geçersiz girdi vakası doğru yol ve mesajla reddedilir; örnek brief'in kuralı geçer.
@@ -389,7 +325,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 
 ### 4.4 `AudienceService`
 
-- **İş:** Kural → kanal başına sayılar (`COUNT(*) FILTER`, tek sorgu, tek tarama) + toplam benzersiz + 5 örnek kişi + kanal başına her kişiselleştirme değişkeninin (`first_name`, `last_name`, `city`) en uzun değeri (K13; `char_length` kod noktası sayar ve grapheme sayısından küçük olamaz, yani güvenli tarafta kalır).
+- **İş:** Kural → kanal başına sayılar (`COUNT(*) FILTER`, tek sorgu, tek tarama) + toplam benzersiz + 5 örnek kişi + kanal başına her kişiselleştirme değişkeninin (`first_name`, `last_name`, `city`) en uzun değeri (`char_length` kod noktası sayar ve grapheme sayısından küçük olamaz, yani güvenli tarafta kalır).
 - **Dosyalar:** `app/Segment/AudienceService.php`, `AudienceSummary.php`, integration test
 - **Bağımlı:** 4.3
 - **Kabul:** Integration: izinsiz kullanıcı ilgili kanal sayısına girmez; sorgu sayısı 2 (`DB::getQueryLog`).
@@ -400,10 +336,9 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 
 ### 5.1 `LlmClient` arayüzü ve fake
 
-- **İş:** `LlmClient::complete(LlmRequest): LlmResponse`, `stream(LlmRequest): iterable<LlmChunk>`. DTO'lar: system, messages, JSON şeması, `maxTokens`; yanıt: metin, usage, `stopReason`. `FakeLlmClient`: sıralı senaryo kuyruğu (geçersiz → geçerli gibi), stream'i parçalara böler, hata da üretebilir. Container binding: `auto` / `claude` / `fake`.
+- **İş:** `LlmClient::complete(LlmRequest): LlmResponse`, `stream(LlmRequest): iterable<LlmChunk>`. DTO'lar: system, messages, JSON şeması, `maxTokens`; yanıt: metin, usage, `stopReason`. `FakeLlmClient`: sıralı senaryo kuyruğu (geçersiz → geçerli gibi), stream'i parçalara böler, hata da üretebilir. Container binding: `auto` / `claude` / `fake`; `config/llm.php` yalnızca değeri çözer, bilinmeyen `LLM_DRIVER` değerinde (örn. `claud`) ve `claude` + boş key birleşiminde binding hata fırlatır.
 - **Dosyalar:** `app/Llm/LlmClient.php`, `LlmRequest.php`, `LlmResponse.php`, `LlmChunk.php`, `FakeLlmClient.php`, `app/Providers/LlmServiceProvider.php`, unit test
 - **Bağımlı:** 2.3
-- **Not:** `config/llm.php` yalnızca çözümler; bilinmeyen `LLM_DRIVER` değerinde (örn. `claud`) ve `claude` + boş key birleşiminde binding hata fırlatır.
 - **Kabul:** Unit: senaryo sırası, stream parçaları birleşince tam metin, binding doğru sürücüyü seçer.
 
 ### 5.2 `ClaudeLlmClient`: tek seferlik çağrı
@@ -450,7 +385,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 
 ### 5.8 `ContentValidator`
 
-- **İş:** SMS ≤160 (K13'e göre en kötü durum render uzunluğu), konu ≤80, email gövdesi ≤2.000, boş değil, yalnızca bilinen değişkenler, bozuk `{{`. Limitler `config/delivery.php`'den. LLM çıktısı ve insan düzenlemesi aynı doğrulayıcıdan geçer (DRY). Yol bazlı hatalar.
+- **İş:** SMS ≤160 (kullanıcının gördüğü karakterle, kitlenin her değişken için en uzun değeriyle en kötü durum render uzunluğu), konu ≤80, email gövdesi ≤2.000, boş değil, yalnızca bilinen değişkenler, bozuk `{{`. Limitler `config/delivery.php`'den. LLM çıktısı ve insan düzenlemesi aynı doğrulayıcıdan geçer (DRY). Yol bazlı hatalar.
 - **Dosyalar:** `app/Content/MessageContent.php`, `ContentValidator.php`, unit test
 - **Bağımlı:** 5.7
 - **Kabul:** Unit: 160/161 ve 80/81 sınırları (görünen karakterle); değişken uzunluğu limiti aşırınca hata; Türkçe harf ve emoji içeren sınır vakaları.
@@ -489,31 +424,29 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 
 ### 6.1 Oluştur, listele, göster
 
-- **İş:** `POST /api/campaigns {brief}`, `GET /api/campaigns` (sayfalı), `GET /api/campaigns/{id}` (kural, sayılar, mesajlar, durum). FormRequest + Resource.
+- **İş:** `POST /api/campaigns {brief}`, `GET /api/campaigns` (sayfalı), `GET /api/campaigns/{id}` (kural, sayılar, mesajlar, durum). FormRequest + Resource. `ModelNotFoundException` → 404 eşlemesi `bootstrap/app.php`'ye eklenir.
 - **Dosyalar:** controller, request, resource, route, feature test
 - **Bağımlı:** 3.3
-- **Not:** `ModelNotFoundException` → 404 eşlemesi `bootstrap/app.php`'ye eklenir.
 - **Kabul:** Feature: kısa brief → 422 ve alan hatası; oluşturma → 201; liste sayfalı.
 
 ### 6.2 Kitle çıkarma
 
-- **İş:** `POST /api/campaigns/{id}/audience` → `SegmentExtractor` + `AudienceService`; kural, desteklenmeyen kriterler ve sayılar saklanır; `audience_ready`. Kural elle düzenlenemez (bunun için endpoint yok); pazarlamacı brief'i değiştirip onaya kadar yeniden çalıştırabilir. LLM başarısız → 422 (hata listesi), LLM erişilemez → 503.
+- **İş:** `POST /api/campaigns/{id}/audience {brief}` → `SegmentExtractor` + `AudienceService`; kampanyadaki brief gövdedekiyle güncellenir; kural, desteklenmeyen kriterler ve sayılar saklanır; `audience_ready`. Kural elle düzenlenemez (bunun için endpoint yok); pazarlamacı brief'i değiştirip onaya kadar yeniden çalıştırabilir. LLM başarısız → 422 (hata listesi), LLM erişilemez → 503.
 - **Dosyalar:** controller, action, feature test
 - **Bağımlı:** 4.4, 5.6, 6.1
 - **Kabul:** Fake ile 200 ve kanal sayıları; başarısız senaryoda 422 gövdesinde anlamlı mesaj; onaylanmış kampanyada 409.
 
 ### 6.3 İçerik stream endpoint'i
 
-- **İş:** `POST /api/campaigns/{id}/content/stream` → SSE: `delta`, `final`, `error`; `final` sonrası `campaign_messages` (`source=llm`) ve `content_ready`. İstemci koparsa iptal.
+- **İş:** `POST /api/campaigns/{id}/content/stream` → SSE: `delta`, `final`, `error`; `final` sonrası `campaign_messages` (`source=llm`) ve `content_ready`. İstemci koparsa iptal. Yanıta `X-Accel-Buffering: no` eklenir (nginx `/api/` tamponu zaten kapalı).
 - **Dosyalar:** controller, feature test
 - **Bağımlı:** 5.10, 6.2
-- **Not:** Yanıta `X-Accel-Buffering: no` eklenir (nginx `/api/` tamponu zaten kapalı).
 - **Kabul:** Feature: yanıt `text/event-stream`, olay sırası delta… → final; DB'de iki mesaj.
 
 ### 6.4 Düzenleme, önizleme ve kurallar
 
-- **İş:** `PUT /api/campaigns/{id}/content` (insan düzenlemesi; yalnızca üretilmiş mesajlar ve yalnızca onaydan önce, `content_ready` dışında 409; `ContentValidator`, 422 yol bazlı); `GET /api/campaigns/{id}/preview?customer_id=` (verilmezse örnek kişi; render edilmiş metin ve uzunluklar); `GET /api/content/rules` (limitler ve değişkenler; frontend kendi kopyasını tutmasın diye, DRY).
-- **Dosyalar:** controller'lar, feature test
+- **İş:** `PUT /api/campaigns/{id}/content` (insan düzenlemesi; yalnızca üretilmiş mesajlar ve yalnızca onaydan önce, `content_ready` dışında 409; `ContentValidator`, 422 yol bazlı); `GET /api/campaigns/{id}/preview?customer_id=` (verilmezse örnek kişi; render edilmiş metin ve uzunluklar); `GET /api/content/rules` (içerik limitleri, değişkenler, `brief` limitleri ve `segment.fields/operators` ile Türkçe çip kalıpları; frontend kendi kopyasını tutmasın diye, DRY).
+- **Dosyalar:** controller'lar (`ContentRulesController` dahil), feature test
 - **Bağımlı:** 6.3
 - **Kabul:** Feature: 161 karakterlik SMS → 422 `sms.body`; onaylanmış kampanyada düzenleme → 409; önizlemede boş isimli kişi için fallback.
 
@@ -523,10 +456,9 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 
 ### 7.1 Servis iskeleti
 
-- **İş:** `mock-provider/`: tek giriş noktalı sade PHP, `php -S` (`PHP_CLI_SERVER_WORKERS=16`). `POST /sms {to, body}`, `POST /email {to, subject, body}`; `Idempotency-Key` zorunlu; geçersiz alıcı → 400 (kalıcı hata). `GET /health`, `GET /stats` (kanal başına toplam, tekrar sayısı, saniyelik en yüksek hız), `DELETE /stats` (test sıfırlama). Compose'a eklenir.
+- **İş:** `mock-provider/`: tek giriş noktalı sade PHP, `php -S` (`PHP_CLI_SERVER_WORKERS=16`). `POST /sms {to, body}`, `POST /email {to, subject, body}`; `Idempotency-Key` zorunlu; geçersiz alıcı → 400 (kalıcı hata). `GET /health`, `GET /stats` (kanal başına toplam, tekrar sayısı, saniyelik en yüksek hız), `DELETE /stats` (test sıfırlama). Compose'a `mock-provider` adıyla eklenir (`PROVIDER_URL` bunu bekler); `MOCK_*` env'leri `.env.example`'da tanımlıdır.
 - **Dosyalar:** `mock-provider/public/index.php`, `mock-provider/src/*`, `mock-provider/Dockerfile`, `docker-compose.yml`
 - **Bağımlı:** 2.8
-- **Not:** Compose servis adı `mock-provider` olmalı (`PROVIDER_URL` bunu bekler); `MOCK_*` env'leri `.env.example`'da hazır.
 - **Kabul:** `curl` ile SMS gönder → 200 ve `id`; `/stats` 1 gösterir.
 
 ### 7.2 Idempotency
@@ -534,15 +466,14 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 - **İş:** Aynı key → kaydedilmiş aynı yanıt, sayaca tekrar eklenmez (`SET NX`); aynı key farklı gövde → 422.
 - **Dosyalar:** `mock-provider/src/IdempotencyStore.php`, test
 - **Bağımlı:** 7.1
-- **Not:** Testler projenin geneliyle aynı şekilde Pest ile yazılır. Mock provider'da Composer yok; testler backend imajındaki Pest ile çalışır (`mock-provider/phpunit.xml`, `tests/bootstrap.php`). `DELETE /stats` idempotency kayıtlarını da siler.
+- **Not:** Mock provider'da Composer yok; testler Pest ile backend imajında çalışır (`mock-provider/phpunit.xml`, `tests/bootstrap.php`). `DELETE /stats` idempotency kayıtlarını da siler.
 - **Kabul:** Aynı key ile 3 istek → `/stats` toplam 1, `duplicates_prevented` 2.
 
 ### 7.3 Hata üretimi ve kendi rate limit'i
 
-- **İş:** `FaultPolicy` (rastgele kaynağı enjekte edilir): gecikme aralığı, 500, 429 (+`Retry-After`), timeout, "kabul edip 500". Oranlar env'den; deterministik test için `X-Mock-Fault` header'ı. Kanal başına >100/sn → 429 (saniyelik Redis `INCR`).
-- **Dosyalar:** `mock-provider/src/FaultPolicy.php`, `RateLimiter.php`, test
+- **İş:** `FaultPolicy` (rastgele kaynağı enjekte edilir): gecikme aralığı, 500, 429 (+`Retry-After`), timeout, "kabul edip 500". Oranlar env'den; deterministik test için `X-Mock-Fault` header'ı. Kanal başına >100/sn → 429 (saniyelik Redis `INCR`). Mock provider testleri `make test-mock` hedefiyle `make test`'e eklenir.
+- **Dosyalar:** `mock-provider/src/FaultPolicy.php`, `RateLimiter.php`, test, `Makefile`
 - **Bağımlı:** 7.2
-- **Not:** Mock provider testleri (Pest, bkz. 7.2) `make test-mock` hedefiyle `make test`'e eklenir.
 - **Kabul:** `make test` mock provider testlerini de çalıştırır. Pest: sabit rastgele kaynakla beklenen dağılım; `X-Mock-Fault: 429` → 429 ve `Retry-After`; "kabul edip 500" sonrası aynı key ile tekrar → 200 ve kayıt 1.
 
 ---
@@ -561,7 +492,7 @@ Görev formatı: **İş** · **Dosyalar** · **Bağımlı** · **Kabul** (senin 
 - **İş:** Saf sınıf: deneme n → `min(cap, base·2ⁿ)` aralığında full jitter; `RateLimited` → `max(retryAfter, backoff)`; maks. 5 deneme; `Permanent` → tekrar yok. Rastgele kaynağı enjekte edilir.
 - **Dosyalar:** `app/Delivery/RetryPolicy.php`, `RetryDecision.php`, unit test
 - **Bağımlı:** 8.1
-- **Not:** `config/delivery.php`'deki taban (200 ms) ve tavan (10 sn) tahmindir, burada ayarlanır.
+- **Not:** `config/delivery.php`'deki taban (200 ms) ve tavan (10 sn) başlangıç değerleridir.
 - **Kabul:** Unit: gecikme sınırları, `Retry-After` önceliği, 5. denemeden sonra `GiveUp`.
 
 ### 8.3 `SendDeliveryJob`
@@ -668,19 +599,18 @@ Performans ilkeleri (gerektiği yerde): lazy route, stream delta'larını `reque
 
 ### 10.3 Brief ve kitle adımı
 
-- **İş:** Karakter sayaçlı textarea, "Kitleyi çıkar", yükleniyor durumu; kural Türkçe çiplerle; desteklenmeyen kriter uyarısı; SMS, email ve toplam sayılar; hata ve tekrar dene.
+- **İş:** Karakter sayaçlı textarea (kayıtlı kampanyada brief onaya kadar düzenlenebilir ve kitle yeniden çıkarılabilir), "Kitleyi çıkar", yükleniyor durumu; kural Türkçe çiplerle (kalıplar ve limitler `GET /api/content/rules`'tan, frontend'de kopya yok); desteklenmeyen kriter uyarısı; SMS, email ve toplam sayılar; hata ve tekrar dene.
 - **Dosyalar:** `views/CampaignComposer.vue`, `components/BriefStep.vue`, `components/AudienceCard.vue`, test
 - **Bağımlı:** 10.2, 6.2
 - **Kabul:** Vitest (başarı, 422, 503); tarayıcıda örnek brief → sayılar.
-- **Uygulama notu:** Frontend limit ve etiket kopyası tutmasın diye `GET /api/content/rules` yanıtına `brief` limitleri ve `segment.fields/operators` (Türkçe çip kalıbı `Operator::template()`) eklendi (`ContentRulesController`, `Operator.php`, feature test); `AudienceCard` sayıları `longest_values`/`sample` ile birlikte okunur. Backend'de brief güncelleme endpoint'i yok: kayıtlı kampanyada brief salt okunur, farklı brief için yeni kampanya açılır.
 
 ### 10.4 İçerik stream adımı
 
-- **İş:** SMS kartı (telefon görünümü) ve email kartı; kısmi JSON ayrıştırma (K12, docs-first ile kütüphane seçimi); iptal butonu; `final` gelince metin doğrulanmış içerikle değişir, "onarıldı" bilgisi gösterilir.
+- **İş:** SMS kartı (telefon görünümü) ve email kartı; kısmi JSON ayrıştırma (`partial-json`, kare başına bir ayrıştırma); iptal butonu; `final` gelince metin doğrulanmış içerikle değişir, "onarıldı" bilgisi gösterilir.
 - **Dosyalar:** `components/ContentStream.vue`, `components/SmsPreview.vue`, `components/EmailPreview.vue`, test
 - **Bağımlı:** 10.3, 6.3
 - **Kabul:** Vitest (sahte stream ile kademeli metin); tarayıcıda metin akarak gelir.
-- **Uygulama notu:** Kısmi JSON için `partial-json` (`STR | OBJ` bayrakları, kare başına bir ayrıştırma) seçildi; K12 `DECISIONS.md`'ye bu görevde yazıldı (ilk görev 6.3'te yazılmamıştı). Vite dev sunucusuna `/api` proxy'si eklendi (`npm run dev`).
+- **Not:** Vite dev sunucusuna `/api` proxy'si eklenir (`npm run dev`).
 
 ### 10.5 Düzenleme ve önizleme
 
@@ -709,9 +639,9 @@ Performans ilkeleri (gerektiği yerde): lazy route, stream delta'larını `reque
 - **Dosyalar:** `frontend/e2e/core-flow.spec.ts`, `playwright.config.ts`, `Makefile`
 - **Bağımlı:** 10.7
 - **Kabul:** `make e2e` yeşil; ekran görüntüleri incelenir.
-- **Uygulama notu:** Test host'ta Node ile çalışır (`make e2e` yığını `up -d --build --wait` ile güncel kodla kaldırır, Chromium'u kurar); ekran görüntüleri `frontend/e2e/artifacts/` (gitignore'da).
+- **Not:** Test host'ta Node ile çalışır; `make e2e` yığını `up -d --build --wait` ile güncel kodla kaldırır ve Chromium'u kurar. Ekran görüntüleri gitignore'dadır.
 
-### 10.9 Arayüz dili (Türkçe/İngilizce) · K23
+### 10.9 Arayüz dili (Türkçe/İngilizce)
 
 - **İş:** `vue-i18n` (Composition API); başlıkta diğer dili kendi adıyla sunan tek buton; seçim `localStorage`'da, kayıt yoksa tarayıcı dili (Türkçe → `tr`, diğerleri `en`); `<html lang>` seçime uyar. Mesajlar `en.ts` (ana kaynak) ve `tr.ts` (`typeof en` ile tip denetimli); tüm görünümler, durum rozetleri, kanal adları ve saat biçimi çevrilir. API hata mesajları, model içeriği ve kural çiplerinin etiketleri (backend zaten Türkçe gönderir) olduğu gibi gösterilir.
 - **Dosyalar:** `frontend/src/i18n/*`, `components/LocaleSwitcher.vue`, mevcut bileşenler, `test-setup.ts`, `e2e/language.spec.ts`, Vitest
@@ -724,7 +654,7 @@ Performans ilkeleri (gerektiği yerde): lazy route, stream delta'larını `reque
 
 ### 11.1 README
 
-- **İş:** Kurulum (`.env.example` → `.env`, key isteğe bağlı), mermaid mimari diyagramı, akış, endpoint tablosu, test komutları (Windows için `docker compose` eşdeğerleriyle), `llm:eval` sonucu, yapılmayanlar. Varsayımlar ve kapsam dışı: kimlik doğrulama yok (K22), içerik Türkçe, yasal SMS metni (İYS, çıkış ifadesi) yok, kampanyalar arası frekans sınırı yok, seed 5.000 kişi.
+- **İş:** Kurulum (`.env.example` → `.env`, key isteğe bağlı), mermaid mimari diyagramı, akış, endpoint tablosu, test komutları (Windows için `docker compose` eşdeğerleriyle), `llm:eval` sonucu, yapılmayanlar. Varsayımlar ve kapsam dışı: kimlik doğrulama yok (tek pazarlamacı, yerel demo), içerik Türkçe, yasal SMS metni (İYS, çıkış ifadesi) yok, kampanyalar arası frekans sınırı yok, seed 5.000 kişi.
 - **Dosyalar:** `README.md`
 - **Bağımlı:** 10.8
 - **Not:** README'deki _TBD_ bölümler doldurulur; Docker imaj etiketleri (`node:24-alpine`, `nginx:stable-alpine`) sabitlenir; Boost için `backend/.env` içinde `APP_ENV=local` gerektiği yazılır.
@@ -732,7 +662,7 @@ Performans ilkeleri (gerektiği yerde): lazy route, stream delta'larını `reque
 
 ### 11.2 DECISIONS kontrolü
 
-- **İş:** Bölüm 2'deki K1–K22 ve uygulamada eklenen kararlar `DECISIONS.md`'de tam mı; reddedilen alternatifler kısa.
+- **İş:** Uygulama boyunca alınan tüm önemli kararlar `DECISIONS.md`'de tam mı; her birinde gerekçe ve reddedilen alternatifler kısa yazılı mı.
 - **Dosyalar:** `DECISIONS.md`
 - **Bağımlı:** 11.1
 - **Kabul:** Okuyarak onay.
@@ -753,16 +683,16 @@ Performans ilkeleri (gerektiği yerde): lazy route, stream delta'larını `reque
 
 ### 11.5 Session export'ları
 
-- **İş:** Tüm export'lar `ai-sessions/`'a; `scrub-sessions.mjs`; `--check` 0.
+- **İş:** Faz 0–11 export'ları `ai-sessions/`'ta tam mı; `scrub-sessions.mjs` ile temizlenir.
 - **Dosyalar:** `ai-sessions/*`
 - **Bağımlı:** 11.4
-- **Kabul:** `--check` 0; her fazın en az bir `phase-<N>_<konu>.md` dosyası var.
+- **Kabul:** `--check` 0; Faz 0–11'in her birinin en az bir `phase-<N>_<konu>.md` dosyası var.
 
 ---
 
 ## Faz 12: Arayüz iyileştirmeleri · G7
 
-Faz 11 sonrası elle incelemeden gelen üç istek; dal `phase-12/ui-polish`. Yeni kütüphane yok (ikon satır içi SVG); tek backend değişikliği gönderim hatasına kod eklemek (K24).
+Üç arayüz iyileştirmesi; dal `phase-12/ui-polish`. Yeni kütüphane yok (ikon satır içi SVG); tek backend değişikliği gönderim hatasına kod eklemektir.
 
 ### 12.1 Başlık linki ve geri butonu
 
@@ -771,14 +701,14 @@ Faz 11 sonrası elle incelemeden gelen üç istek; dal `phase-12/ui-polish`. Yen
 - **Bağımlı:** 10.9
 - **Kabul:** Vitest: başlık ve geri butonu listeye götürür, geri butonunun erişilebilir adı iki dilde var, dashboard'da alt link yok; tarayıcıda üç sayfada buton başlığın solunda; `make e2e` yeşil.
 
-### 12.2 Gönderim hatası kodu (backend) · K24
+### 12.2 Gönderim hatası kodu (backend)
 
 - **İş:** `DeliveryErrorCode` enum'u: `consent_withdrawn` (atlandı), `provider_unreachable` (bağlantı kurulamadı veya zaman aşımı), `provider_busy` (429), `provider_error` (5xx); üçü de yeniden denenecek, `retries_exhausted`, `provider_rejected` (kalıcı 4xx), `content_invalid` (uzunluk aşımı veya kanal mesajı yok), `internal` (job tekrar tekrar çöktü). `deliveries.last_error_code` (nullable, yeni migration). `markFailed`, `scheduleRetry` ve `skip` metnin yanında kodu da alır; kodu `SendDeliveryJob` ve `RetryDecision` verir. `CampaignStats` `recent_errors` öğesine `code` ekler (SSE aynı sınıfı kullandığı için ayrıca iş yok). Ham `error` metni ve maskelemesi aynen kalır.
 - **Dosyalar:** `app/Delivery/DeliveryErrorCode.php`, `database/migrations/*_add_last_error_code_to_deliveries_table.php`, `app/Models/Delivery.php`, `app/Delivery/{SendDeliveryJob,SendResult,HttpMessageProvider,RetryPolicy,RetryDecision,CampaignStats}.php`, Pest
 - **Bağımlı:** 8.3, 9.1
 - **Kabul:** Pest: her hata yolu doğru kodu yazar (izin geri çekildi, zaman aşımı, 429, 5xx, deneme tükendi, 4xx, uzunluk aşımı, job çökmesi); stats yanıtında `code` var; `make smoke` yeşil.
 
-### 12.3 Anlaşılır gönderim hataları (dashboard) · K24
+### 12.3 Anlaşılır gönderim hataları (dashboard)
 
 - **İş:** "Son hatalar" tablosunun hata sütunu koddan çevrilmiş sade açıklama gösterir (`deliveryError.<code>`, Türkçe/İngilizce; kod yoksa genel açıklama). Altında varsayılan kapalı `<details>` "Teknik ayrıntı": ham hata metni, seçilip kopyalanabilir (yazılım ekibine iletmek için). `types.ts`'te `code` alanı.
 - **Dosyalar:** `views/CampaignDashboard.vue`, `api/types.ts`, `i18n/en.ts`, `i18n/tr.ts`, Vitest
@@ -789,28 +719,19 @@ Faz 11 sonrası elle incelemeden gelen üç istek; dal `phase-12/ui-polish`. Yen
 
 ## Faz 13: Fake LLM değişiklikleri · G7
 
-Plan dışı faz: Faz 12 sonrası elle denemeden gelen dört bulgu; dal `phase-13/fake-llm`. Kapsam yalnızca key'siz geliştirme fake'i (`DevScenarios`, `resources/llm-fixtures`) ve bir frontend tetikleyicisi. Değişmeyenler: `ClaudeLlmClient`, prompt'lar, `SegmentExtractor`/`ContentGenerator` doğrulama zinciri (fake çıktısı da parse → doğrula → tipli nesneden geçer, K7, K11), testlerin `enqueue` kuyruğu ve kendi kuyruğunu kullanan `llm:eval`. Yeni kütüphane ve migration yok.
+Key'siz geliştirme fake'i (`DevScenarios`, `resources/llm-fixtures`) gerçek modele yakın davranır ve kitle çıkarımından sonra içerik üretimi kendiliğinden başlar; dal `phase-13/fake-llm`. Değişmeyenler: `ClaudeLlmClient`, prompt'lar, `SegmentExtractor`/`ContentGenerator` doğrulama zinciri (fake çıktısı da parse → doğrula → tipli nesneden geçer), testlerin `enqueue` kuyruğu ve kendi kuyruğunu kullanan `llm:eval`. Yeni kütüphane ve migration yok. Sıra bağımlılığa göre: 13.3 ve 13.4, 13.2'deki brief okuyucusunu kullanır (aynı brief → aynı bilgiler).
 
-| Bulgu                                    | Görev      |
-| ---------------------------------------- | ---------- |
-| 1. Kitle sonrası otomatik içerik üretimi | 13.1       |
-| 2. E-posta/SMS tutarlılığı               | 13.3       |
-| 3. Çeşitlilik ve kitle verisi            | 13.2, 13.3 |
-| 4. "Tekrar oluştur" farklı ama uyumlu    | 13.4       |
-
-Sıra bağımlılığa göre: 13.3 ve 13.4, 13.2'deki brief okuyucusunu kullanır (aynı brief → aynı bilgiler).
-
-### 13.1 Kitle sonrası otomatik içerik üretimi · K26
+### 13.1 Kitle sonrası otomatik içerik üretimi
 
 - **İş:** Store'da tek seferlik bayrak (`autoGenerateFor: campaignId | null`): `extractAudience` başarılı olduğunda ve kampanyada henüz mesaj yoksa kurulur. Bayrak bileşende değil store'da, çünkü yeni kampanyada çıkarımdan sonra `router.replace` ile sayfa değişir. `ContentStream` mount olunca bayrak kendi kampanyasınınsa tüketir ve `start()` çağırır. Sayfa yenilemesi, içeriği olan kampanyada kitleyi yeniden çıkarma ve başarısız çıkarım (422/503) otomatik üretim başlatmaz; "Tekrar oluştur" butonu aynen kalır; composer'dan ayrılınca (`leaveCurrent`) bayrak temizlenir.
 - **Dosyalar:** `stores/campaign.ts`, `components/ContentStream.vue`, gerekirse `views/CampaignComposer.vue`, `e2e/core-flow.spec.ts`, Vitest
 - **Bağımlı:** 10.4, 12.1
 - **Kabul:** Vitest: başarılı ilk çıkarımdan sonra stream isteği tek kez gider; mesajı olan kampanyada, yeniden yüklemede ve 422/503'te gitmez. e2e: "Generate content" tıklaması kaldırılır, içerik kendiliğinden akar; `make e2e` yeşil.
 
-### 13.2 Fake kitle çıkarımı: brief okuyucu · K25
+### 13.2 Fake kitle çıkarımı: brief okuyucu
 
 - **İş:** Saf `BriefReader` sınıfı, Türkçe katlanmış (`fold`) brief'ten koşul çıkarır. Her kalıp dar ve açıktır; emin olunamayan ifadede koşul eklenmez (yanlış kitle yerine eksik koşul):
-  - **Şehir:** şehir listesi `FieldRegistry`'den (provider verir; K7 tek kaynak); kelime başında eşleşme, kesme ekli biçimler dahil (`İstanbul'daki`, `İzmir'de`). Bir şehir → `eq`, birden çok → `in`.
+  - **Şehir:** şehir listesi `FieldRegistry`'den (provider verir; tek kaynak registry); kelime başında eşleşme, kesme ekli biçimler dahil (`İstanbul'daki`, `İzmir'de`). Bir şehir → `eq`, birden çok → `in`.
   - **Cinsiyet:** `erkek` → `male`; `kadın`/`bayan` → `female`; ikisi birden geçerse koşul yok.
   - **Yaş:** `N yaş altı/altındaki/küçük` → `lt N`; `N yaş ve altı` → `lte N`; `N yaş üstü/üzeri/büyük` → `gt N`; `N yaş ve üzeri` → `gte N`; `N-M yaş` ve `N ile M yaş arası` → `between`.
   - **Süre + eylem:** `N gün/hafta/ay` (`bir` = 1, hafta 7, ay 30 gün, 1–365'e sıkıştırılır) ve aynı cümle parçasında `sipariş`/`alışveriş`/`satın` → `last_purchase_at`, `giriş` → `last_login_at`, `sepet` → `last_cart_add_at`. Olumsuz eylem (`vermemiş`, `yapmamış`, `almamış`, `-mayan/-meyen`) → `not_within_last_days`, değilse `within_last_days`.
@@ -822,14 +743,14 @@ Sıra bağımlılığa göre: 13.3 ve 13.4, 13.2'deki brief okuyucusunu kullanı
 - **Bağımlı:** 4.1, 5.11
 - **Kabul:** Pest: ≥15 brief vakası (data provider) beklenen koşul kümesini verir; "1 haftadır sipariş vermemiş İstanbul'daki 25 yaş altı erkekler için kampanya" → `city eq İstanbul`, `gender eq male`, `age lt 25`, `last_purchase_at not_within_last_days 7`. Yanlış pozitif vakaları (`evde` geçen ama kategori kastedilmeyen cümle, "erkek ve kadın", sayı içermeyen yaş ifadesi) koşul üretmez; tüm vaka çıktıları `SegmentRuleParser`'dan geçer; örnek brief (sepet terk) eski kuralı aynen verir. Tarayıcıda bu brief'in kanal sayıları filtrelere göre düşer.
 
-### 13.3 Fake içerik: geniş havuz ve SMS/email tutarlılığı · K25
+### 13.3 Fake içerik: geniş havuz ve SMS/email tutarlılığı
 
 - **İş:** Fixture'lardaki `content` tek yanıttan varyant listesine döner (`content: [{sms, email}, …]`), her senaryoda 3 varyant. Yeni senaryolar: indirim (`indirim`, `kupon`, `fırsat`), geri kazanım (`sipariş vermemiş`, `alışveriş yapmamış`), yeni üye (`yeni üye`, `kayıt`), yüksek harcama (`harcama`, `vip`). Kategori senaryosu `elektronik`'e bağlı kalmaz, kategori brief'ten okunur (`%CATEGORY%`). Tutarlılık yapısaldır: her varyantta anahtar bilgi tek `%OFFER%` yuvasıyla hem SMS'te hem email'de geçer. `%OFFER%`, `BriefReader`'ın okuduklarıyla dolar: indirim (`%20`, `yüzde 20`, `20%` → "%20 indirim"), tek şehir (ek gerektirmeyen "İstanbul için" biçimi), kategori; brief'te yoksa varyantın kendi varsayılan teklifi. Fixture metinlerinde şehir adı sabit yazılmaz.
 - **Dosyalar:** `resources/llm-fixtures/*.json` (mevcut 5 + 4 yeni), `app/Llm/Fake/DevScenarios.php`, `app/Llm/Fake/BriefReader.php`, Pest
 - **Bağımlı:** 13.2
-- **Kabul:** Pest: her senaryonun her varyantında `%OFFER%` hem SMS'te hem email'de; brief'te "%20 indirim" varsa her varyantın SMS'inde ve email'inde "%20" geçer; her varyant en uzun şehir, indirim ve kategoriyle doldurulup kitlenin en uzun `first_name` değeriyle `ContentValidator`'dan geçer (K13); farklı türde 10 brief en az 6 farklı senaryoya düşer (genel yanıt baskın değil); `make smoke` yeşil.
+- **Kabul:** Pest: her senaryonun her varyantında `%OFFER%` hem SMS'te hem email'de; brief'te "%20 indirim" varsa her varyantın SMS'inde ve email'inde "%20" geçer; her varyant en uzun şehir, indirim ve kategoriyle doldurulup kitlenin en uzun `first_name` değeriyle `ContentValidator`'dan geçer; farklı türde 10 brief en az 6 farklı senaryoya düşer (genel yanıt baskın değil); `make smoke` yeşil.
 
-### 13.4 "Tekrar oluştur": sıradaki varyant · K25
+### 13.4 "Tekrar oluştur": sıradaki varyant
 
 - **İş:** İçerik isteğinde varyant sırası brief'e bağlı bir sayaçtan gelir: `Cache::increment('fake-llm:content:'.sha1(brief))` (Redis), varyant = (sayaç − 1) mod varyant sayısı. İlk üretim ilk varyantı verir, her yeniden üretim bir sonrakine geçer, sonda başa döner. Segment yanıtı sayaçtan etkilenmez (aynı brief → aynı kitle). `%OFFER%` aynı brief'ten dolduğu için şehir, indirim ve kategori varyantlar arasında değişmez. Sayaç `DevScenarios`'a provider'dan closure olarak verilir; unit testte bellek içi sayaç.
 - **Dosyalar:** `app/Llm/Fake/DevScenarios.php`, `app/Providers/LlmServiceProvider.php`, Pest
@@ -840,37 +761,29 @@ Sıra bağımlılığa göre: 13.3 ve 13.4, 13.2'deki brief okuyucusunu kullanı
 
 ## Faz 14: Case denetimi düzeltmeleri · G7
 
-Plan dışı faz: Faz 13 sonrası kodun case dosyasına karşı denetiminden gelen bulgular; dal `phase-14/audit-fixes`. Çekirdek akış değişmez; düzeltmeler kurulum, test yalıtımı ve hız limiti kanıtı; sonda README kapanışı. Yeni kütüphane ve migration yok. Sıra önceliğe göre.
+Kodun case dosyasına karşı denetiminden çıkan düzeltmeler; dal `phase-14/audit-fixes`. Çekirdek akış değişmez; kurulum, test yalıtımı ve hız limiti kanıtı düzeltilir, sonda README kapanır. Yeni kütüphane ve migration yok. Sıra önceliğe göredir.
 
-| Bulgu                                                            | Önem   | Görev |
-| ---------------------------------------------------------------- | ------ | ----- |
-| H1. Temiz klonda `docker compose up`, `.env` olmadığı için düşer | Kritik | 14.1  |
-| H2. `.env`'de key varken testler fake LLM'den çıkar              | Orta   | 14.2  |
-| H3. Smoke'un ≤100/sn kontrolü yapısı gereği hep geçer            | Orta   | 14.3  |
-| E1. Bonuslar yok ve README'de belirtilmemiş                      | Düşük  | 14.4  |
-| E2. Gerçek modelle `llm:eval` sonucu yok                         | Düşük  | 14.4  |
-
-### 14.1 Tek komutla kurulum · K27
+### 14.1 Tek komutla kurulum
 
 - **İş:** `docker-compose.yml`: backend anchor'ı (`x-backend`) ve `mock-provider` için `env_file: [{ path: .env, required: false }]`. Container'ların `.env` olmadan da ihtiyaç duyduğu değerler (DB, Redis, kuyruk/cache/session sürücüleri, `LLM_DRIVER`, `ANTHROPIC_MODEL`, `PROVIDER_URL`, `SEND_RATE_PER_SECOND`, `WORKERS_PER_CHANNEL`, `MOCK_*`) ortak bir `x-env` bloğunda `${VAR:-<.env.example değeri>}` ile verilir; `ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}`. Varsayılanlar `.env.example` ile aynı kalır, iki dosyada da yorumla birbirine bağlanır. README kurulumu tek komuta iner (`docker compose up`; key için isteğe bağlı `cp .env.example .env`) ve gereken en düşük Compose sürümünü (2.24, `required` alanı) yazar. `make up` ve Makefile'daki `.env` hedefi aynen kalır.
-- **Dosyalar:** `docker-compose.yml`, `.env.example` (yorum), `README.md`, `DECISIONS.md`
+- **Dosyalar:** `docker-compose.yml`, `.env.example` (yorum), `README.md`
 - **Bağımlı:** Faz 13
 - **Kabul:** Geçici klasöre temiz klon, `.env` yok → `docker compose up -d --wait` tüm servisler healthy; `curl localhost:8080/api/health` → 200 ve `llm_driver: fake`; aynı klonda `make smoke` yeşil. `.env`'i olan çalışma klasöründe `make up` davranışı değişmez.
 
-### 14.2 Testlerde LLM yalıtımı · K28
+### 14.2 Testlerde LLM yalıtımı
 
 - **İş:** `backend/phpunit.xml`'e `<server name="LLM_DRIVER" value="fake" force="true"/>` ve `<server name="ANTHROPIC_API_KEY" value="" force="true"/>` (2.9'daki DB sabitlemesiyle aynı yöntem). `tests/Pest.php`: `tests/Feature` için `beforeEach` ile `Http::preventStrayRequests()`; `Http::fake` kuran testler etkilenmez. `LlmConfigTest` sürücüyü `$_ENV` ile değiştirdiği için sabitlemeyle çakışırsa kendi değerini çakışmayacak biçimde verir. Yeni bir Feature test, test ortamında sürücünün `fake` olduğunu doğrular.
-- **Dosyalar:** `backend/phpunit.xml`, `backend/tests/Pest.php`, `backend/tests/Feature/*` (yeni küçük test), gerekirse `backend/tests/Unit/LlmConfigTest.php`, `DECISIONS.md`
+- **Dosyalar:** `backend/phpunit.xml`, `backend/tests/Pest.php`, `backend/tests/Feature/*` (yeni küçük test), gerekirse `backend/tests/Unit/LlmConfigTest.php`
 - **Bağımlı:** Faz 13
 - **Kabul:** `.env`'e dokunmadan, sahte değerle: `docker compose run --rm -e ANTHROPIC_API_KEY=not-a-real-key -e LLM_DRIVER=auto app vendor/bin/pest` tümü yeşil ve dışarıya istek yok; `make test` yeşil.
 
-### 14.3 Hız limitinin gönderen tarafta ölçülmesi · K17
+### 14.3 Hız limitinin gönderen tarafta ölçülmesi
 
 - **İş:**
   - **Ölçüm:** `ChannelRateLimiter` izin verdiği her çağrıyı Redis'te çağrı saniyesinin kovasına sayar ve kanal başına tepe değeri tek Lua betiğiyle tutar (mock'taki `RAISE_PEAK_SCRIPT` kalıbı). `/api/metrics`'e `send_peak_per_second{channel}` gauge'u eklenir. Mock provider `/stats`'a 429 ile reddedilen istek sayısı eklenir (`rate_limited`; limit kaynaklı ve enjekte edilen ayrı).
   - **Smoke:** `send_peak_per_second ≤ SEND_RATE_PER_SECOND` kontrolü eklenir ve sonuç tablosunda gösterilir. Provider'ın `peak_per_second` değeri yalnızca bilgi olarak kalır: kendi limitiyle sınırlı olduğu için kanıt değildir.
-  - **Karar noktası:** 3 ardışık smoke'ta tepe 100'ü aşarsa limiter kayan 1 sn pencereye geçer (Redis sorted set + Lua: son 1 sn'deki çağrı sayısı limitin altındaysa ekle); böylece herhangi bir 1 sn aralığında ≤100 olur. Aşmazsa limiter değişmez. Her iki durumda ölçüm sonucu K17'ye yazılır.
-- **Dosyalar:** `app/Delivery/ChannelRateLimiter.php`, `app/Metrics/PrometheusMetrics.php`, `mock-provider/src/{Application,Stats}.php`, `scripts/smoke.mjs`, Pest (backend ve mock), `DECISIONS.md` (K17)
+  - **Karar noktası:** 3 ardışık smoke'ta tepe 100'ü aşarsa limiter kayan 1 sn pencereye geçer (Redis sorted set + Lua: son 1 sn'deki çağrı sayısı limitin altındaysa ekle); böylece herhangi bir 1 sn aralığında ≤100 olur. Aşmazsa limiter değişmez. Ölçüm sonucu ve alınan karar `DECISIONS.md`'de belirtilir.
+- **Dosyalar:** `app/Delivery/ChannelRateLimiter.php`, `app/Metrics/PrometheusMetrics.php`, `mock-provider/src/{Application,Stats}.php`, `scripts/smoke.mjs`, Pest (backend ve mock)
 - **Bağımlı:** 8.4, 8.8, 9.3
 - **Kabul:** Integration (gerçek Redis): 250 alım sonrası tepe sayacı saniye kovalarıyla birebir; `/api/metrics` satırı Prometheus biçiminde. `make smoke` 3 ardışık koşuda yeşil; tabloda gönderen tepe/sn ≤100 ve `rate_limited` sütunu var; çıktı rapora eklenir.
 
@@ -879,7 +792,7 @@ Plan dışı faz: Faz 13 sonrası kodun case dosyasına karşı denetiminden gel
 - **İş:** README "Not done" listesine bonusların durumu: zamanlanmış gönderim, A/B varyantları, kullanıcının diline göre içerik (`customers.language` var, içerik yalnızca Türkçe) ve CI pipeline yapılmadı. Kurulum bloğunun 14.1 ile uyumu kontrol edilir. İsteğe bağlı: sen `.env`'e gerçek key koyup `docker compose exec app php artisan llm:eval` çalıştırırsın; Claude çıktıyı README'nin "LLM evaluation" bölümüne ekler (Claude `.env`'e erişmez).
 - **Dosyalar:** `README.md`
 - **Bağımlı:** 14.1–14.3
-- **Kabul:** Okuyarak onay; `node scripts/scrub-sessions.mjs --check` 0.
+- **Kabul:** Okuyarak onay; Faz 12–14 export'ları da eklenmiş ve `node scripts/scrub-sessions.mjs --check` 0.
 
 ---
 
