@@ -19,7 +19,7 @@
     </source>
     <php>
         <!-- Forced so the container's env_file (APP_ENV=local, the development database,
-             Redis db 0) can never leak into a test run (K4). These are <server> entries
+             Redis db 0) can never leak into a test run. These are <server> entries
              because Laravel reads $_SERVER before $_ENV. -->
         <server name="APP_ENV" value="testing" force="true"/>
         <server name="DB_CONNECTION" value="pgsql" force="true"/>
@@ -33,7 +33,7 @@
         <server name="LOG_CHANNEL" value="null" force="true"/>
         <!-- Tests queue their own fake LLM scenarios; the ready-made dev answers would hide a missing one. -->
         <server name="LLM_FAKE_DEV_SCENARIOS" value="false" force="true"/>
-        <!-- A key in the container's env_file must not turn a test run into real model calls (K28). -->
+        <!-- A key in the container's env_file must not turn a test run into real model calls. -->
         <server name="LLM_DRIVER" value="fake" force="true"/>
         <server name="ANTHROPIC_API_KEY" value="" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>

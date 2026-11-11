@@ -10,7 +10,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Turns a parsed SegmentRule into a query on customers (K7). Column names come only from FieldRegistry
+ * Turns a parsed SegmentRule into a query on customers. Column names come only from FieldRegistry
  * definitions and every rule value is a binding, so nothing from the LLM reaches the SQL text.
  */
 final class SegmentQueryCompiler

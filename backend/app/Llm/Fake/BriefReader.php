@@ -9,10 +9,10 @@ use App\Segment\FieldRegistry;
 use App\Segment\Operator;
 
 /**
- * Reads the audience filters a Turkish brief states in plain words, for the key-less fake (K25). It is a
+ * Reads the audience filters a Turkish brief states in plain words, for the key-less fake. It is a
  * handful of narrow patterns, not language understanding: when a phrase is not clear the filter is left
  * out, because a missing condition is a visible gap while a wrong one silently picks the wrong customers.
- * Allowed values come from the FieldRegistry (K7); every result still goes through SegmentRuleParser.
+ * Allowed values come from the FieldRegistry; every result still goes through SegmentRuleParser.
  *
  * @phpstan-type Condition array{field: string, operator: string, value: mixed}
  */
@@ -86,7 +86,7 @@ final class BriefReader
     }
 
     /**
-     * The details a message should repeat, so SMS and email carry the same facts (K25): the discount, a
+     * The details a message should repeat, so SMS and email carry the same facts: the discount, a
      * single city and the categories the brief names.
      *
      * @return array{discount: int|null, city: string|null, categories: list<string>}

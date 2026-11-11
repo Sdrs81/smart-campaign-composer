@@ -9,7 +9,7 @@ use App\Enums\Channel;
 use App\Segment\AudienceSummary;
 
 /**
- * Builds the prompt that asks for the campaign's SMS and email text (K10, K13). The fixed rules, limits
+ * Builds the prompt that asks for the campaign's SMS and email text. The fixed rules, limits
  * and variable list are the system prompt; everything that changes per campaign is the user message,
  * so the system prompt stays byte-identical between calls and can be cached.
  */

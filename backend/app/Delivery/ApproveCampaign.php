@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 
 /**
- * A person's approval (K15). The campaign lock makes two clicks at once into one approval. A repeat once
+ * A person's approval. The campaign lock makes two clicks at once into one approval. A repeat once
  * sending has started returns the current state; a repeat while the campaign is still "approved" pushes the
  * start job again, so a lost push is recovered by approving once more.
  */
@@ -42,7 +42,7 @@ final class ApproveCampaign
 
         if ($campaign->status->isApprovedOrLater()) {
             // Still "approved" means the job never started (for example the queue was down when the first
-            // request tried to push it). Pushing again is safe: StartCampaignJob is idempotent (K16).
+            // request tried to push it). Pushing again is safe: StartCampaignJob is idempotent.
             if ($campaign->status === CampaignStatus::Approved) {
                 StartCampaignJob::dispatch($campaign->id);
             }
@@ -66,7 +66,7 @@ final class ApproveCampaign
         return $campaign;
     }
 
-    /** The text is checked once more against the audience it will go to, with the same validator as every edit (K13). */
+    /** The text is checked once more against the audience it will go to, with the same validator as every edit. */
     private function assertContentValid(Campaign $campaign, AudienceSummary $audience): void
     {
         $problems = [];

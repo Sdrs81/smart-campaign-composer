@@ -22,7 +22,7 @@ it('reads the filters a brief states', function (string $brief, array $expected)
 
     expect($read)->toEqualCanonicalizing($expected);
 
-    // Whatever the reader finds must be something the real parser accepts (K7).
+    // Whatever the reader finds must be something the real parser accepts.
     if ($read !== []) {
         expect((new SegmentRuleParser(briefRegistry()))->parse(['version' => 1, 'conditions' => $read]))->toBeInstanceOf(SegmentRule::class);
     }

@@ -7,7 +7,7 @@ import { useContentStream } from '../composables/useContentStream'
 import EmailPreview from './EmailPreview.vue'
 import SmsPreview from './SmsPreview.vue'
 
-// When `autostart` turns true the content is written without a click (K26); `started` lets the page spend that request.
+// When `autostart` turns true the content is written without a click; `started` lets the page spend that request.
 const props = defineProps<{ campaign: Campaign; autostart?: boolean }>()
 const emit = defineEmits<{ completed: []; started: [] }>()
 const { t } = useI18n()

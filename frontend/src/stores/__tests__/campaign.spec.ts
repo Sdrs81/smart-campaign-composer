@@ -105,7 +105,7 @@ describe('campaign store', () => {
     expect(store.error).toBeNull()
   })
 
-  describe('automatic first content (K26)', () => {
+  describe('automatic first content', () => {
     const MESSAGE = { channel: 'sms', subject: null, body: 'Kayıtlı SMS', source: 'llm' } as const
 
     it('marks the campaign after its first successful extraction', async () => {

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Content;
 
 /**
- * Fills {{variable}} placeholders (K14). Every method makes one pass over the template, so cost is O(n);
+ * Fills {{variable}} placeholders. Every method makes one pass over the template, so cost is O(n);
  * a customer's value is inserted as plain text and never read as a placeholder again.
  */
 final class PersonalizationRenderer

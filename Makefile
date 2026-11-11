@@ -24,7 +24,7 @@ fresh: .env
 logs:
 	$(COMPOSE) logs -f --tail=100
 
-# Tests run inside Docker so the host needs no PHP or Node setup (K4).
+# Tests run inside Docker so the host needs no PHP or Node setup.
 test: test-backend test-mock test-frontend
 
 # The backend code is baked into the image (no bind mount), so rebuild first or the run tests stale code.

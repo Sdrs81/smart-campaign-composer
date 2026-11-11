@@ -9,7 +9,7 @@ use Closure;
 use Generator;
 
 /**
- * Server-sent frames for the live campaign status (K21): a snapshot only when it changed,
+ * Server-sent frames for the live campaign status: a snapshot only when it changed,
  * a comment heartbeat while it did not, and an end once the campaign is final or the
  * stream is old. The client's EventSource reconnects by itself after the `retry` delay.
  */

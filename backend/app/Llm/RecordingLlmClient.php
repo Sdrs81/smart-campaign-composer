@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * Decorator that writes one llm_calls row per call and leaves the wrapped client untouched (K11).
+ * Decorator that writes one llm_calls row per call and leaves the wrapped client untouched.
  * Exactly one row per call: a stream is recorded when it ends, fails or is abandoned.
  */
 final class RecordingLlmClient implements LlmClient

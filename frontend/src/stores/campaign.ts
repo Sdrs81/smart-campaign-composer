@@ -58,7 +58,7 @@ export const useCampaignStore = defineStore('campaign', () => {
   // True only between creating a campaign here and the page that opens it: that copy is newer than a
   // refetch and carries the extraction error. Every later visit must fetch, or it shows a stale copy.
   let adoptHeldCopy = false
-  // The campaign whose first content should start by itself (K26): set when an extraction succeeds on a
+  // The campaign whose first content should start by itself: set when an extraction succeeds on a
   // campaign without messages, spent by ContentStream when it starts. Kept in the store, not the
   // component, because a new campaign changes page between the extraction and the stream.
   const autoGenerateFor = ref<number | null>(null)
@@ -170,7 +170,7 @@ export const useCampaignStore = defineStore('campaign', () => {
       const extracted = await api.defineAudience(campaign.id, brief)
       current.value = extracted
       // Running the extraction is the click that asks for new text: the server has dropped the old text with
-      // the old audience, so the content is written again (K26). A campaign that still has text is left alone.
+      // the old audience, so the content is written again. A campaign that still has text is left alone.
       if (extracted.status === 'audience_ready' && (extracted.messages?.length ?? 0) === 0) {
         autoGenerateFor.value = extracted.id
       }

@@ -30,7 +30,7 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    // Global outbound limit per channel, shared by all workers (K17).
+    // Global outbound limit per channel, shared by all workers.
     'rate_per_second' => (int) env('SEND_RATE_PER_SECOND', 100),
 
     // Kept well under claim_timeout_seconds: a worker waits holding a claim, and a longer wait would let
@@ -43,7 +43,7 @@ return [
     'approval_lock_seconds' => 10,
     'approval_lock_wait_seconds' => 5,
 
-    // A delivery stuck in "sending" longer than this is taken over by another worker (K19 layer two).
+    // A delivery stuck in "sending" longer than this is taken over by another worker (second layer against double sends).
     'claim_timeout_seconds' => 60,
 
     'provider' => [
@@ -52,7 +52,7 @@ return [
         'timeout' => 3,
     ],
 
-    // Retry policy (K18): exponential backoff with full jitter, 429 honours Retry-After.
+    // Retry policy: exponential backoff with full jitter, 429 honours Retry-After.
     'retry' => [
         'max_attempts' => 5,
         'base_delay_ms' => 200,

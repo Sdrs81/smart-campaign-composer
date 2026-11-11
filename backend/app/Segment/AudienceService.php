@@ -6,7 +6,7 @@ namespace App\Segment;
 
 use App\Enums\Channel;
 
-/** Counts the audience of a rule in two queries: one aggregate scan and one sample (K8, K13). */
+/** Counts the audience of a rule in two queries: one aggregate scan and one sample. */
 final class AudienceService
 {
     private const SAMPLE_SIZE = 5;

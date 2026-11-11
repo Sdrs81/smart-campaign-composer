@@ -33,7 +33,7 @@ test('brief → audience → streamed content → edit → approve → dashboard
   })
 
   await test.step('content starts by itself and streams in', async () => {
-    // No click: the first content begins right after the audience (K26).
+    // No click: the first content begins right after the audience.
     await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible()
     await expect(page.getByText('Writing content…')).toBeVisible()
     await capture(page, '02-streaming')

@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Deterministic demo customers: the same Faker seed always yields the same rows (emails and
  * every random choice), only the dates shift with "now". Distributions are tuned for the
- * sample brief and for varied segment briefs (K5).
+ * sample brief and for varied segment briefs.
  */
 class CustomerSeeder extends Seeder
 {

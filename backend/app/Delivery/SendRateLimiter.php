@@ -7,7 +7,7 @@ namespace App\Delivery;
 use App\Enums\Channel;
 
 /**
- * The per-channel outbound limit a send waits on (K17). The send job depends on this interface so its tests can
+ * The per-channel outbound limit a send waits on. The send job depends on this interface so its tests can
  * use a limiter whose state does not hang on the clock; ChannelRateLimiter is the Redis implementation.
  */
 interface SendRateLimiter

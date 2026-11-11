@@ -8,7 +8,7 @@ use App\Content\MessageContent;
 
 /**
  * What ContentGenerator tells its consumer, one event at a time. The three types are the names of the
- * server-sent events the endpoint will send (K12).
+ * server-sent events the endpoint will send.
  */
 final readonly class ContentEvent
 {

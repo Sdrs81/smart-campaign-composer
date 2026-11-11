@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Plain PHP built-in server with parallel workers; no framework (K20).
+# Plain PHP built-in server with parallel workers; no framework.
 FROM php:8.4-cli-alpine
 
 COPY --from=ghcr.io/mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/

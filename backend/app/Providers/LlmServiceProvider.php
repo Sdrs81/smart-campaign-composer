@@ -36,13 +36,13 @@ class LlmServiceProvider extends ServiceProvider
         $this->app->singleton(LlmClient::class, fn (): LlmClient => $this->resolveClient());
 
         // LlmClient stays the raw client so tests can queue scenarios on the fake. Classes that must
-        // write the call log (K11) ask for RecordingLlmClient, which wraps that same shared instance.
+        // write the call log ask for RecordingLlmClient, which wraps that same shared instance.
         $this->app->singleton(RecordingLlmClient::class, fn (Application $app): RecordingLlmClient => new RecordingLlmClient(
             $app->make(LlmClient::class),
             config('llm.driver') === 'fake' ? self::FAKE_MODEL_NAME : (string) config('llm.anthropic.model'),
         ));
 
-        // Built here instead of autowired: it needs the logging client and config values (K11).
+        // Built here instead of autowired: it needs the logging client and config values.
         $this->app->bind(SegmentExtractor::class, fn (Application $app): SegmentExtractor => new SegmentExtractor(
             $app->make(RecordingLlmClient::class),
             $app->make(SegmentPrompt::class),
@@ -62,7 +62,7 @@ class LlmServiceProvider extends ServiceProvider
         ));
     }
 
-    // config/llm.php only resolves; an invalid combination fails here, loudly (K9).
+    // config/llm.php only resolves; an invalid combination fails here, loudly.
     private function resolveClient(): LlmClient
     {
         $driver = (string) config('llm.driver');
@@ -78,7 +78,7 @@ class LlmServiceProvider extends ServiceProvider
 
     /**
      * Counts content requests per brief in the cache (Redis in the running app), because every request is
-     * served by a fresh process and an in-memory count would always read 1 (K25).
+     * served by a fresh process and an in-memory count would always read 1.
      *
      * @return Closure(string): int
      */

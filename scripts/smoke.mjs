@@ -50,7 +50,7 @@ async function providerRequest(method, path) {
   return JSON.parse(await compose("exec", "-T", "app", "php", "-r", code));
 }
 
-// The sender's own peak is what proves the limit (K17): the provider's peak is capped by its own limit, so it
+// The sender's own peak is what proves the limit: the provider's peak is capped by its own limit, so it
 // would look fine even if we sent too fast. It lives in Redis across runs, so it is cleared with the provider stats.
 async function resetSenderPeak() {
   await compose(

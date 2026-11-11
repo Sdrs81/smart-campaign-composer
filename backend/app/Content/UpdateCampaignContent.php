@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * A person's edit of the generated text. It goes through the same ContentValidator as model output (K13),
+ * A person's edit of the generated text. It goes through the same ContentValidator as model output,
  * and is only possible while the campaign waits for approval.
  */
 final class UpdateCampaignContent

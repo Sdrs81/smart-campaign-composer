@@ -12,7 +12,7 @@ use Closure;
 use LogicException;
 
 /**
- * Ready-made answers for running the app without an API key (K9). The scenario is chosen by keywords in
+ * Ready-made answers for running the app without an API key. The scenario is chosen by keywords in
  * the brief, from the fixtures in resources/llm-fixtures; a brief that matches none gets the generic one.
  * Fixtures are read in file-name order and the first keyword match wins.
  *
@@ -76,7 +76,7 @@ final class DevScenarios
     /**
      * One ready-made SMS + email pair of the brief's scenario. Both texts are written with the same
      * %OFFER% slot, filled once from the brief (discount, single city, categories), so the key facts are
-     * the same in the SMS and the email by construction (K25). A fact the brief does not state falls back
+     * the same in the SMS and the email by construction. A fact the brief does not state falls back
      * to the variant's own default offer; city names are never written into the fixtures.
      *
      * @return array{sms: array{body: string}, email: array{subject: string, body: string}}

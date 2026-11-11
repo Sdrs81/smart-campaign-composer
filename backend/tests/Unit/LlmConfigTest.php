@@ -6,7 +6,7 @@ declare(strict_types=1);
 function llmConfig(string $driver, string $apiKey): array
 {
     $names = ['LLM_DRIVER', 'ANTHROPIC_API_KEY'];
-    // $_ENV and $_SERVER are kept apart: phpunit.xml pins these names in $_SERVER only (K28), and the
+    // $_ENV and $_SERVER are kept apart: phpunit.xml pins these names in $_SERVER only, and the
     // Feature tests that run later need that value back.
     $previousEnv = array_intersect_key($_ENV, array_flip($names));
     $previousServer = array_intersect_key($_SERVER, array_flip($names));

@@ -92,7 +92,7 @@ export interface Preview {
   messages: PreviewMessage[]
 }
 
-// Mirrors App\Delivery\DeliveryErrorCode (K24); the dashboard explains each one in plain language.
+// Mirrors App\Delivery\DeliveryErrorCode; the dashboard explains each one in plain language.
 export const DELIVERY_ERROR_CODES = [
   'consent_withdrawn',
   'provider_unreachable',

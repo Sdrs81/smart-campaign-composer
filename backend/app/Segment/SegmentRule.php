@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Segment;
 
-/** Conditions joined by AND (K6). Built only by SegmentRuleParser, so an invalid rule cannot exist. */
+/** Conditions joined by AND. Built only by SegmentRuleParser, so an invalid rule cannot exist. */
 final readonly class SegmentRule
 {
     public const VERSION = 1;
